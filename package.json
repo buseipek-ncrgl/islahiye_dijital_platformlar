@@ -1,0 +1,23 @@
+{
+  "name": "islahiye-dijital-platformlar",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:gastronomi": "npm run dev --workspace=apps/gastronomi",
+    "dev:egitim": "npm run dev --workspace=apps/egitim",
+    "build:gastronomi": "npm run build --workspace=apps/gastronomi",
+    "build:egitim": "npm run build --workspace=apps/egitim",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "keywords": [
+    "islahiye",
+    "gastronomi",
+    "egitim",
+    "monorepo"
+  ],
+  "author": "İslahiye Ticaret Odası",
+  "license": "UNLICENSED"
+}

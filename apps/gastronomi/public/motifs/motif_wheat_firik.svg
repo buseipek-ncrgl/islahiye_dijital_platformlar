@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Central curving arched stalk (rachis) -->
+  <path d="M 82 192 C 92 160, 102 120, 105 28" stroke-width="2.0"/>
+  <path d="M 84 192 C 94 162, 103 124, 106 50" stroke-width="0.8" opacity="0.4" stroke-dasharray="2 3"/>
+
+  <!-- Long radiating awns (kılçıklar) shooting upwards -->
+  <!-- Topmost awns -->
+  <line x1="105" y1="30" x2="106" y2="10" stroke-width="1.2"/>
+  <line x1="102" y1="36" x2="92" y2="14" stroke-width="1.1"/>
+  <line x1="108" y1="36" x2="120" y2="14" stroke-width="1.1"/>
+
+  <!-- Spikelet 1 (Top Left) -->
+  <g class="spikelet">
+    <path d="M 104 38 C 96 34, 88 38, 92 46 C 98 48, 104 44, 104 38 Z" fill="currentColor" fill-opacity="0.15" stroke-width="1.4"/>
+    <line x1="90" y1="38" x2="72" y2="20" stroke-width="1.0"/>
+    <path d="M 98 40 L 93 45 M 101 42 L 96 47" stroke-width="0.6" opacity="0.6"/>
+  </g>
+
+  <!-- Spikelet 2 (Top Right) -->
+  <g class="spikelet">
+    <path d="M 105 45 C 114 41, 122 45, 118 53 C 112 55, 105 51, 105 45 Z" fill="currentColor" fill-opacity="0.15" stroke-width="1.4"/>
+    <line x1="120" y1="45" x2="138" y2="26" stroke-width="1.0"/>
+    <path d="M 112 47 L 117 52 M 109 49 L 114 54" stroke-width="0.6" opacity="0.6"/>
+  </g>
+
+  <!-- Spikelet 3 (Upper Left) -->
+  <g class="spikelet">
+    <path d="M 103 54 C 94 50, 85 54, 89 63 C 96 65, 103 61, 103 54 Z" fill="currentColor" fill-opacity="0.18" stroke-width="1.4"/>
+    <line x1="87" y1="54" x2="65" y2="34" stroke-width="1.1"/>
+    <path d="M 97 56 L 90 62 M 100 58 L 94 64 M 93 54 L 88 59" stroke-width="0.6" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 4 (Upper Right) -->
+  <g class="spikelet">
+    <path d="M 104 62 C 114 58, 123 62, 119 71 C 111 73, 104 62, 104 62 Z" fill="currentColor" fill-opacity="0.18" stroke-width="1.4"/>
+    <line x1="121" y1="62" x2="145" y2="42" stroke-width="1.1"/>
+    <path d="M 111 64 L 118 70 M 108 66 L 115 72 M 115 62 L 120 67" stroke-width="0.6" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 5 (Mid Left) -->
+  <g class="spikelet">
+    <path d="M 102 72 C 92 68, 83 72, 87 82 C 95 84, 102 80, 102 72 Z" fill="currentColor" fill-opacity="0.20" stroke-width="1.5"/>
+    <line x1="85" y1="72" x2="60" y2="50" stroke-width="1.1"/>
+    <path d="M 96 74 L 88 81 M 99 76 L 92 83 M 92 72 L 86 78" stroke-width="0.7" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 6 (Mid Right) -->
+  <g class="spikelet">
+    <path d="M 103 80 C 114 76, 124 80, 120 90 C 111 92, 103 88, 103 80 Z" fill="currentColor" fill-opacity="0.20" stroke-width="1.5"/>
+    <line x1="122" y1="80" x2="148" y2="58" stroke-width="1.1"/>
+    <path d="M 110 82 L 118 89 M 107 84 L 115 91 M 116 80 L 121 86" stroke-width="0.7" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 7 (Lower Left) -->
+  <g class="spikelet">
+    <path d="M 101 91 C 91 87, 81 91, 85 101 C 94 103, 101 99, 101 91 Z" fill="currentColor" fill-opacity="0.22" stroke-width="1.5"/>
+    <line x1="83" y1="91" x2="56" y2="68" stroke-width="1.1"/>
+    <path d="M 95 93 L 86 100 M 98 95 L 90 102 M 91 91 L 84 97" stroke-width="0.7" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 8 (Lower Right) -->
+  <g class="spikelet">
+    <path d="M 102 99 C 113 95, 123 99, 118 109 C 110 111, 102 107, 102 99 Z" fill="currentColor" fill-opacity="0.22" stroke-width="1.5"/>
+    <line x1="120" y1="99" x2="148" y2="76" stroke-width="1.1"/>
+    <path d="M 109 101 L 117 108 M 106 103 L 114 110 M 115 99 L 120 105" stroke-width="0.7" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 9 (Bottom Left) -->
+  <g class="spikelet">
+    <path d="M 99 110 C 90 106, 81 110, 85 119 C 93 121, 99 117, 99 110 Z" fill="currentColor" fill-opacity="0.22" stroke-width="1.5"/>
+    <line x1="83" y1="110" x2="58" y2="88" stroke-width="1.0"/>
+    <path d="M 93 112 L 86 118 M 96 114 L 89 120" stroke-width="0.6" opacity="0.7"/>
+  </g>
+
+  <!-- Spikelet 10 (Bottom Right) -->
+  <g class="spikelet">
+    <path d="M 100 118 C 110 114, 119 118, 115 127 C 108 129, 100 125, 100 118 Z" fill="currentColor" fill-opacity="0.22" stroke-width="1.5"/>
+    <line x1="117" y1="118" x2="142" y2="96" stroke-width="1.0"/>
+    <path d="M 107 120 L 114 126 M 104 122 L 111 128" stroke-width="0.6" opacity="0.7"/>
+  </g>
+
+  <!-- Graceful Flag Leaf at Base -->
+  <g class="flag-leaf">
+    <path d="M 96 142 C 78 135, 58 115, 52 90 C 66 106, 84 128, 96 142 Z" fill="currentColor" fill-opacity="0.10" stroke-width="1.3"/>
+    <path d="M 96 142 Q 74 118 52 90" stroke-width="0.8"/>
+    <path d="M 82 134 L 75 125 M 74 124 L 67 115 M 66 114 L 59 105" stroke-width="0.6" opacity="0.5"/>
+  </g>
+</svg>

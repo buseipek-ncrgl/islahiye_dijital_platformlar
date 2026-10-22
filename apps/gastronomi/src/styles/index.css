@@ -1,0 +1,26 @@
+@import 'leaflet/dist/leaflet.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+:root {
+  --color-forest: #203B31;
+  --color-ivory: #F6F2E9;
+  --color-copper: #BA855E;
+  --color-sand: #DCCAB2;
+  --color-charcoal: #242724;
+  --color-paper: #FFFCF7;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-ivory);
+    color: var(--color-charcoal);
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+}

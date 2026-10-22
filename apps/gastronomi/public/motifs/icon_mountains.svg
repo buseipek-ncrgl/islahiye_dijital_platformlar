@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Amanos Dağları Sıradağları (Lezzet Haritası / Gastronomi Seyahatnamesi) -->
+  <!-- Background distant peaks -->
+  <path d="M 12 52 L 28 32 L 40 44 L 54 26 L 68 40 L 82 22 L 96 38 L 110 52" stroke-width="1.2" opacity="0.5"/>
+  <!-- Primary prominent ridge & peaks -->
+  <!-- Peak 1 (Left-Center) -->
+  <path d="M 2 54 L 24 36 L 42 16 L 62 42 L 72 32 L 92 12 L 108 34 L 118 54" stroke-width="1.8"/>
+  <!-- Ridge crest lines -->
+  <path d="M 42 16 L 38 32 L 34 54" stroke-width="1.2"/>
+  <path d="M 92 12 L 88 30 L 84 54" stroke-width="1.2"/>
+  <!-- Sunken pass between main massifs -->
+  <path d="M 62 42 L 66 54" stroke-width="1.0" opacity="0.7"/>
+
+  <!-- Left flank shading (Hatching on shaded slopes) -->
+  <path d="M 42 16 L 46 22 M 40 22 L 48 30 M 38 28 L 52 40 M 36 36 L 56 52 M 35 44 L 52 54" stroke-width="0.8" opacity="0.65"/>
+  <path d="M 24 36 L 28 42 M 22 42 L 30 50 M 18 46 L 26 54" stroke-width="0.7" opacity="0.6"/>
+
+  <!-- Right peak shading -->
+  <path d="M 92 12 L 96 18 M 90 18 L 100 28 M 88 26 L 104 38 M 86 34 L 106 48 M 85 42 L 104 54" stroke-width="0.8" opacity="0.65"/>
+  <path d="M 72 32 L 76 38 M 70 38 L 80 48 M 68 46 L 76 54" stroke-width="0.7" opacity="0.6"/>
+
+  <!-- Foothill contours / plateau horizontal dashes -->
+  <path d="M 8 56 Q 30 52 60 55 T 112 56" stroke-width="1.4"/>
+  <path d="M 14 60 Q 40 57 75 59 T 106 60" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 24 64 L 96 64" stroke-width="0.8" stroke-dasharray="3 3" opacity="0.5"/>
+
+  <!-- Little tree / shrub silhouettes at valley floor -->
+  <path d="M 18 54 L 18 51 M 30 53 L 30 49 M 58 54 L 58 50 M 80 54 L 80 50 M 102 55 L 102 51" stroke-width="1.2" opacity="0.6"/>
+</svg>

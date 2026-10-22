@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 75" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Taş Fırın Kemer Kapı / Geleneksel Ocak Taş Mimarisi (Mutfak Mirası) -->
+  <!-- Outer stone structure roof / cornice -->
+  <path d="M 12 24 L 98 24" stroke-width="2.0"/>
+  <path d="M 8 20 L 102 20" stroke-width="1.4"/>
+  <path d="M 16 16 L 94 16" stroke-width="1.0" opacity="0.6"/>
+
+  <!-- Left & right outer stone wall edges -->
+  <path d="M 14 24 L 14 68 L 96 68 L 96 24" stroke-width="2.0"/>
+  <!-- Base plinth -->
+  <path d="M 10 68 L 100 68" stroke-width="2.4"/>
+
+  <!-- Central arch opening (Hearth / Taş fırın kemer ağzı) -->
+  <path d="M 36 68 L 36 44 C 36 32, 74 32, 74 44 L 74 68" stroke-width="2.2" fill="currentColor" fill-opacity="0.12"/>
+  <path d="M 40 68 L 40 46 C 40 37, 70 37, 70 46 L 70 68" stroke-width="1.2" opacity="0.7"/>
+
+  <!-- Arch voussoirs (Kemer kilit taşları) -->
+  <path d="M 55 24 L 55 33" stroke-width="1.4"/>
+  <path d="M 46 26 L 49 35" stroke-width="1.2"/>
+  <path d="M 64 26 L 61 35" stroke-width="1.2"/>
+  <path d="M 38 31 L 44 38" stroke-width="1.2"/>
+  <path d="M 72 31 L 66 38" stroke-width="1.2"/>
+  <path d="M 33 38 L 38 43" stroke-width="1.2"/>
+  <path d="M 77 38 L 72 43" stroke-width="1.2"/>
+
+  <!-- Ashlar stone courses (Horizontal and vertical stone joints) -->
+  <!-- Left wall blocks -->
+  <path d="M 14 34 L 35 34" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 14 44 L 36 44" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 14 56 L 36 56" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 24 24 L 24 34 M 20 34 L 20 44 M 28 44 L 28 56 M 22 56 L 22 68" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- Right wall blocks -->
+  <path d="M 75 34 L 96 34" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 74 44 L 96 44" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 74 56 L 96 56" stroke-width="1.0" opacity="0.7"/>
+  <path d="M 86 24 L 86 34 M 82 34 L 82 44 M 90 44 L 90 56 M 84 56 L 84 68" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- Warm flame/glow indication inside oven hearth -->
+  <path d="M 50 64 C 50 56, 55 52, 55 52 C 55 52, 60 56, 60 64" stroke-width="1.2" opacity="0.8"/>
+  <circle cx="55" cy="58" r="1.5" fill="currentColor" opacity="0.8"/>
+  <!-- Floor stone steps -->
+  <path d="M 32 64 L 78 64" stroke-width="1.0" opacity="0.5"/>
+</svg>

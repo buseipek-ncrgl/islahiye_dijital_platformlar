@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 75" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Toprak Güveç Çanağı (Yöresel Lezzetler) -->
+  <!-- Bowl rim and opening -->
+  <ellipse cx="55" cy="24" rx="42" ry="10" stroke-width="1.8" fill="#FFFDF8" fill-opacity="0.5"/>
+  <ellipse cx="55" cy="24" rx="38" ry="7.5" stroke-width="1.0" stroke-dasharray="2 2" opacity="0.6"/>
+  <!-- Food / grains inside bowl -->
+  <path d="M 22 24 C 28 17, 40 16, 50 20 C 58 14, 72 16, 88 24" stroke-width="1.2" opacity="0.8"/>
+  <circle cx="36" cy="21" r="1.5" fill="currentColor"/>
+  <circle cx="48" cy="19" r="1.5" fill="currentColor"/>
+  <circle cx="62" cy="19" r="1.5" fill="currentColor"/>
+  <circle cx="74" cy="22" r="1.5" fill="currentColor"/>
+  <!-- Spoon / ladle handle resting in bowl -->
+  <path d="M 20 12 L 35 25" stroke-width="2.2"/>
+  <ellipse cx="18" cy="10" rx="3.5" ry="2" transform="rotate(-30 18 10)" stroke-width="1.4"/>
+  <!-- Bowl body -->
+  <path d="M 13 24 C 15 48, 28 62, 55 62 C 82 62, 95 48, 97 24" stroke-width="2.0" fill="currentColor" fill-opacity="0.08"/>
+  <!-- Foot / base -->
+  <path d="M 36 62 L 34 66 C 34 68, 76 68, 76 66 L 74 62" stroke-width="1.6"/>
+  <!-- Woodcut horizontal shading lines on bowl curvature -->
+  <path d="M 22 34 Q 55 42 88 34" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 25 40 Q 55 48 85 40" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 30 46 Q 55 54 80 46" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 36 52 Q 55 58 74 52" stroke-width="0.8" opacity="0.6"/>
+  <!-- Fine vertical hatching on lower left shadow -->
+  <path d="M 20 28 L 22 36 M 23 35 L 25 43 M 28 42 L 31 50 M 34 49 L 38 56" stroke-width="0.7" opacity="0.7"/>
+</svg>

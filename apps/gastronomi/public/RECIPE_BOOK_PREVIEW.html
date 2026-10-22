@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İslahiye Lezzet Atlası — Tarif Atölyesi: Yöresel Eskitme Açık Gastronomi Kitabı</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-forest: #203B31;
+      --color-forest-dark: #162721;
+      --color-ivory: #F6F2E9;
+      --color-paper: #FBF8F1;
+      --color-copper: #BA855E;
+      --color-copper-dark: #936645;
+      --color-sand: #DCCAB2;
+      --color-charcoal: #242724;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #EFE8DA;
+      color: var(--color-charcoal);
+      font-family: 'Manrope', -apple-system, sans-serif;
+      line-height: 1.5;
+      padding-bottom: 80px;
+    }
+
+    .font-serif {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Outer Wrapper */
+    .stage-wrapper {
+      max-width: 1520px;
+      margin: 0 auto;
+      padding: 24px 28px;
+    }
+
+    /* Top Section Header */
+    .top-editorial-header {
+      position: relative;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .header-left-col {
+      max-width: 620px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--color-copper-dark);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .main-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 46px;
+      font-weight: 700;
+      color: var(--color-forest);
+      line-height: 1.08;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+
+    .main-subtitle {
+      font-size: 14.5px;
+      color: rgba(36, 39, 36, 0.8);
+      line-height: 1.55;
+    }
+
+    .header-right-quote {
+      max-width: 380px;
+      text-align: right;
+      position: relative;
+      z-index: 2;
+    }
+
+    .quote-text {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 19px;
+      color: var(--color-copper-dark);
+      line-height: 1.35;
+      margin-bottom: 4px;
+    }
+
+    .quote-branch-icon {
+      font-size: 16px;
+      opacity: 0.7;
+      display: inline-block;
+    }
+
+    /* ============================================================== */
+    /* MASTER REGIONAL VINTAGE STAGE                                  */
+    /* ============================================================== */
+    .regional-stage {
+      position: relative;
+      background: #E8DECC url('/images/hero_parchment_bg.jpg') center/cover;
+      padding: 36px 28px 44px;
+      border-radius: 6px;
+      border: 1px solid rgba(186, 133, 94, 0.35);
+      box-shadow: 0 16px 40px rgba(35, 25, 18, 0.16);
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 24px;
+      align-items: center;
+      min-height: 720px;
+    }
+
+    /* Background Mountain Engraving */
+    .bg-mountain-panorama {
+      position: absolute;
+      top: 8px;
+      left: 54%;
+      transform: translateX(-50%);
+      width: 720px;
+      opacity: 0.38;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Left Olive Flourish */
+    .bg-left-olive {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      width: 140px;
+      opacity: 0.32;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ============================================================== */
+    /* SOL YAN: POPÜLER TARİFLER KARTI                                */
+    /* ============================================================== */
+    .sidebar-card-container {
+      position: relative;
+      z-index: 10;
+      background: #F9F4EB url('/images/recipe_sidebar_card_bg.png') center/100% 100% no-repeat;
+      padding: 22px 14px 22px 16px;
+      border-radius: 4px;
+      box-shadow: 0 10px 28px rgba(30, 20, 10, 0.18);
+      border: 1px solid rgba(220, 202, 178, 0.6);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 610px;
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      margin-bottom: 10px;
+      border-bottom: 1px dashed rgba(220, 202, 178, 0.8);
+    }
+
+    .sidebar-header-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-forest);
+    }
+
+    .sidebar-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .sidebar-item:hover {
+      background: rgba(246, 242, 233, 0.85);
+      border-color: rgba(220, 202, 178, 0.6);
+    }
+
+    .sidebar-item.active {
+      background: rgba(255, 252, 247, 0.98);
+      border: 1px solid var(--color-copper);
+      box-shadow: 0 2px 6px rgba(186, 133, 94, 0.2);
+    }
+
+    .sidebar-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 4px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid rgba(186, 133, 94, 0.4);
+    }
+
+    .sidebar-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-recipe-name {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--color-forest);
+      line-height: 1.15;
+    }
+
+    .sidebar-arrow {
+      color: var(--color-copper);
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    .sidebar-item.active .sidebar-arrow {
+      opacity: 1;
+      transform: translateX(2px);
+    }
+
+    .sidebar-all-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--color-copper-dark);
+      text-decoration: underline;
+      cursor: pointer;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(220, 202, 178, 0.6);
+    }
+
+    /* ============================================================== */
+    /* MERKEZ: AÇIK KİTAP (OPEN COOKBOOK STAGE)                       */
+    /* ============================================================== */
+    .book-wrapper {
+      position: relative;
+      z-index: 10;
+      background: url('/images/recipe_book_isolated_shell.png') center/100% 100% no-repeat;
+      min-height: 620px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      box-shadow: 0 16px 40px rgba(25, 18, 10, 0.28);
+      border-radius: 4px;
+    }
+
+    /* -------------------------------------------------------------- */
+    /* SOL SAYFA İÇERİĞİ                                              */
+    /* -------------------------------------------------------------- */
+    .book-left-page {
+      padding: 24px 34px 26px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      z-index: 10;
+    }
+
+    .left-photo-container {
+      width: 100%;
+      height: 195px;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(186, 133, 94, 0.5);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+      margin-bottom: 12px;
+    }
+
+    .left-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .left-recipe-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--color-forest);
+      line-height: 1.08;
+      letter-spacing: -0.01em;
+      margin-bottom: 6px;
+    }
+
+    .left-recipe-desc {
+      font-size: 12.5px;
+      color: rgba(36, 39, 36, 0.85);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    /* Metadata Bar */
+    .left-meta-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 8px 10px;
+      background: rgba(246, 242, 233, 0.7);
+      border: 1px solid rgba(220, 202, 178, 0.7);
+      border-radius: 3px;
+      margin-bottom: 12px;
+    }
+
+    .left-meta-col {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .left-meta-icon {
+      font-size: 14px;
+      opacity: 0.85;
+    }
+
+    .left-meta-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .left-meta-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      text-transform: uppercase;
+      color: rgba(36, 39, 36, 0.5);
+    }
+
+    .left-meta-val {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-forest);
+    }
+
+    /* Portion Row */
+    .left-portion-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .left-portion-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-copper-dark);
+      font-weight: 700;
+    }
+
+    .left-portion-pills {
+      display: flex;
+      gap: 6px;
+    }
+
+    .portion-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 13px;
+      border: 1px solid rgba(220, 202, 178, 0.8);
+      background: rgba(255, 252, 247, 0.85);
+      color: var(--color-charcoal);
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .portion-btn.active {
+      background: var(--color-forest);
+      color: var(--color-ivory);
+      border-color: var(--color-forest);
+      box-shadow: 0 1px 3px rgba(32, 59, 49, 0.2);
+    }
+
+    /* -------------------------------------------------------------- */
+    /* SAĞ SAYFA İÇERİĞİ                                              */
+    /* -------------------------------------------------------------- */
+    .book-right-page {
+      padding: 24px 48px 26px 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Stepper Navigation */
+    .stepper-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .stepper-left-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .step-counter-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--color-copper-dark);
+      font-weight: 700;
+    }
+
+    .stepper-dots-track {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stepper-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(220, 202, 178, 0.9);
+    }
+
+    .stepper-dot.active {
+      width: 9px;
+      height: 9px;
+      background: var(--color-forest);
+      box-shadow: 0 0 0 2px rgba(32, 59, 49, 0.2);
+    }
+
+    .stepper-dot.completed {
+      background: var(--color-copper);
+    }
+
+    .stepper-line {
+      width: 10px;
+      height: 1px;
+      background: rgba(220, 202, 178, 0.9);
+    }
+
+    .stepper-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .stepper-circle-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1px solid rgba(186, 133, 94, 0.5);
+      background: rgba(255, 252, 247, 0.85);
+      color: var(--color-charcoal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .stepper-circle-btn:hover {
+      background: var(--color-forest);
+      color: var(--color-ivory);
+      border-color: var(--color-forest);
+    }
+
+    /* Right Step Title & Instruction */
+    .right-step-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 25px;
+      font-weight: 700;
+      color: var(--color-forest);
+      line-height: 1.15;
+      margin-bottom: 5px;
+    }
+
+    .right-step-instruction {
+      font-size: 13px;
+      color: rgba(36, 39, 36, 0.85);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    /* Right Step Skillet Photo */
+    .step-photo-wrap {
+      width: 100%;
+      height: 165px;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(186, 133, 94, 0.4);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      margin-bottom: 10px;
+    }
+
+    .step-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Chef Tip Box */
+    .chef-tip-container {
+      display: flex;
+      gap: 10px;
+      padding: 9px 12px;
+      background: rgba(246, 242, 233, 0.75);
+      border-left: 2px solid var(--color-copper);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    .chef-tip-icon {
+      font-size: 15px;
+      color: var(--color-copper);
+      flex-shrink: 0;
+    }
+
+    .chef-tip-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-copper-dark);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .chef-tip-content {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 13px;
+      color: var(--color-charcoal);
+      line-height: 1.35;
+    }
+
+    /* Ingredients Used In This Step */
+    .step-ingredients-section {
+      margin-top: 2px;
+    }
+
+    .step-ingredients-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-copper-dark);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .step-ingredients-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+    }
+
+    .step-ing-card {
+      background: rgba(255, 252, 247, 0.85);
+      border: 1px solid rgba(220, 202, 178, 0.7);
+      border-radius: 3px;
+      padding: 5px 3px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .step-ing-icon {
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+
+    .step-ing-name {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--color-forest);
+      line-height: 1.1;
+      margin-bottom: 1px;
+    }
+
+    .step-ing-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5px;
+      color: var(--color-copper-dark);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage-wrapper">
+    
+    <!-- Top Editorial Header & Right Quote -->
+    <header class="top-editorial-header">
+      <div class="header-left-col">
+        <div class="eyebrow">TARİF ATÖLYESİ • İSLAHİYE MUTFAĞI</div>
+        <h1 class="main-title">Tarif Atölyesi</h1>
+        <p class="main-subtitle">
+          İslahiye'nin özgün tatlarını adım adım keşfedin. Yöresel tarifler, ustaların püf noktaları ve 
+          kültürel hikâyeleriyle mutfağımız şimdi sizin mutfağınızda.
+        </p>
+      </div>
+
+      <div class="header-right-quote">
+        <p class="quote-text">
+          “Her tarif, bu toprakların hafızasından sofralarımıza uzanan bir hikâyedir.”
+        </p>
+        <span class="quote-branch-icon">🌾</span>
+      </div>
+    </header>
+
+    <!-- Master Regional Vintage Stage -->
+    <main class="regional-stage">
+      
+      <!-- Ambient Mountain & Olive Engravings -->
+      <img src="/images/mountain_landscape_clean.png" alt="" class="bg-mountain-panorama">
+      <img src="/motifs/ribbon_olive_flourish.png" alt="" class="bg-left-olive">
+
+      <!-- ============================================================== -->
+      <!-- SOL YAN: POPÜLER TARİFLER KARTI (Parchment Bookmark Flap)      -->
+      <!-- ============================================================== -->
+      <aside class="sidebar-card-container">
+        <div>
+          <div class="sidebar-header">
+            <div class="sidebar-header-title">
+              <span>🍲</span>
+              <span>Popüler Tarifler</span>
+            </div>
+            <span style="font-size: 12px; color: var(--color-copper); font-weight: bold;">›</span>
+          </div>
+
+          <ul class="sidebar-list">
+            <li class="sidebar-item active">
+              <img src="/images/islahiye_tava.jpg" alt="İslahiye Tavası" class="sidebar-thumb">
+              <div class="sidebar-info">
+                <div class="sidebar-recipe-name">Geleneksel İslahiye Tavası</div>
+              </div>
+              <span class="sidebar-arrow">›</span>
+            </li>
+
+            <li class="sidebar-item">
+              <img src="/images/firik_pilavi.jpg" alt="Firik Pilavı" class="sidebar-thumb">
+              <div class="sidebar-info">
+                <div class="sidebar-recipe-name">Firik Pilavı</div>
+              </div>
+              <span class="sidebar-arrow">›</span>
+            </li>
+
+            <li class="sidebar-item">
+              <img src="/images/semsek_boregi.jpg" alt="İslahiye Semseği" class="sidebar-thumb">
+              <div class="sidebar-info">
+                <div class="sidebar-recipe-name">İslahiye Semseği</div>
+              </div>
+              <span class="sidebar-arrow">›</span>
+            </li>
+
+            <li class="sidebar-item">
+              <img src="/images/islahiye_kombesi.jpg" alt="İslahiye Kömbesi" class="sidebar-thumb">
+              <div class="sidebar-info">
+                <div class="sidebar-recipe-name">İslahiye Kömbesi</div>
+              </div>
+              <span class="sidebar-arrow">›</span>
+            </li>
+
+            <li class="sidebar-item">
+              <img src="/images/islahiye_biberi.jpg" alt="Biber Salçası" class="sidebar-thumb">
+              <div class="sidebar-info">
+                <div class="sidebar-recipe-name">Biber Salçası</div>
+              </div>
+              <span class="sidebar-arrow">›</span>
+            </li>
+
+            <li class="sidebar-item">
+              <img src="/images/incir_tatlisi.jpg" alt="İncir Tatlısı" class="sidebar-thumb">
+              <div class="sidebar-info">
+                <div class="sidebar-recipe-name">Kıymalı Dolma</div>
+              </div>
+              <span class="sidebar-arrow">›</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-all-link">
+          <span>Tüm Tarifler</span>
+          <span>→</span>
+        </div>
+      </aside>
+
+      <!-- ============================================================== -->
+      <!-- MERKEZ: AÇIK KİTAP (OPEN COOKBOOK STAGE)                       -->
+      <!-- ============================================================== -->
+      <section class="book-wrapper">
+
+        <!-- ------------------------------------------------------------ -->
+        <!-- SOL SAYFA: FOTOĞRAF, REÇETE ANLATISI & PORSiYON             -->
+        <!-- ------------------------------------------------------------ -->
+        <article class="book-left-page">
+          
+          <div>
+            <!-- Top Large Finished Dish Photo -->
+            <div class="left-photo-container">
+              <img src="/images/islahiye_tava.jpg" alt="Taş fırında pişen İslahiye Tavası" class="left-photo">
+            </div>
+
+            <!-- Title & Narrative -->
+            <h2 class="left-recipe-title">Geleneksel İslahiye Tavası</h2>
+            <p class="left-recipe-desc">
+              Amanos yaylalarının meşe közü, kırmızı biberin kokusu ve doğal malzemelerin uyumuyla 
+              şekillenen İslahiye mutfağının en özel lezzetlerinden biridir. Taş fırınlarda ağır ağır 
+              pişen bu tava, yörenin bereketini ve misafirperverliğini sofralara taşır.
+            </p>
+
+            <!-- Metadata Strip -->
+            <div class="left-meta-strip">
+              <div class="left-meta-col">
+                <span class="left-meta-icon">🍴</span>
+                <div class="left-meta-text">
+                  <span class="left-meta-label">Hazırlık Süresi</span>
+                  <span class="left-meta-val">30 dakika</span>
+                </div>
+              </div>
+
+              <div class="left-meta-col" style="border-left: 1px solid rgba(220, 202, 178, 0.7); padding-left: 6px;">
+                <span class="left-meta-icon">🍲</span>
+                <div class="left-meta-text">
+                  <span class="left-meta-label">Pişirme Süresi</span>
+                  <span class="left-meta-val">1,5 saat</span>
+                </div>
+              </div>
+
+              <div class="left-meta-col" style="border-left: 1px solid rgba(220, 202, 178, 0.7); padding-left: 6px;">
+                <span class="left-meta-icon">👥</span>
+                <div class="left-meta-text">
+                  <span class="left-meta-label">Porsiyon</span>
+                  <span class="left-meta-val">4 kişilik</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Portion Controls -->
+          <div class="left-portion-row">
+            <span class="left-portion-label">Porsiyon Seçimi</span>
+            <div class="left-portion-pills">
+              <button class="portion-btn">2</button>
+              <button class="portion-btn active">4</button>
+              <button class="portion-btn">6</button>
+              <button class="portion-btn">8</button>
+            </div>
+          </div>
+
+        </article>
+
+        <!-- ------------------------------------------------------------ -->
+        <!-- SAĞ SAYFA: PİŞİRME GÜNCESİ, AŞAMA FOTOĞRAFI & MALZEMELER    -->
+        <!-- ------------------------------------------------------------ -->
+        <article class="book-right-page">
+          
+          <div>
+            <!-- Stepper Track & Controls -->
+            <div class="stepper-row">
+              <div class="stepper-left-badge">
+                <span class="step-counter-text">Adım 2 / 6</span>
+                <div class="stepper-dots-track">
+                  <div class="stepper-dot completed"></div>
+                  <div class="stepper-line"></div>
+                  <div class="stepper-dot active"></div>
+                  <div class="stepper-line"></div>
+                  <div class="stepper-dot"></div>
+                  <div class="stepper-line"></div>
+                  <div class="stepper-dot"></div>
+                  <div class="stepper-line"></div>
+                  <div class="stepper-dot"></div>
+                  <div class="stepper-line"></div>
+                  <div class="stepper-dot"></div>
+                </div>
+              </div>
+
+              <div class="stepper-buttons">
+                <button class="stepper-circle-btn" title="Önceki Adım">←</button>
+                <button class="stepper-circle-btn" title="Sonraki Adım">→</button>
+              </div>
+            </div>
+
+            <!-- Step Title & Instruction -->
+            <h3 class="right-step-title">Et ve Sebzeleri Hazırlayın</h3>
+            <p class="right-step-instruction">
+              Kuşbaşı doğranmış eti, zeytinyağı ile geniş bir tavada yüksek ateşte mühürleyin. 
+              Ardından doğranmış soğan ve biberleri ekleyerek birkaç dakika daha kavurun.
+            </p>
+
+            <!-- Step Skillet Photo -->
+            <div class="step-photo-wrap">
+              <img src="/images/recipe_step_skillet.jpg" alt="Et ve sebzelerin tavada kavrulması" class="step-photo">
+            </div>
+
+            <!-- Chef's Tip Box -->
+            <div class="chef-tip-container">
+              <span class="chef-tip-icon">👨‍🍳</span>
+              <div>
+                <div class="chef-tip-title">Ustanın Notu</div>
+                <p class="chef-tip-content">
+                  “Etin suyunu salıp yeniden çekmesi, tavanın lezzetinin temelidir. Bu aşamada sabırlı olun, 
+                  yüksek ateşte pişirmek lezzeti artırır.”
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ingredients Used in this Step -->
+          <div class="step-ingredients-section">
+            <div class="step-ingredients-title">Bu Adımda Kullanılan Malzemeler</div>
+            <div class="step-ingredients-grid">
+              <div class="step-ing-card">
+                <span class="step-ing-icon">🥩</span>
+                <div class="step-ing-name">Kuzu eti</div>
+                <div class="step-ing-amount">500 gr</div>
+              </div>
+
+              <div class="step-ing-card">
+                <span class="step-ing-icon">🧅</span>
+                <div class="step-ing-name">Soğan</div>
+                <div class="step-ing-amount">2 adet</div>
+              </div>
+
+              <div class="step-ing-card">
+                <span class="step-ing-icon">🌶️</span>
+                <div class="step-ing-name">İslahiye biberi</div>
+                <div class="step-ing-amount">4 adet</div>
+              </div>
+
+              <div class="step-ing-card">
+                <span class="step-ing-icon">🍅</span>
+                <div class="step-ing-name">Domates</div>
+                <div class="step-ing-amount">3 adet</div>
+              </div>
+
+              <div class="step-ing-card">
+                <span class="step-ing-icon">🫒</span>
+                <div class="step-ing-name">Zeytinyağı</div>
+                <div class="step-ing-amount">3 y.k.</div>
+              </div>
+            </div>
+          </div>
+
+        </article>
+
+      </section>
+
+    </main>
+
+  </div>
+
+</body>
+</html>

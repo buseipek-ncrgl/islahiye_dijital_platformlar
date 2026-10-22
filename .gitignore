@@ -1,0 +1,65 @@
+# =============================================================================
+# İslahiye Dijital Platformlar — .gitignore
+# =============================================================================
+
+# 1. Bağımlılıklar (Dependencies)
+node_modules/
+.pnp
+.pnp.js
+package-lock.json.bak
+
+# 2. Üretim Derleme Çıktıları (Production Build Outputs)
+dist/
+dist-ssr/
+build/
+out/
+*.tsbuildinfo
+
+# 3. Yerel Çevre Değişkenleri ve Gizli Anahtarlar (Local Env & Secrets)
+.env
+.env.*
+!.env.example
+
+# 4. Önbellekler (Vite & Cache)
+.vite/
+.cache/
+.parcel-cache/
+
+# 5. Günlük ve Hata Kayıtları (Logs & Debug Outputs)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# 6. İşletim Sistemi ve IDE Dosyaları (OS & Editor Files)
+.DS_Store
+Thumbs.db
+desktop.ini
+*.local
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 7. Yerel Test, Şema ve Tasarım Deneyleri (Yalnızca Localde Kalacak Dosyalar)
+# Test betikleri, crop'lar, topleft/harita şemaları, edge ekran görüntüleri, tarayıcı profilleri
+scratch/
+coverage/
+*.lcov
+.nyc_output/
+
+# 8. Yerel Sprint Raporları, Tasarım Kılavuzları ve İç Referanslar
+# Sprint teslim raporları, benchmark zip paketleri, promptlar ve iç notlar
+docs/
+AGENTS.md
+ANTIGRAVITY_HERO_EDITORIAL_REFINEMENT.md
+ISLAHIYE_GLOBAL_DESIGN_STANDARDS.md
+SPRINT_E05A_DELIVERY_REPORT.md
+TASARIM_NOTLARI.md

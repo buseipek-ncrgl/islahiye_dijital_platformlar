@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İslahiye Lezzet Atlası — 390px Mobil Tarif Atölyesi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-forest: #203B31;
+      --color-forest-dark: #162721;
+      --color-ivory: #F6F2E9;
+      --color-paper: #FBF8F1;
+      --color-copper: #BA855E;
+      --color-copper-dark: #936645;
+      --color-sand: #DCCAB2;
+      --color-charcoal: #242724;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: var(--color-paper);
+      color: var(--color-charcoal);
+      font-family: 'Manrope', -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .font-serif {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Top Brand Bar */
+    .mobile-header {
+      background-color: var(--color-forest);
+      color: var(--color-ivory);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.15em;
+      border-bottom: 1px solid rgba(220, 202, 178, 0.3);
+    }
+
+    /* Recipe Cover Hero */
+    .recipe-cover {
+      position: relative;
+      width: 100%;
+      height: 190px;
+      background: #3A2E28;
+    }
+
+    .recipe-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .recipe-cover-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(22, 39, 33, 0.95) 0%, rgba(22, 39, 33, 0.4) 60%, transparent 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 16px;
+    }
+
+    .recipe-cover-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--color-sand);
+      margin-bottom: 2px;
+    }
+
+    .recipe-cover-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #F6F2E9;
+      line-height: 1.1;
+    }
+
+    /* Tab Switcher (Segmented Control) */
+    .tab-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 6px 12px;
+      background: rgba(220, 202, 178, 0.3);
+      border-bottom: 1px solid rgba(220, 202, 178, 0.6);
+      gap: 6px;
+    }
+
+    .tab-btn {
+      padding: 9px;
+      text-align: center;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: none;
+      background: transparent;
+      color: rgba(36,39,36,0.7);
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--color-forest);
+      color: var(--color-ivory);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    /* Content Area */
+    .content-area {
+      padding: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Quick Metadata */
+    .meta-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      background: rgba(246, 242, 233, 0.85);
+      border: 1px solid rgba(220, 202, 178, 0.7);
+      padding: 8px 10px;
+      border-radius: 3px;
+    }
+
+    .meta-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .meta-cell-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5px;
+      text-transform: uppercase;
+      color: rgba(36,39,36,0.5);
+    }
+
+    .meta-cell-value {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--color-forest);
+      margin-top: 1px;
+    }
+
+    /* Portion Controls */
+    .portion-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(220, 202, 178, 0.5);
+    }
+
+    .portion-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-copper-dark);
+      font-weight: 700;
+    }
+
+    .portion-group {
+      display: flex;
+      gap: 5px;
+    }
+
+    .portion-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border: 1px solid rgba(220, 202, 178, 0.8);
+      background: white;
+      color: var(--color-charcoal);
+      border-radius: 2px;
+    }
+
+    .portion-btn.active {
+      background: var(--color-forest);
+      color: white;
+      border-color: var(--color-forest);
+    }
+
+    /* Ingredients Checklist */
+    .ing-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .ing-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 10px;
+      background: rgba(255, 252, 247, 0.8);
+      border-bottom: 1px dashed rgba(220, 202, 178, 0.6);
+      border-radius: 2px;
+      font-size: 12.5px;
+    }
+
+    .ing-item.checked {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+
+    .ing-check {
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--color-copper);
+      border-radius: 2px;
+      margin-right: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      background: white;
+    }
+
+    .ing-item.checked .ing-check {
+      background: var(--color-forest);
+      border-color: var(--color-forest);
+      color: white;
+    }
+
+    .ing-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-copper-dark);
+    }
+
+    /* Note Box */
+    .note-card {
+      background: rgba(246, 242, 233, 0.9);
+      border-left: 2px solid var(--color-copper);
+      padding: 9px 12px;
+      border-radius: 2px;
+      font-size: 11.5px;
+      color: rgba(36,39,36,0.8);
+      line-height: 1.45;
+    }
+
+    /* Bottom Action */
+    .bottom-cta {
+      margin-top: auto;
+      padding-top: 10px;
+    }
+
+    .btn-main {
+      width: 100%;
+      background: var(--color-forest);
+      color: var(--color-ivory);
+      border: none;
+      padding: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      border-radius: 2px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(32, 59, 49, 0.25);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Brand Navigation -->
+  <header class="mobile-header">
+    <span>İSLAHİYE LEZZET ATLASI</span>
+    <span>TARİF ATÖLYESİ</span>
+  </header>
+
+  <!-- Recipe Cover Hero (Açık Kitap Kapağı) -->
+  <div class="recipe-cover">
+    <img src="/images/recipe_tava_ingredients_side.jpg" alt="İslahiye Tavası Hazırlık Natürmortu">
+    <div class="recipe-cover-gradient">
+      <div class="recipe-cover-eyebrow">EDİTORYAL REÇETE 01</div>
+      <h1 class="recipe-cover-title">Geleneksel İslahiye Tavası</h1>
+    </div>
+  </div>
+
+  <!-- Segmented Tab Controls (Kitap Sayfaları Arası Geçiş) -->
+  <div class="tab-bar">
+    <button class="tab-btn active">Malzemeler (7)</button>
+    <button class="tab-btn">Adımlar (1/4)</button>
+  </div>
+
+  <!-- Content Container -->
+  <main class="content-area">
+    
+    <!-- Quick Metadata -->
+    <div class="meta-row">
+      <div class="meta-cell">
+        <span class="meta-cell-label">Hazırlık</span>
+        <span class="meta-cell-value">⏱ 25 dk</span>
+      </div>
+      <div class="meta-cell" style="border-left: 1px solid rgba(220, 202, 178, 0.6);">
+        <span class="meta-cell-label">Pişirme</span>
+        <span class="meta-cell-value">🔥 55 dk</span>
+      </div>
+      <div class="meta-cell" style="border-left: 1px solid rgba(220, 202, 178, 0.6);">
+        <span class="meta-cell-label">Zorluk</span>
+        <span class="meta-cell-value">👨‍🍳 Orta</span>
+      </div>
+    </div>
+
+    <!-- Portion Controls -->
+    <div class="portion-box">
+      <span class="portion-title">Porsiyon (Kişi):</span>
+      <div class="portion-group">
+        <button class="portion-btn">2</button>
+        <button class="portion-btn active">4</button>
+        <button class="portion-btn">6</button>
+        <button class="portion-btn">8</button>
+      </div>
+    </div>
+
+    <!-- Ingredients Checklist -->
+    <ul class="ing-list">
+      <li class="ing-item checked">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check">✓</span>
+          <span>Kuzu kuşbaşı (orta yağlı)</span>
+        </div>
+        <span class="ing-amount">800 g</span>
+      </li>
+
+      <li class="ing-item checked">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check">✓</span>
+          <span>İslahiye pul biberi</span>
+        </div>
+        <span class="ing-amount">2 tatlı kaşığı</span>
+      </li>
+
+      <li class="ing-item">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check"></span>
+          <span>Yerli sarımsak</span>
+        </div>
+        <span class="ing-amount">12 diş</span>
+      </li>
+
+      <li class="ing-item">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check"></span>
+          <span>Köy domatesi</span>
+        </div>
+        <span class="ing-amount">4 adet</span>
+      </li>
+
+      <li class="ing-item">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check"></span>
+          <span>Köy biberi (yeşil)</span>
+        </div>
+        <span class="ing-amount">4 adet</span>
+      </li>
+
+      <li class="ing-item">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check"></span>
+          <span>Kuyruk yağı (ince kıyılmış)</span>
+        </div>
+        <span class="ing-amount">80 g</span>
+      </li>
+
+      <li class="ing-item">
+        <div style="display: flex; align-items: center;">
+          <span class="ing-check"></span>
+          <span>Kaya tuzu & karabiber</span>
+        </div>
+        <span class="ing-amount">Damak tadına</span>
+      </li>
+    </ul>
+
+    <!-- Preparation Advice Note -->
+    <div class="note-card">
+      <strong style="color: var(--color-copper-dark); font-weight: 700;">Taş Fırın Notu:</strong> 
+      Taş fırında piştiğinde lezzeti katlanır; ev fırınında 200°C alt-üst ayarda pişirilebilir.
+    </div>
+
+    <!-- Action Button -->
+    <div class="bottom-cta">
+      <button class="btn-main">
+        <span>Pişirmeye Başla (Aşama 1)</span>
+        <span>→</span>
+      </button>
+    </div>
+
+  </main>
+
+</body>
+</html>

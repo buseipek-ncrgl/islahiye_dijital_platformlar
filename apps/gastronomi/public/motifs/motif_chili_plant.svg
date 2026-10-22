@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Main central branching stalk -->
+  <path d="M 100 188 L 100 135 C 99 110, 102 85, 94 48" stroke-width="2.2"/>
+  <path d="M 100 135 C 115 120, 135 112, 155 104" stroke-width="1.6"/>
+  <path d="M 98 105 C 80 95, 65 88, 48 82" stroke-width="1.4"/>
+
+  <!-- Root / base woodcut cut -->
+  <path d="M 94 188 L 106 188 M 96 182 L 104 182 M 98 176 L 102 176" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- Capsicum Star Flower (Top Left) -->
+  <g class="flower">
+    <path d="M 94 48 C 90 40, 84 35, 78 30" stroke-width="1.2"/>
+    <!-- 5 pointed star petals -->
+    <path d="M 78 30 L 74 20 L 79 24 L 86 18 L 84 25 L 92 28 L 85 32 L 85 40 L 80 34 L 72 36 Z" fill="#FFFDF8" fill-opacity="0.7" stroke-width="1.2"/>
+    <!-- Center stamen / pistil -->
+    <circle cx="80" cy="28" r="2.5" fill="currentColor" fill-opacity="0.3" stroke-width="1.0"/>
+    <path d="M 79 27 L 78 24 M 81 27 L 83 24 M 80 29 L 80 32 M 78 29 L 75 30 M 82 29 L 84 30" stroke-width="0.8"/>
+    <!-- Flower bud -->
+    <path d="M 94 48 C 96 42, 98 38, 102 36 C 104 38, 102 44, 98 47 Z" fill="currentColor" fill-opacity="0.2" stroke-width="1.0"/>
+  </g>
+
+  <!-- Large Elongated İslahiye Pepper (Right) -->
+  <g class="pepper">
+    <!-- Curved pedicel / stem -->
+    <path d="M 142 108 C 146 114, 148 120, 146 126" stroke-width="1.6"/>
+    <!-- Calyx (5-toothed cap) -->
+    <path d="M 138 126 C 142 124, 150 124, 154 126 L 152 131 L 148 129 L 144 132 L 140 129 Z" fill="currentColor" fill-opacity="0.3" stroke-width="1.2"/>
+    <!-- Conical curved pepper body -->
+    <path d="M 139 130 C 137 142, 138 162, 134 175 C 132 182, 126 186, 124 186 C 122 186, 124 180, 127 172 C 132 158, 132 142, 134 130 Z" fill="currentColor" fill-opacity="0.2" stroke-width="1.7" stroke-linejoin="round"/>
+    <!-- Longitudinal form curvature lines -->
+    <path d="M 136 134 C 135 146, 135 162, 131 174" stroke-width="0.9" stroke-dasharray="4 2" opacity="0.7"/>
+    <path d="M 132 138 C 130 148, 129 160, 127 170" stroke-width="0.7" opacity="0.5"/>
+    <!-- Woodcut shading hatch lines on shadowed concave side -->
+    <path d="M 137 138 L 134 140 M 137 144 L 134 146 M 136 150 L 133 152 M 135 156 L 132 158 M 134 162 L 131 164" stroke-width="0.7" opacity="0.7"/>
+  </g>
+
+  <!-- Secondary Smaller Pepper (Left hanging) -->
+  <g class="pepper-small">
+    <path d="M 68 90 C 65 96, 62 102, 60 108" stroke-width="1.2"/>
+    <path d="M 56 108 C 59 106, 63 106, 65 108 L 63 111 L 60 110 L 58 111 Z" fill="currentColor" fill-opacity="0.25" stroke-width="1.0"/>
+    <path d="M 57 110 C 56 118, 56 128, 52 138 C 50 142, 47 144, 46 144 C 45 144, 46 140, 48 134 C 52 124, 53 116, 54 110 Z" fill="currentColor" fill-opacity="0.18" stroke-width="1.3"/>
+    <path d="M 55 114 C 54 122, 53 130, 50 137" stroke-width="0.7" stroke-dasharray="3 2" opacity="0.6"/>
+  </g>
+
+  <!-- Botanical Leaves with Venation -->
+  <!-- Top Center Leaf -->
+  <g class="leaf">
+    <path d="M 94 65 C 108 55, 126 52, 134 38 C 122 40, 104 48, 94 65 Z" fill="currentColor" fill-opacity="0.10" stroke-width="1.4"/>
+    <path d="M 94 65 Q 114 52 134 38" stroke-width="0.9"/>
+    <path d="M 104 60 L 110 55 M 112 55 L 118 50 M 120 50 L 126 44" stroke-width="0.6" opacity="0.6"/>
+  </g>
+
+  <!-- Left Main Leaf -->
+  <g class="leaf">
+    <path d="M 72 90 C 52 82, 34 68, 28 50 C 44 56, 62 72, 72 90 Z" fill="currentColor" fill-opacity="0.10" stroke-width="1.4"/>
+    <path d="M 72 90 Q 48 72 28 50" stroke-width="1.0"/>
+    <path d="M 60 84 L 52 74 M 52 76 L 44 66 M 44 68 L 36 58" stroke-width="0.7" opacity="0.6"/>
+    <path d="M 64 86 L 68 78 M 56 78 L 60 70 M 48 70 L 52 62" stroke-width="0.6" opacity="0.5"/>
+  </g>
+
+  <!-- Right Upper Leaf -->
+  <g class="leaf">
+    <path d="M 125 115 C 145 105, 168 100, 180 84 C 168 88, 144 98, 125 115 Z" fill="currentColor" fill-opacity="0.10" stroke-width="1.4"/>
+    <path d="M 125 115 Q 152 102 180 84" stroke-width="1.0"/>
+    <path d="M 138 110 L 146 104 M 148 104 L 156 98 M 158 98 L 166 92" stroke-width="0.6" opacity="0.6"/>
+  </g>
+
+  <!-- Lower Left Leaf -->
+  <g class="leaf">
+    <path d="M 96 145 C 80 148, 62 156, 52 168 C 62 160, 82 152, 96 145 Z" fill="currentColor" fill-opacity="0.10" stroke-width="1.3"/>
+    <path d="M 96 145 Q 74 158 52 168" stroke-width="0.8"/>
+  </g>
+</svg>
