@@ -6,31 +6,30 @@ on:
   pull_request:
     branches: [ main, master ]
 
-# Eşzamanlı commitlerde eski çalışan işi iptal et (kaynak tasarrufu)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-and-verify:
-    name: Derleme ve Tip Güvenliği Doğrulaması
+    name: Derleme ve Tip Guvenligi Dogrulamasi
     runs-on: ubuntu-latest
 
     steps:
-      - name: Kaynak Kodunu İndir (Checkout)
+      - name: Kaynak Kodunu Indir (Checkout)
         uses: actions/checkout@v4
 
-      - name: Node.js Ortamını Hazırla (v20 LTS)
+      - name: Node.js Ortamini Hazirla (v20 LTS)
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Bağımlılıkları Kur (Workspace Install)
+      - name: Bagimliliklari Kur (Clean Install)
         run: npm ci
 
-      - name: 1. Ürün: İslahiye Lezzet Atlası Derleme & Tip Kontrolü
+      - name: '1. Urun: Islahiye Lezzet Atlasi Derleme ve Tip Kontrolu'
         run: npm run build:gastronomi
 
-      - name: 2. Ürün: İslahiye Eğitim Portalı Derleme & Tip Kontrolü
+      - name: '2. Urun: Islahiye Egitim Portali Derleme ve Tip Kontrolu'
         run: npm run build:egitim
