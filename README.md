@@ -1,5 +1,7 @@
 # İslahiye Dijital Platformlar — Monorepo
 
+[![CI - Build & Type Check](https://github.com/buseipek-ncrgl/islahiye_dijital_platformlar/actions/workflows/ci.yml/badge.svg)](https://github.com/buseipek-ncrgl/islahiye_dijital_platformlar/actions/workflows/ci.yml)
+
 İslahiye Ticaret Odası bünyesinde yürütülen yerel kalkınma, kültürel mirasın korunması ve nitelikli mesleki/dijital eğitim hamlelerini desteklemek üzere tasarlanmış iki bağımsız yazılım ürününü barındıran kurumsal monorepo çalışma alanıdır.
 
 ---
