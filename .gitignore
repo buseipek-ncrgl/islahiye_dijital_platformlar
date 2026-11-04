@@ -89,7 +89,6 @@ BACKEND_SPRINT_*.md
 *FINAL_ACCEPTANCE*.md
 *ANALYSIS_AND_DESIGN*.md
 
-# 10. Geçici Test Prototip Dosyaları ve Kök Backend Dizinleri
+# 10. Geçici Test Prototip Dosyaları
 !apps/**/src/**
 apps/egitim/src/B01App.tsx
-/services/
