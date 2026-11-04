@@ -23,6 +23,7 @@ export interface UserProfile {
   isActive?: boolean; // Pasif durumdaki kullanıcı işlem yapamaz
   statusReason?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export type ProgramCategory =
@@ -35,7 +36,7 @@ export type ProgramCategory =
   | 'Gastronomi'
   | string;
 export type ProgramStatus = 'open' | 'pre_registration' | 'almost_full' | 'planned';
-export type TrainingMode = 'Yüz Yüze' | 'Hibrit';
+export type TrainingMode = 'Yüz Yüze' | 'Hibrit' | 'Çevrimiçi';
 
 export interface CurriculumModule {
   sessionNumber: number;
@@ -496,7 +497,8 @@ export type CriterionType =
   | 'numeric'
   | 'boolean'
   | 'text'
-  | 'verified_statement';
+  | 'verified_statement'
+  | 'scale_100';
 
 export interface CriterionOption {
   id: string;
@@ -875,6 +877,17 @@ export interface DirectMessage {
   createdAt: string;
   status: DirectMessageStatus;
   readAt?: string; // "Okundu (Demo Görüntüleme)"
+  isEdited?: boolean;
+  editedAt?: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  replyTo?: {
+    id: string;
+    senderName: string;
+    senderRole?: string;
+    content: string;
+  };
+  reactions?: Record<string, string[]>; // emoji -> array of userIds
 }
 
 export type ChannelType = 'announcement' | 'discussion';
@@ -914,11 +927,23 @@ export interface ChannelMessage {
   senderId: string;
   senderName: string;
   senderRole: ConversationParticipantRole;
+  senderEmail?: string;
   title?: string; // Duyuru başlığı
   content: string;
   isPinned?: boolean;
   createdAt: string;
   status: 'saved_locally';
+  isEdited?: boolean;
+  editedAt?: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  replyTo?: {
+    id: string;
+    senderName: string;
+    senderRole?: string;
+    content: string;
+  };
+  reactions?: Record<string, string[]>; // emoji -> array of userIds
 }
 
 export * from './notificationTypes';

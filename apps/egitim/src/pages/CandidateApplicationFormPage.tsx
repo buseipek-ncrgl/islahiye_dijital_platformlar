@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ChevronRight,
   Save,
@@ -7,14 +7,15 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Calendar,
-  MapPin,
   Info,
+  X,
 } from 'lucide-react';
-import { DEMO_PROGRAMS } from '../data/educationData';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
+import { Program } from '../types';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { Toast } from '../components/ui/Toast';
 import {
   saveDraftApplication,
   submitApplication,
@@ -24,7 +25,17 @@ import {
 export const CandidateApplicationFormPage: React.FC = () => {
   const { programId } = useParams<{ programId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCandidatePanel = location.pathname.startsWith('/aday');
   const { currentUser, currentRole, setRole } = useDemoRole();
+
+  const [livePrograms, setLivePrograms] = useState<Program[]>(() => getInitialPrograms());
+
+  useEffect(() => {
+    fetchLivePrograms().then((list) => {
+      if (list && list.length > 0) setLivePrograms(list);
+    });
+  }, []);
 
   // If role is not applicant, switch to applicant so user experiences the candidate workflow
   useEffect(() => {
@@ -35,7 +46,23 @@ export const CandidateApplicationFormPage: React.FC = () => {
 
   // Program matching
   const program =
-    DEMO_PROGRAMS.find((p) => p.id === programId) || DEMO_PROGRAMS[0];
+    livePrograms.find((p) => p.id === programId) ||
+    livePrograms[0] || {
+      id: programId || 'prog-01',
+      title: 'Eğitim Programı',
+      category: 'Tarım ve E-Ticaret',
+      description: '',
+      targetAudience: '',
+      durationWeeks: 8,
+      totalHours: 32,
+      cohortName: '2026 Güz Dönemi',
+      quota: 25,
+      enrolledCount: 0,
+      location: 'İslahiye Ticaret Odası',
+      mode: 'Yüz Yüze' as const,
+      status: 'open' as const,
+      curriculumModules: [],
+    };
 
   // Existing active application check
   const candidateApps = getApplicationsByCandidateId(currentUser.id);
@@ -188,47 +215,49 @@ export const CandidateApplicationFormPage: React.FC = () => {
       
       {/* Breadcrumb Navigation */}
       <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Sayfa Konumu">
-        <Link to="/" className="hover:text-brand-blue transition-colors">Ana Sayfa</Link>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <Link to="/egitimler" className="hover:text-brand-blue transition-colors">Eğitim Kataloğu</Link>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <Link to={`/egitimler/${program.id}`} className="hover:text-brand-blue transition-colors truncate max-w-[180px]">
-          {program.title}
-        </Link>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        <span className="text-slate-800 font-semibold">Ön Başvuru Formu</span>
+        {isCandidatePanel ? (
+          <>
+            <Link to="/aday" className="hover:text-blue-600 transition-colors">Aday Paneli</Link>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <Link to="/aday/katalog" className="hover:text-blue-600 transition-colors">Eğitim Kataloğu</Link>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <Link to={`/aday/katalog/${program.id}`} className="hover:text-blue-600 transition-colors truncate max-w-[180px]">
+              {program.title}
+            </Link>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-800 font-semibold">Ön Başvuru</span>
+          </>
+        ) : (
+          <>
+            <Link to="/" className="hover:text-brand-blue transition-colors">Ana Sayfa</Link>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <Link to="/egitimler" className="hover:text-brand-blue transition-colors">Eğitim Kataloğu</Link>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <Link to={`/egitimler/${program.id}`} className="hover:text-brand-blue transition-colors truncate max-w-[180px]">
+              {program.title}
+            </Link>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-800 font-semibold">Ön Başvuru Formu</span>
+          </>
+        )}
       </nav>
 
-      {/* Program Summary Card */}
-      <div className="bg-white rounded-2xl border border-brand-border p-6 shadow-xs flex flex-col md:flex-row items-start justify-between gap-6">
-        <div className="space-y-2 max-w-2xl">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-blue-50 text-brand-blue border border-blue-200">
-              {program.category}
-            </span>
-            <span className="text-xs text-slate-400 font-mono">Dönem: {program.cohortName}</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">
-            {program.title} — Başvuru Formu
+      {/* Standard Flat Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            {program.title} — Ön Başvuru Formu
           </h1>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            {program.description}
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+            {program.cohortName} dönemi başvuru formunu eksiksiz doldurunuz. Değerlendirme kriterleri doğrultusunda başvurunuz incelenecektir.
           </p>
         </div>
 
-        <div className="shrink-0 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1.5 min-w-[200px]">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-            <Clock className="w-3.5 h-3.5 text-brand-blue" />
-            <span>{program.durationWeeks} Hafta • {program.totalHours} Saat</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            <span>{program.location} ({program.mode})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>Kontenjan: {program.quota} Kişi</span>
-          </div>
+        <div className="flex items-center gap-2.5 bg-blue-50/70 border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-blue-900 shrink-0">
+          <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+          <p className="leading-snug text-xs font-medium">
+            {program.durationWeeks} Hafta • {program.totalHours} Saat • {program.mode}
+          </p>
         </div>
       </div>
 
@@ -264,20 +293,25 @@ export const CandidateApplicationFormPage: React.FC = () => {
         </div>
       )}
 
-      {/* Success Notification for Draft Saving */}
-      {draftSuccessNotice && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{draftSuccessNotice}</span>
-        </div>
-      )}
+      {/* Success Notification for Draft Saving (Floating Toast) */}
+      <Toast message={draftSuccessNotice} onClose={() => setDraftSuccessNotice(null)} />
 
       {/* Validation Errors Alert Box */}
       {validationErrors.length > 0 && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5">
-          <div className="flex items-center gap-1.5 font-bold text-rose-800">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-            <span>Lütfen aşağıdaki eksik alanları tamamlayınız:</span>
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5 relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-bold text-rose-800">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>Lütfen aşağıdaki eksik alanları tamamlayınız:</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setValidationErrors([])}
+              className="p-1 rounded-md text-rose-400 hover:text-rose-700 hover:bg-rose-100 transition"
+              aria-label="Kapat"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <ul className="list-disc list-inside space-y-0.5 text-[11px] pl-1">
             {validationErrors.map((err, i) => (
@@ -295,9 +329,9 @@ export const CandidateApplicationFormPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-brand-border p-6 shadow-xs space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h2 className="text-base font-bold text-slate-900">
-                1. Aday Profil Bilgileri
+                1. Aday Kütük & Kimlik Bilgileri
               </h2>
-              <span className="text-[11px] text-slate-400">Demo Profili</span>
+              <span className="text-[11px] text-slate-500 font-medium">Kayıtlı Profil</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -322,14 +356,14 @@ export const CandidateApplicationFormPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Temsili İletişim Telefonu</label>
+                <label className="block text-slate-700 font-semibold mb-1">İletişim Telefonu</label>
                 <input
                   type="text"
                   disabled
                   value={currentUser.phone || '0544 *** ** 28'}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 font-mono"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-600 font-mono"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">Gerçek telefon talep edilmemektedir.</span>
+                <span className="text-[10px] text-slate-400 mt-1 block">Kayıtlı GSM numarası bildirimlerde kullanılır.</span>
               </div>
 
               <div>
@@ -616,7 +650,7 @@ export const CandidateApplicationFormPage: React.FC = () => {
                   className="mt-0.5 rounded text-brand-blue focus:ring-brand-blue"
                 />
                 <span className="leading-relaxed">
-                  Formda beyan ettiğim tüm bilgilerin doğruluğunu onaylıyor, bu başvurunun bir <strong>ön inceleme simülasyonu</strong> olduğunu ve kesin kabul kararının yetkili yönetici tarafından verileceğini kabul ediyorum.
+                  Formda beyan ettiğim tüm bilgilerin doğruluğunu onaylıyor, bu başvurunun ön incelemeye tabi tutulacağını ve kesin kabul kararının İslahiye Ticaret Odası Eğitim Yönetimi tarafından verileceğini kabul ediyorum.
                 </span>
               </label>
             </div>
@@ -663,7 +697,7 @@ export const CandidateApplicationFormPage: React.FC = () => {
           setSubmittedModalOpen(false);
           navigate('/aday');
         }}
-        title="Demo Başvurunuz Kaydedildi"
+        title="Başvurunuz Başarıyla Alındı"
         maxWidth="max-w-md"
         footer={
           <div className="flex items-center justify-end gap-3 w-full">
@@ -695,10 +729,10 @@ export const CandidateApplicationFormPage: React.FC = () => {
             <strong>{program.title}</strong> eğitimi için başvurunuz idari inceleme kuyruğuna alınmıştır.
           </p>
 
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500 space-y-1">
-            <strong>Dürüst Ön Tanıtım Bildirimi:</strong>
+          <div className="p-3.5 rounded-lg bg-blue-50/70 border border-blue-200 text-[11px] text-blue-900 space-y-1">
+            <strong>İdari Süreç Bilgilendirmesi:</strong>
             <p>
-              Bu kayıt bir frontend demo simülasyonudur. Sistemde adayın kriter tavsiye puanı simüle edilecek; kesin kabul/ret kararı İslahiye Ticaret Odası yetkili idari yöneticisi tarafından verilecektir.
+              Başvurunuz ön inceleme kriter havuzuna alınmıştır. İdari komisyon değerlendirmesi tamamlandığında sonuç sistem üzerinden ve kayıtlı iletişim kanallarınızdan tarafınıza bildirilecektir.
             </p>
           </div>
         </div>

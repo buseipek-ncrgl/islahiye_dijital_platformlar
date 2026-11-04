@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Calendar,
   Clock,
@@ -17,27 +17,96 @@ import {
   ShieldCheck,
   BarChart3,
 } from 'lucide-react';
-import { DEMO_PROGRAMS } from '../data/educationData';
 import { Program } from '../types';
-import { Modal } from '../components/ui/Modal';
-import { Button } from '../components/ui/Button';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
 
 export const ProgramDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCandidatePanel = location.pathname.startsWith('/aday');
+  const isTraineePanel = location.pathname.startsWith('/kursiyer');
+  const isPortalMode = isCandidatePanel || isTraineePanel || location.pathname.startsWith('/yonetim');
 
-  // Find active program or fallback
-  const program: Program =
-    DEMO_PROGRAMS.find(
-      (p) =>
-        p.id === id ||
-        p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').includes(id || '')
-    ) || DEMO_PROGRAMS[0];
+  const getCatalogLink = () => {
+    if (isCandidatePanel) return '/aday/katalog';
+    if (isTraineePanel) return '/kursiyer/katalog';
+    return '/egitimler';
+  };
+
+  const getProgramLink = (progId: string) => {
+    if (isCandidatePanel) return `/aday/katalog/${progId}`;
+    if (isTraineePanel) return `/kursiyer/katalog/${progId}`;
+    return `/egitimler/${progId}`;
+  };
+
+  const getGuideLink = () => {
+    if (isCandidatePanel) return '/aday/rehber';
+    if (isTraineePanel) return '/kursiyer/dersler';
+    return '/basvuru-rehberi';
+  };
+
+  const initialList = useMemo<Program[]>(() => getInitialPrograms(), []);
+  const initialFound = useMemo<Program | null>(() => {
+    return (
+      initialList.find(
+        (p: Program) =>
+          p.id === id ||
+          p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').includes(id || '')
+      ) || initialList[0] || null
+    );
+  }, [id, initialList]);
+
+  const [program, setProgram] = useState<Program | null>(() => initialFound);
+  const [otherPrograms, setOtherPrograms] = useState<Program[]>(() =>
+    initialFound ? initialList.filter((p: Program) => p.id !== initialFound.id) : []
+  );
+  const [isLoading, setIsLoading] = useState(false);
 
   // Accordion state for FAQ and Sessions
   const [expandedSessions, setExpandedSessions] = useState<number[]>([1, 2]);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
-  const [applyModalOpen, setApplyModalOpen] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchLivePrograms().then((all) => {
+      if (!mounted) return;
+      if (all.length > 0) {
+        const found =
+          all.find(
+            (p) =>
+              p.id === id ||
+              p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').includes(id || '')
+          ) || all[0];
+        setProgram(found);
+        setOtherPrograms(all.filter((p) => p.id !== found.id));
+      }
+      setIsLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!program) {
+    return (
+      <div className="max-w-4xl mx-auto py-16 px-4 text-center">
+        <h2 className="text-xl font-bold text-slate-800">Program Bulunamadı</h2>
+        <p className="text-sm text-slate-500 mt-2">İlgili eğitim programı sistemde mevcut değil.</p>
+        <Link to={getCatalogLink()} className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold">
+          Kataloğa Dön
+        </Link>
+      </div>
+    );
+  }
 
   const toggleSession = (sessNum: number) => {
     setExpandedSessions((prev) =>
@@ -56,7 +125,6 @@ export const ProgramDetailPage: React.FC = () => {
   };
 
   // Other programs for Related & Similar sections
-  const otherPrograms = DEMO_PROGRAMS.filter((p) => p.id !== program.id);
   const relatedPrograms = otherPrograms.slice(0, 3);
 
   // Dynamic Learning Competencies (Neler Öğreneceksiniz?)
@@ -180,17 +248,33 @@ export const ProgramDetailPage: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+    <div className={`max-w-7xl mx-auto space-y-6 pb-12 ${isPortalMode ? '' : 'px-4 sm:px-6 lg:px-8 py-8'}`}>
       
-      {/* ===================================================================== */}
-      {/* 1. BREADCRUMB NAVIGATION                                              */}
-      {/* ===================================================================== */}
+      {/* 1. BREADCRUMB NAVIGATION */}
       <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Sayfa Konumu">
-        <Link to="/" className="hover:text-blue-600 transition-colors">Ana Sayfa</Link>
-        <span className="text-slate-400">/</span>
-        <Link to="/egitimler" className="hover:text-blue-600 transition-colors">Eğitim Programları</Link>
-        <span className="text-slate-400">/</span>
-        <span className="text-slate-900 font-semibold truncate max-w-sm sm:max-w-md">{program.title}</span>
+        {isTraineePanel ? (
+          <>
+            <Link to="/kursiyer/katalog" className="hover:text-blue-600 transition-colors">Eğitim Kataloğu</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold truncate max-w-sm sm:max-w-md">{program.title}</span>
+          </>
+        ) : isCandidatePanel ? (
+          <>
+            <Link to="/aday" className="hover:text-blue-600 transition-colors">Aday Portalı</Link>
+            <span className="text-slate-400">/</span>
+            <Link to="/aday/katalog" className="hover:text-blue-600 transition-colors">Eğitim Kataloğu</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold truncate max-w-sm sm:max-w-md">{program.title}</span>
+          </>
+        ) : (
+          <>
+            <Link to="/" className="hover:text-blue-600 transition-colors">Ana Sayfa</Link>
+            <span className="text-slate-400">/</span>
+            <Link to="/egitimler" className="hover:text-blue-600 transition-colors">Eğitim Programları</Link>
+            <span className="text-slate-400">/</span>
+            <span className="text-slate-900 font-semibold truncate max-w-sm sm:max-w-md">{program.title}</span>
+          </>
+        )}
       </nav>
 
       {/* ===================================================================== */}
@@ -255,9 +339,9 @@ export const ProgramDetailPage: React.FC = () => {
                 <Tag className="w-3.5 h-3.5 text-slate-400" />
                 <span>Program Alanı: <strong className="text-slate-700">{program.category}</strong></span>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700">
-                <Info className="w-3.5 h-3.5 text-blue-500" />
-                <span>Temsilî Demo İçeriği</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Ücretsiz Katılım</span>
               </div>
             </div>
 
@@ -450,7 +534,7 @@ export const ProgramDetailPage: React.FC = () => {
                     {isOpen && (
                       <div className="px-4 pb-4 pt-1 sm:px-5 sm:pb-5 text-xs text-slate-600 border-t border-slate-100 bg-slate-50/40 space-y-2">
                         <p className="leading-relaxed">
-                          {mod.description} Bu oturumda teorik anlatımın yanı sıra vaka analizleri ve simülasyon araçları üzerinden birebir uygulamalar yapılacaktır.
+                          {mod.description} Bu oturumda teorik anlatımın yanı sıra vaka analizleri ve dijital pazar araçları üzerinden birebir uygulamalar yapılacaktır.
                         </p>
                         <div className="flex items-center gap-2 text-[11px] text-blue-700 font-medium pt-1">
                           <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
@@ -471,7 +555,7 @@ export const ProgramDetailPage: React.FC = () => {
                 Sık Sorulan Sorular
               </h2>
               <Link
-                to="/basvuru-rehberi"
+                to={getGuideLink()}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
               >
                 Tüm Soruları Gör →
@@ -562,30 +646,35 @@ export const ProgramDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Primary Action Button */}
+            {/* Primary Action Button - Direct Frictionless Navigation */}
             <button
               type="button"
-              onClick={() => setApplyModalOpen(true)}
+              onClick={() => {
+                if (isTraineePanel) {
+                  navigate('/kursiyer/dersler');
+                } else {
+                  navigate(`/aday/basvuru/${program.id}`);
+                }
+              }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 px-4 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 group"
             >
-              <span>Ön Başvuru Yap</span>
+              <span>{isTraineePanel ? 'Kayıtlı Derslerime Git' : 'Ön Başvuru Yap'}</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
             {/* Secondary Action Link */}
             <Link
-              to="/basvuru-rehberi"
+              to={getGuideLink()}
               className="w-full flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs py-2.5 px-4 rounded-xl transition-colors cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5 text-slate-500" />
               <span>Başvuru Rehberi</span>
             </Link>
 
-            {/* Transparency Note */}
             <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-[11px] text-blue-900 leading-relaxed flex items-start gap-2">
               <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <span>
-                Bu sayfa demo simülasyonu içindir. Kesin kayıt ve kabul süreçleri İslahiye Ticaret Odası tarafından yürütülmektedir.
+                Eğitim kontenjanları sınırlıdır. Başvurular oda yönetim kurulu tarafından değerlendirilerek kesin kayıt listesi ilan edilir.
               </span>
             </div>
 
@@ -677,7 +766,7 @@ export const ProgramDetailPage: React.FC = () => {
                 İlgili Programlar
               </h3>
               <Link
-                to="/egitimler"
+                to={getCatalogLink()}
                 className="text-[11px] font-semibold text-blue-600 hover:underline"
               >
                 Tüm Programları Gör →
@@ -688,7 +777,7 @@ export const ProgramDetailPage: React.FC = () => {
               {relatedPrograms.map((rel) => (
                 <Link
                   key={rel.id}
-                  to={`/egitimler/${rel.id}`}
+                  to={getProgramLink(rel.id)}
                   className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors group"
                 >
                   <img
@@ -734,7 +823,7 @@ export const ProgramDetailPage: React.FC = () => {
           </div>
 
           <Link
-            to="/egitimler"
+            to={getCatalogLink()}
             className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
           >
             <span>Tüm Eğitim Programlarını Gör</span>
@@ -764,7 +853,7 @@ export const ProgramDetailPage: React.FC = () => {
 
                 <div className="p-5 space-y-2">
                   <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors line-clamp-1">
-                    <Link to={`/egitimler/${p.id}`}>{p.title}</Link>
+                    <Link to={getProgramLink(p.id)}>{p.title}</Link>
                   </h3>
                   <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
                     {p.description}
@@ -785,7 +874,7 @@ export const ProgramDetailPage: React.FC = () => {
                 </div>
 
                 <Link
-                  to={`/egitimler/${p.id}`}
+                  to={getProgramLink(p.id)}
                   className="font-semibold text-blue-600 hover:text-blue-700 text-xs inline-flex items-center gap-1 group/btn"
                 >
                   <span>Programı İncele</span>
@@ -798,61 +887,33 @@ export const ProgramDetailPage: React.FC = () => {
       </section>
 
       {/* ===================================================================== */}
-      {/* 5. INTERACTIVE MODAL: Demo Ön Başvuru                                  */}
+      {/* 5. MOBILE STICKY ACTION BAR (Sürtünmesiz Mobil Dönüşüm Çubuğu)        */}
       {/* ===================================================================== */}
-      {applyModalOpen && (
-        <Modal
-          isOpen={applyModalOpen}
-          onClose={() => setApplyModalOpen(false)}
-          title="Ön Başvuru Formu Bilgilendirmesi"
-          description={program.title}
-          maxWidth="max-w-md"
-          footer={
-            <div className="flex items-center justify-between w-full">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setApplyModalOpen(false);
-                  navigate('/basvuru-rehberi');
-                }}
-              >
-                Rehberi Gör
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setApplyModalOpen(false)}>
-                  Kapat
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    setApplyModalOpen(false);
-                    navigate(`/aday/basvuru/${program.id}`);
-                  }}
-                >
-                  Başvuru Formuna Git →
-                </Button>
-              </div>
-            </div>
-          }
-        >
-          <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
-            <p>
-              Bu eğitim programı <strong>{program.cohortName}</strong> için ön başvuru kabul etmektedir.
-            </p>
-            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 space-y-1">
-              <strong>Şeffaflık ve Simülasyon Kuralı:</strong>
-              <p className="text-[11px]">
-                Bu ekran bir arayüz demo simülasyonudur. Sistemde adayın kriter puanı hesaplanır; kesin kabul kararı yetkili yönetici tarafından verilir.
-              </p>
-            </div>
-            <p>
-              Tüm koşulları, başarı kriterlerini ve başvuru takvimini incelemek için Başvuru Rehberi sayfamıza yönelebilirsiniz.
-            </p>
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-bold text-slate-900 truncate">
+            {program.title}
           </div>
-        </Modal>
-      )}
+          <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span>Ücretsiz • Ön Başvuru Açık</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (isTraineePanel) {
+              navigate('/kursiyer/dersler');
+            } else {
+              navigate(`/aday/basvuru/${program.id}`);
+            }
+          }}
+          className="shrink-0 h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
+        >
+          <span>{isTraineePanel ? 'Derslerime Git' : 'Ön Başvuru Yap'}</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
     </div>
   );

@@ -81,9 +81,9 @@ export const PlaceholderPage: React.FC = () => {
             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200/80 flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
               <div>
-                <h4 className="text-sm font-semibold text-slate-900">Rol Bazlı Simülasyon</h4>
+                <h4 className="text-sm font-semibold text-slate-900">Rol Bazlı Yönetim Mimarisi</h4>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Aday, kursiyer, eğitmen, admin ve süper admin panelleri Sprint 05 sonrasında aşamalı geliştirilecektir.
+                  Aday, kursiyer, eğitmen, admin ve sistem yöneticisi panelleri kurumsal iş akışlarına göre yapılandırılmıştır.
                 </p>
               </div>
             </div>
@@ -110,7 +110,7 @@ export const PlaceholderPage: React.FC = () => {
         <p>© 2026 {EGITIM_APP_META.institution} — Dijital Platformlar Projesi</p>
         <p className="flex items-center gap-1.5">
           <ArrowRight className="w-3 h-3 text-slate-400" />
-          <span>Eğitim & Kursiyer Yönetimi Demo Simülasyonu</span>
+          <span>Eğitim & Kursiyer Yönetim Portalı</span>
         </p>
       </footer>
     </div>

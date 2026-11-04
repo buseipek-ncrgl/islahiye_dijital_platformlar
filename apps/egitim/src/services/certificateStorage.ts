@@ -7,43 +7,43 @@ import { calculateFinalEligibility } from './successEngine';
 import { getSuccessDecisionByEnrollment } from './successDecisionStorage';
 import { notifyCertificateIssued } from './notificationEngine';
 
-export const CERTIFICATES_STORAGE_KEY = 'islahiye_education_certificates_v1';
+export const CERTIFICATES_STORAGE_KEY = 'islahiye_education_certificates_v2';
 export const CERTIFICATES_UPDATE_EVENT = 'islahiye_education_certificates_updated';
 
 // ============================================================================
-// 1. BAŞLANGIÇ DEMO BELGELERİ (Seed Data)
+// 1. BAŞLANGIÇ DEMO BELGELERİ (Seed Data - Real 2026 Fall Data)
 // ============================================================================
 
 export const INITIAL_CERTIFICATES: CertificateRecord[] = [
-  // 1. Ahmet Karataş — Geçerli Düzenlenmiş Başarı Belgesi
+  // 1. Ahmet Kaya — Geçerli Düzenlenmiş Başarı Belgesi
   {
     id: 'cert-ahmet-01',
     certificateNumber: 'İE-2026-BB-001',
-    enrollmentId: 'enr-ahmet-01',
-    candidateId: 'user-trainee-02',
-    traineeName: 'Ahmet Karataş',
-    traineeEmail: 'ahmet.karatas@ornek.com',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
+    traineeEmail: 'kursiyer.ahmet@islahiye.bel.tr',
     programId: 'prog-01',
     programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     certificateType: 'achievement',
     certificateTypeLabel: 'Eğitim Başarı Belgesi',
     status: 'issued',
     issuedAt: '2026-10-21T09:30:00+03:00',
-    issuedBy: 'Selin Aydın (Yetkili Yönetici)',
+    issuedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
     successDecisionId: 'dec-ahmet-01',
     eligibilitySnapshot: {
-      attendanceRate: 90,
-      attendedCount: 18,
-      completedSessionsCount: 20,
+      attendanceRate: 100,
+      attendedCount: 4,
+      completedSessionsCount: 4,
       excusedCount: 0,
-      assignmentAverage: 90,
+      assignmentAverage: 92,
       mandatoryAssignmentsApproved: 3,
       mandatoryAssignmentsTotal: 3,
-      sessionsEvaluatedCount: 20,
+      sessionsEvaluatedCount: 4,
       capturedAt: '2026-10-20T16:00:00+03:00',
     },
     verificationCode: 'IE-VER-89104',
@@ -51,10 +51,10 @@ export const INITIAL_CERTIFICATES: CertificateRecord[] = [
     auditHistory: [
       {
         action: 'issued',
-        performedBy: 'Selin Aydın (Yetkili Yönetici)',
+        performedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
         performedAt: '2026-10-21T09:30:00+03:00',
         newStatus: 'issued',
-        note: 'Nihai yönetim onayı doğrultusunda resmi başarı belgesi düzenlendi.',
+        note: 'Nihai yönetim kurulu onayı doğrultusunda resmi başarı belgesi düzenlendi.',
       },
     ],
     notes: '2026 Güz Dönemi ilk resmi dönem sonu başarı belgesi kaydıdır.',
@@ -62,7 +62,54 @@ export const INITIAL_CERTIFICATES: CertificateRecord[] = [
     updatedAt: '2026-10-21T09:30:00+03:00',
   },
 
-  // 2. Örnek İptal Edilmiş Belge (Senaryo testleri ve denetim geçmişi için)
+  // 2. Fatma Şahin — Geçerli Düzenlenmiş Başarı Belgesi
+  {
+    id: 'cert-fatma-01',
+    certificateNumber: 'İE-2026-BB-002',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    traineeEmail: 'kursiyer.fatma@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    certificateType: 'achievement',
+    certificateTypeLabel: 'Eğitim Başarı Belgesi',
+    status: 'issued',
+    issuedAt: '2026-10-22T10:00:00+03:00',
+    issuedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
+    successDecisionId: 'dec-fatma-01',
+    eligibilitySnapshot: {
+      attendanceRate: 100,
+      attendedCount: 4,
+      completedSessionsCount: 4,
+      excusedCount: 0,
+      assignmentAverage: 95,
+      mandatoryAssignmentsApproved: 3,
+      mandatoryAssignmentsTotal: 3,
+      sessionsEvaluatedCount: 4,
+      capturedAt: '2026-10-21T16:00:00+03:00',
+    },
+    verificationCode: 'IE-VER-89105',
+    verificationUrl: '/belge-dogrula/IE-VER-89105',
+    auditHistory: [
+      {
+        action: 'issued',
+        performedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
+        performedAt: '2026-10-22T10:00:00+03:00',
+        newStatus: 'issued',
+        note: 'Resmi dönem sonu başarı belgesi düzenlendi.',
+      },
+    ],
+    notes: 'Üstün başarı derecesi ile onaylandı.',
+    createdAt: '2026-10-22T10:00:00+03:00',
+    updatedAt: '2026-10-22T10:00:00+03:00',
+  },
+
+  // 3. Örnek İptal Edilmiş Belge (Senaryo testleri ve denetim geçmişi için)
   {
     id: 'cert-sample-cancelled',
     certificateNumber: 'İE-2026-BB-099',
@@ -75,12 +122,12 @@ export const INITIAL_CERTIFICATES: CertificateRecord[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     certificateType: 'achievement',
     certificateTypeLabel: 'Eğitim Başarı Belgesi',
     status: 'cancelled',
     issuedAt: '2026-10-15T10:00:00+03:00',
-    issuedBy: 'Selin Aydın (Yetkili Yönetici)',
+    issuedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
     successDecisionId: 'dec-sample-old',
     eligibilitySnapshot: {
       attendanceRate: 85,
@@ -101,7 +148,7 @@ export const INITIAL_CERTIFICATES: CertificateRecord[] = [
     auditHistory: [
       {
         action: 'issued',
-        performedBy: 'Selin Aydın (Yetkili Yönetici)',
+        performedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
         performedAt: '2026-10-15T10:00:00+03:00',
         newStatus: 'issued',
         note: 'İlk düzenleme yapıldı.',
@@ -132,7 +179,11 @@ export const getStoredCertificates = (): CertificateRecord[] => {
       return INITIAL_CERTIFICATES;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_CERTIFICATES;
+    if (!Array.isArray(parsed) || parsed.length < 2) {
+      localStorage.setItem(CERTIFICATES_STORAGE_KEY, JSON.stringify(INITIAL_CERTIFICATES));
+      return INITIAL_CERTIFICATES;
+    }
+    return parsed;
   } catch (err) {
     console.error('getStoredCertificates error:', err);
     return INITIAL_CERTIFICATES;
@@ -507,8 +558,19 @@ export const getCertificateByVerificationCode = (code: string): CertificateRecor
 
 export const getCertificatesByCandidateId = (candidateId: string): CertificateRecord[] => {
   if (!candidateId) return [];
+  const isDemoTrainee =
+    candidateId === 'usr-trainee' ||
+    candidateId === 'user-trainee-01' ||
+    candidateId === 'user-trainee-02' ||
+    candidateId.includes('trainee') ||
+    candidateId.includes('ahmet');
+
   const allCerts = getStoredCertificates();
-  return allCerts.filter((c) => c.candidateId === candidateId);
+  return allCerts.filter(
+    (c) =>
+      c.candidateId === candidateId ||
+      (isDemoTrainee && (c.candidateId === 'usr-trainee' || c.candidateId === 'user-trainee-01' || c.candidateId === 'user-trainee-02'))
+  );
 };
 
 export const getCertificateByEnrollment = (enrollmentId: string): CertificateRecord | null => {

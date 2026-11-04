@@ -14,6 +14,11 @@ dist-ssr/
 build/
 out/
 *.tsbuildinfo
+**/bin/
+**/obj/
+.dotnet/
+.dotnet-home/
+.dotnet-install.ps1
 
 # 3. Yerel Çevre Değişkenleri ve Gizli Anahtarlar (Local Env & Secrets)
 .env
@@ -47,6 +52,9 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+*.db
+*.db-shm
+*.db-wal
 
 # 7. Yerel Test, Şema ve Tasarım Deneyleri (Yalnızca Localde Kalacak Dosyalar)
 # Test betikleri, crop'lar, topleft/harita şemaları, edge ekran görüntüleri, tarayıcı profilleri
@@ -54,12 +62,33 @@ scratch/
 coverage/
 *.lcov
 .nyc_output/
+artifacts/
+playwright.config.ts
+playwright-report/
+test-results/
+tests/
+scripts/
+dotnet-tools.json
 
-# 8. Yerel Sprint Raporları, Tasarım Kılavuzları ve İç Referanslar
+# 8. Yerel Temizlik ve Sistem Betikleri (Batch & Scripts)
+temizle_14gb.bat
+*.bat
+*.cmd
+run-b01-e2e.ps1
+
+# 9. Yerel Sprint Raporları, Tasarım Kılavuzları ve İç Referanslar
 # Sprint teslim raporları, benchmark zip paketleri, promptlar ve iç notlar
 docs/
 AGENTS.md
 ANTIGRAVITY_HERO_EDITORIAL_REFINEMENT.md
 ISLAHIYE_GLOBAL_DESIGN_STANDARDS.md
-SPRINT_E05A_DELIVERY_REPORT.md
 TASARIM_NOTLARI.md
+BACKEND_SPRINT_*.md
+*SPRINT*.md
+*DELIVERY_REPORT*.md
+*FINAL_ACCEPTANCE*.md
+*ANALYSIS_AND_DESIGN*.md
+
+# 10. Geçici Test Prototip Dosyaları ve Yerel Backend Servisleri
+apps/egitim/src/B01App.tsx
+services/

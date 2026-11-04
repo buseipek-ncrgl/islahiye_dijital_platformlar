@@ -4,7 +4,7 @@ import {
   DecisionHistoryItem,
   ProgramQuotaStats,
 } from '../types';
-import { DEMO_APPLICATIONS } from '../data/educationData';
+import { educationApi, ApplicationDto } from './apiClient';
 import {
   getActiveCriteriaSetForProgram,
   evaluateAndStoreApplication,
@@ -15,8 +15,585 @@ import {
   notifyAdminDecision,
 } from './notificationEngine';
 
-const STORAGE_KEY = 'islahiye_education_applications_v1';
+const STORAGE_KEY = 'islahiye_education_applications_v2';
 const UPDATE_EVENT = 'islahiye_applications_updated';
+
+const statusMap: Record<number, ApplicationStatus> = {
+  0: 'draft',
+  1: 'submitted',
+  2: 'under_review',
+  3: 'accepted',
+  4: 'rejected',
+  5: 'withdrawn',
+};
+
+const reverseStatusMap: Partial<Record<ApplicationStatus, number>> = {
+  draft: 0,
+  submitted: 1,
+  under_review: 2,
+  accepted: 3,
+  rejected: 4,
+  withdrawn: 5,
+};
+
+export const mapApplicationDtoToApplication = (dto: ApplicationDto): Application => {
+  return {
+    id: dto.id,
+    referenceNumber: dto.applicationNumber,
+    candidateId: dto.applicantUserId,
+    candidateName: dto.fullName,
+    phone: dto.phone,
+    email: dto.email,
+    programId: dto.programId,
+    programTitle: dto.programName,
+    termId: dto.termId,
+    cohortName: dto.termName,
+    appliedAt: dto.submittedAt ? new Date(dto.submittedAt).toLocaleDateString('tr-TR') : 'Bugün',
+    updatedAt: dto.createdAt ? new Date(dto.createdAt).toLocaleDateString('tr-TR') : 'Bugün',
+    educationLevel: dto.educationLevel,
+    occupation: dto.occupation,
+    residenceDistrict: dto.address?.includes('İslahiye') ? 'İslahiye Merkez' : 'Gaziantep',
+    experienceYears: `${dto.experienceYears} Yıl`,
+    statement: dto.motivation,
+    status: statusMap[dto.status] || 'submitted',
+    autoScore: dto.score
+      ? {
+          total: dto.score,
+          ruleVersion: 'v1.0',
+          residencePoints: 20,
+          educationPoints: 20,
+          experiencePoints: 20,
+        }
+      : undefined,
+    deviationReason: dto.rejectionReason || undefined,
+    adminJustification: dto.adminNotes || undefined,
+    commitments: {
+      attendanceAccepted: true,
+      assignmentsAccepted: true,
+      truthfulnessAccepted: true,
+    },
+    statusHistory: [
+      {
+        status: statusMap[dto.status] || 'submitted',
+        changedAt: dto.submittedAt ? new Date(dto.submittedAt).toLocaleDateString('tr-TR') : 'Bugün',
+        note: 'Başvuru sisteme kaydedildi.',
+      },
+    ],
+  };
+};
+
+export const syncApplicationsWithApi = async (): Promise<Application[]> => {
+  try {
+    const list = await educationApi.applications();
+    if (list && list.length > 0) {
+      const mapped = list.map(mapApplicationDtoToApplication);
+      const merged = [...INITIAL_APPLICATIONS];
+      mapped.forEach((apiApp) => {
+        const idx = merged.findIndex((m) => m.id === apiApp.id || m.candidateId === apiApp.candidateId);
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], ...apiApp };
+        } else {
+          merged.push(apiApp);
+        }
+      });
+      saveToStorage(merged);
+      return merged;
+    }
+  } catch (err) {
+    console.warn('API sync applications notice:', err);
+  }
+  return getStoredApplications();
+};
+
+if (typeof window !== 'undefined') {
+  syncApplicationsWithApi().catch(() => {});
+}
+
+export const INITIAL_APPLICATIONS: Application[] = [
+  // 1. Ahmet Kaya (Grup A - Kayıtlı)
+  {
+    id: 'app-seed-ahmet',
+    referenceNumber: 'ISL-2026-0001',
+    candidateId: 'usr-trainee',
+    candidateName: 'Ahmet Kaya',
+    phone: '0532 *** ** 11',
+    email: 'kursiyer.ahmet@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '12 Ağustos 2026 10:00',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'Tarımsal Üretici & Çiftçi',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '4 Yıl',
+    statement: 'İslahiye biberinin coğrafi işaret standartlarında dijital pazarlarda doğrudan satışı üzerine çalışmaktayım.',
+    status: 'accepted',
+    autoScore: { total: 95, ruleVersion: 'v1.0', residencePoints: 30, educationPoints: 30, experiencePoints: 35 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '12 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 2. Fatma Şahin (Grup A - Kayıtlı)
+  {
+    id: 'app-seed-fatma',
+    referenceNumber: 'ISL-2026-0002',
+    candidateId: 'usr-real-12',
+    candidateName: 'Fatma Şahin',
+    phone: '0533 *** ** 12',
+    email: 'kursiyer.fatma@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '13 Ağustos 2026 11:30',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'Gıda Teknikeri',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '5 Yıl',
+    statement: 'Paketleme ve soğuk zincir lojistiği eğitimlerini tamamlayarak e-ihracat yapmak istiyorum.',
+    status: 'accepted',
+    autoScore: { total: 92, ruleVersion: 'v1.0', residencePoints: 30, educationPoints: 30, experiencePoints: 32 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '13 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 3. Mehmet Öztürk (Grup A - Kayıtlı)
+  {
+    id: 'app-seed-mehmet-ozturk',
+    referenceNumber: 'ISL-2026-0003',
+    candidateId: 'usr-real-13',
+    candidateName: 'Mehmet Öztürk',
+    phone: '0534 *** ** 13',
+    email: 'kursiyer.mehmet@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '14 Ağustos 2026 09:15',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Ön Lisans',
+    occupation: 'Esnaf',
+    residenceDistrict: 'İslahiye / Fevzipaşa',
+    experienceYears: '3 Yıl',
+    statement: 'Yöresel baharat ve salça ürünlerimizi ulusal pazaryerlerine taşımak.',
+    status: 'accepted',
+    autoScore: { total: 88, ruleVersion: 'v1.0', residencePoints: 28, educationPoints: 25, experiencePoints: 35 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '14 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 4. Elif Çetin (Grup A - Kayıtlı)
+  {
+    id: 'app-seed-elif',
+    referenceNumber: 'ISL-2026-0004',
+    candidateId: 'usr-real-14',
+    candidateName: 'Elif Çetin',
+    phone: '0535 *** ** 14',
+    email: 'kursiyer.elif@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '15 Ağustos 2026 14:20',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'Grafik & Medya',
+    residenceDistrict: 'İslahiye / Atatürk Mah.',
+    experienceYears: '3 Yıl',
+    statement: 'Ürün etiket tasarımı, fotoğrafçılık ve sosyal medya kanallarından doğrudan satış.',
+    status: 'accepted',
+    autoScore: { total: 85, ruleVersion: 'v1.0', residencePoints: 25, educationPoints: 30, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '15 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 5. Mustafa Demir (Grup A - Kayıtlı)
+  {
+    id: 'app-seed-mustafa',
+    referenceNumber: 'ISL-2026-0005',
+    candidateId: 'usr-real-15',
+    candidateName: 'Mustafa Demir',
+    phone: '0536 *** ** 15',
+    email: 'kursiyer.mustafa@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '16 Ağustos 2026 16:00',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lise',
+    occupation: 'Çiftçi',
+    residenceDistrict: 'İslahiye / Boğaziçi',
+    experienceYears: '6 Yıl',
+    statement: 'Biber hasadı sonrası kurutma ve paketlemede e-ticaret modeline geçiş.',
+    status: 'accepted',
+    autoScore: { total: 81, ruleVersion: 'v1.0', residencePoints: 30, educationPoints: 16, experiencePoints: 35 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '16 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 6. Emine Koç (Grup A - Kayıtlı)
+  {
+    id: 'app-seed-emine',
+    referenceNumber: 'ISL-2026-0006',
+    candidateId: 'usr-real-16',
+    candidateName: 'Emine Koç',
+    phone: '0537 *** ** 16',
+    email: 'kursiyer.emine@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '17 Ağustos 2026 10:30',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Ön Lisans',
+    occupation: 'Kooperatif Temsilcisi',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '2 Yıl',
+    statement: 'Kadın kooperatifimizin el yapımı kurutulmuş biber ve baharat ürünlerini pazarlamak.',
+    status: 'accepted',
+    autoScore: { total: 79, ruleVersion: 'v1.0', residencePoints: 28, educationPoints: 25, experiencePoints: 26 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '17 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 7. Caner Yıldız (Grup B - Kayıtlı)
+  {
+    id: 'app-seed-caner',
+    referenceNumber: 'ISL-2026-0007',
+    candidateId: 'usr-real-17',
+    candidateName: 'Caner Yıldız',
+    phone: '0538 *** ** 17',
+    email: 'kursiyer.caner@islahiye.bel.tr',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '18 Ağustos 2026 09:40',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'Dış Ticaret Uzman Adayı',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '3 Yıl',
+    statement: 'Ortadoğu ve Avrupa pazarlarına yöresel ürün ihracatı yapmak için mevzuat öğrenmek.',
+    status: 'accepted',
+    autoScore: { total: 90, ruleVersion: 'v1.0', residencePoints: 30, educationPoints: 30, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '18 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 8. Büşra Kurt (Grup B - Kayıtlı)
+  {
+    id: 'app-seed-busra',
+    referenceNumber: 'ISL-2026-0008',
+    candidateId: 'usr-real-18',
+    candidateName: 'Büşra Kurt',
+    phone: '0539 *** ** 18',
+    email: 'kursiyer.busra@islahiye.bel.tr',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '19 Ağustos 2026 13:10',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'Lojistik Operatörü',
+    residenceDistrict: 'İslahiye / Fevzipaşa',
+    experienceYears: '4 Yıl',
+    statement: 'Gümrük evrakları ve akreditif yöntemlerini uluslararası standartlarda öğrenmek.',
+    status: 'accepted',
+    autoScore: { total: 86, ruleVersion: 'v1.0', residencePoints: 26, educationPoints: 30, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '19 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '20 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 9. Serdar Aslan (Grup B - Kayıtlı)
+  {
+    id: 'app-seed-serdar',
+    referenceNumber: 'ISL-2026-0009',
+    candidateId: 'usr-real-19',
+    candidateName: 'Serdar Aslan',
+    phone: '0532 *** ** 19',
+    email: 'kursiyer.serdar@islahiye.bel.tr',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '20 Ağustos 2026 11:00',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Ön Lisans',
+    occupation: 'Gümrük Stajyeri',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '2 Yıl',
+    statement: 'Incoterms ve sınır kapısı lojistik operasyonlarında yetkinlik kazanmak.',
+    status: 'accepted',
+    autoScore: { total: 83, ruleVersion: 'v1.0', residencePoints: 28, educationPoints: 25, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '20 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '22 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 10. Zeynep Polat (Grup B - Kayıtlı)
+  {
+    id: 'app-seed-zeynep-polat',
+    referenceNumber: 'ISL-2026-0010',
+    candidateId: 'usr-real-20',
+    candidateName: 'Zeynep Polat',
+    phone: '0533 *** ** 20',
+    email: 'kursiyer.zeynep@islahiye.bel.tr',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '21 Ağustos 2026 15:45',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'İşletmeci',
+    residenceDistrict: 'İslahiye / Atatürk Mah.',
+    experienceYears: '3 Yıl',
+    statement: 'Kuru meyve ve baharat ihracatında sınır ötesi pazaryeri anlaşmaları yapmak.',
+    status: 'accepted',
+    autoScore: { total: 78, ruleVersion: 'v1.0', residencePoints: 25, educationPoints: 28, experiencePoints: 25 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '21 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '23 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 11. İbrahim Çelik (Grup C - Kayıtlı)
+  {
+    id: 'app-seed-ibrahim',
+    referenceNumber: 'ISL-2026-0011',
+    candidateId: 'usr-real-21',
+    candidateName: 'İbrahim Çelik',
+    phone: '0534 *** ** 21',
+    email: 'kursiyer.ibrahim@islahiye.bel.tr',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '22 Ağustos 2026 10:15',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Ön Lisans',
+    occupation: 'Aşçı Yardımcısı',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '4 Yıl',
+    statement: 'Geleneksel İslahiye mutfak reçeteleri ve modern sunum teknikleri.',
+    status: 'accepted',
+    autoScore: { total: 91, ruleVersion: 'v1.0', residencePoints: 30, educationPoints: 26, experiencePoints: 35 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '22 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '24 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 12. Merve Doğan (Grup C - Kayıtlı)
+  {
+    id: 'app-seed-merve',
+    referenceNumber: 'ISL-2026-0012',
+    candidateId: 'usr-real-22',
+    candidateName: 'Merve Doğan',
+    phone: '0535 *** ** 22',
+    email: 'kursiyer.merve@islahiye.bel.tr',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '23 Ağustos 2026 14:00',
+    updatedAt: '25 Ağustos 2026 14:00',
+    educationLevel: 'Lisans',
+    occupation: 'Gıda Mühendisi',
+    residenceDistrict: 'İslahiye / Cumhuriyet',
+    experienceYears: '3 Yıl',
+    statement: 'Yöresel gastronomi turizmi ve reçete standardizasyonu çalışması.',
+    status: 'accepted',
+    autoScore: { total: 87, ruleVersion: 'v1.0', residencePoints: 27, educationPoints: 30, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '23 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '25 Ağustos 2026', note: 'Asil listeye kabul edildi.' },
+    ],
+  },
+  // 13. Seda Erdem (Asil Liste / Kesin Kayıt Masasında Onay Bekleyen)
+  {
+    id: 'app-seed-seda',
+    referenceNumber: 'ISL-2026-0013',
+    candidateId: 'usr-real-26',
+    candidateName: 'Seda Erdem',
+    phone: '0536 *** ** 26',
+    email: 'aday.seda@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '24 Ağustos 2026 16:30',
+    updatedAt: '28 Ağustos 2026 11:00',
+    educationLevel: 'Lisans',
+    occupation: 'Pazarlama Uzmanı',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '4 Yıl',
+    statement: 'Asil listeye kabul edildim; evraklarımı yükledim, kesin kayıt onayını bekliyorum.',
+    status: 'accepted',
+    autoScore: { total: 89, ruleVersion: 'v1.0', residencePoints: 29, educationPoints: 30, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '24 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'accepted', changedAt: '28 Ağustos 2026', note: 'Asil listeye kabul edildi, kesin kayıt evrakı bekleniyor.' },
+    ],
+  },
+  // 14. Derya Yılmaz (İnceleme / Evrak Kontrolü Bekleyen)
+  {
+    id: 'app-seed-derya',
+    referenceNumber: 'ISL-2026-0014',
+    candidateId: 'usr-real-24',
+    candidateName: 'Derya Yılmaz',
+    phone: '0537 *** ** 24',
+    email: 'aday.derya@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '25 Ağustos 2026 11:15',
+    updatedAt: '28 Ağustos 2026 12:00',
+    educationLevel: 'Ön Lisans',
+    occupation: 'Grafiker',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '3 Yıl',
+    statement: 'Ürün ambalajı ve e-ticaret vitrini tasarımı yapmaktayım.',
+    status: 'under_review',
+    autoScore: { total: 82, ruleVersion: 'v1.0', residencePoints: 25, educationPoints: 25, experiencePoints: 32 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '25 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'under_review', changedAt: '28 Ağustos 2026', note: 'Kriter ve evrak incelemesine alındı.' },
+    ],
+  },
+  // 15. Hasan Kılıç (İnceleme / Kriter Puanlaması Bekleyen)
+  {
+    id: 'app-seed-hasan',
+    referenceNumber: 'ISL-2026-0015',
+    candidateId: 'usr-real-25',
+    candidateName: 'Hasan Kılıç',
+    phone: '0538 *** ** 25',
+    email: 'aday.hasan@islahiye.bel.tr',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '26 Ağustos 2026 09:30',
+    updatedAt: '28 Ağustos 2026 13:00',
+    educationLevel: 'Lise',
+    occupation: 'Lojistik Elemanı',
+    residenceDistrict: 'İslahiye / Boğaziçi',
+    experienceYears: '2 Yıl',
+    statement: 'İhracat gümrük süreçlerinde kendimi geliştirmek istiyorum.',
+    status: 'under_review',
+    autoScore: { total: 74, ruleVersion: 'v1.0', residencePoints: 28, educationPoints: 16, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '26 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'under_review', changedAt: '28 Ağustos 2026', note: 'İnceleme aşamasında.' },
+    ],
+  },
+  // 16. Ali Çelik (Yeni Başvuru)
+  {
+    id: 'app-seed-ali',
+    referenceNumber: 'ISL-2026-0016',
+    candidateId: 'usr-real-23',
+    candidateName: 'Ali Çelik',
+    phone: '0539 *** ** 23',
+    email: 'aday.ali@islahiye.bel.tr',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '27 Ağustos 2026 15:20',
+    updatedAt: '27 Ağustos 2026 15:20',
+    educationLevel: 'Ön Lisans',
+    occupation: 'Aşçı Yardımcısı',
+    residenceDistrict: 'İslahiye Merkez',
+    experienceYears: '2 Yıl',
+    statement: 'Geleneksel İslahiye mutfağı ve gastronomi alanında mesleki uzmanlığımı artırmak istiyorum.',
+    status: 'submitted',
+    autoScore: { total: 70, ruleVersion: 'v1.0', residencePoints: 25, educationPoints: 25, experiencePoints: 20 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [{ status: 'submitted', changedAt: '27 Ağustos 2026', note: 'Başvuru sisteme kaydedildi.' }],
+  },
+  // 17. Burak Şen (Yedek Liste)
+  {
+    id: 'app-seed-burak',
+    referenceNumber: 'ISL-2026-0017',
+    candidateId: 'usr-real-27',
+    candidateName: 'Burak Şen',
+    phone: '0532 *** ** 27',
+    email: 'aday.burak@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '28 Ağustos 2026 14:00',
+    updatedAt: '30 Ağustos 2026 10:00',
+    educationLevel: 'Lise',
+    occupation: 'Çırak',
+    residenceDistrict: 'Gaziantep',
+    experienceYears: '1 Yıl',
+    statement: 'Kontenjan açılırsa eğitime katılmak istiyorum.',
+    status: 'waitlisted',
+    autoScore: { total: 65, ruleVersion: 'v1.0', residencePoints: 15, educationPoints: 20, experiencePoints: 30 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '28 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'waitlisted', changedAt: '30 Ağustos 2026', note: 'Kriter sıralaması sonucu yedek listeye alındı.' },
+    ],
+  },
+  // 18. Volkan Tekin (Şartları Sağlamadı / Elendi)
+  {
+    id: 'app-seed-volkan',
+    referenceNumber: 'ISL-2026-0018',
+    candidateId: 'usr-real-29',
+    candidateName: 'Volkan Tekin',
+    phone: '0533 *** ** 29',
+    email: 'aday.volkan@islahiye.bel.tr',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    appliedAt: '29 Ağustos 2026 16:50',
+    updatedAt: '31 Ağustos 2026 09:00',
+    educationLevel: 'Lise',
+    occupation: 'Öğrenci',
+    residenceDistrict: 'Kilis',
+    experienceYears: '0 Yıl',
+    statement: 'Online katılmak istiyorum.',
+    status: 'rejected',
+    autoScore: { total: 42, ruleVersion: 'v1.0', residencePoints: 10, educationPoints: 15, experiencePoints: 17 },
+    commitments: { attendanceAccepted: true, assignmentsAccepted: true, truthfulnessAccepted: true },
+    statusHistory: [
+      { status: 'submitted', changedAt: '29 Ağustos 2026', note: 'Başvuru yapıldı.' },
+      { status: 'rejected', changedAt: '31 Ağustos 2026', note: 'Bölge ikamet şartı ve devam taahhüdü sağlanamadı.' },
+    ],
+  },
+];
 
 /**
  * Başvuru yerel deposunu ilklendirir veya mevcut veriyi döndürür.
@@ -25,18 +602,19 @@ export const getStoredApplications = (): Application[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_APPLICATIONS));
-      return DEMO_APPLICATIONS;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_APPLICATIONS));
+      return INITIAL_APPLICATIONS;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed) && parsed.length >= 15) {
       return parsed;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_APPLICATIONS));
-    return DEMO_APPLICATIONS;
+    // Önbellekte eksik/eski veri varsa zengin tohum verisiyle tazele
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_APPLICATIONS));
+    return INITIAL_APPLICATIONS;
   } catch (err) {
     console.error('LocalStorage read error:', err);
-    return DEMO_APPLICATIONS;
+    return INITIAL_APPLICATIONS;
   }
 };
 
@@ -58,32 +636,47 @@ const saveToStorage = (apps: Application[]): void => {
  * Rastgele referans takip numarası üretir (Örn: ISL-2026-0942)
  */
 export const generateReferenceNumber = (): string => {
-  const num = Math.floor(1000 + Math.random() * 9000);
-  return `ISL-2026-${num}`;
+  const year = new Date().getFullYear();
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  return `ISL-${year}-${randomNum}`;
 };
 
 /**
- * Tarih ve saat formatı (Türkçe)
+ * Tarih ve saati Türkçe kurumsal formatta döner.
  */
 export const formatCurrentTimestamp = (): string => {
-  return new Date().toLocaleString('tr-TR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const now = new Date();
+  const months = [
+    'Ocak',
+    'Şubat',
+    'Mart',
+    'Nisan',
+    'Mayıs',
+    'Haziran',
+    'Temmuz',
+    'Ağustos',
+    'Eylül',
+    'Ekim',
+    'Kasım',
+    'Aralık',
+  ];
+  const day = now.getDate();
+  const month = months[now.getMonth()];
+  const year = now.getFullYear();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year} ${hours}:${minutes}`;
 };
 
 /**
- * Tüm kayıtlı başvuruları listeler (Yönetici masası için)
+ * Tüm başvuruları getirir.
  */
 export const getAllApplications = (): Application[] => {
   return getStoredApplications();
 };
 
 /**
- * Belirli bir adayın başvurularını getirir (Aday Mahremiyeti ve İzolasyonu)
+ * Belirli bir adaya ait tüm başvuruları getirir.
  */
 export const getApplicationsByCandidateId = (candidateId: string): Application[] => {
   const all = getStoredApplications();
@@ -99,8 +692,7 @@ export const getApplicationById = (idOrRef: string): Application | undefined => 
 };
 
 /**
- * Bir adayın belirli bir program ve dönemde aktif (devam eden) başvurusu olup olmadığını denetler.
- * SPRINT E02-B: Mükerrer kontrolü candidateId + programId + termId birleşimine dayanır.
+ * Bir adayın belirli bir program ve dönemde aktif başvurusu olup olmadığını denetler.
  */
 export const hasActiveApplication = (
   candidateId: string,
@@ -115,13 +707,11 @@ export const hasActiveApplication = (
     if (excludeAppId && app.id === excludeAppId) return false;
     if (app.programId !== programId) return false;
 
-    // Farklı bir dönem ise mükerrer sayılmaz (sonraki dönem başvurusu engellenmez)
     const norm = (val?: string) => (val === '2026 Güz Dönemi' ? 'term-2026-fall' : val);
     const appTerm = norm(app.termId || app.cohortName) || 'term-2026-fall';
     const targetNorm = norm(targetTerm) || 'term-2026-fall';
-    if (appTerm !== targetNorm && app.cohortName !== targetTerm && app.termId !== targetTerm) return false;
+    if (appTerm !== targetNorm && app.cohortName !== targetNorm && app.termId !== targetNorm) return false;
 
-    // Taslak, geri çekilen veya reddedilenler yeni başvuruya engel olmaz
     return !['withdrawn', 'rejected', 'draft'].includes(app.status);
   });
 };
@@ -173,7 +763,6 @@ export const saveDraftApplication = (
     return { success: true, application: updated };
   }
 
-  // Yeni taslak oluşturma öncesi aynı dönem ve programda aktif başvuru var mı?
   if (hasActiveApplication(appData.candidateId, appData.programId, termId)) {
     return {
       success: false,
@@ -185,7 +774,7 @@ export const saveDraftApplication = (
     id: appData.id || `app-${Date.now()}`,
     referenceNumber: appData.referenceNumber || generateReferenceNumber(),
     candidateId: appData.candidateId,
-    candidateName: appData.candidateName || 'Demo Aday',
+    candidateName: appData.candidateName || 'Aday',
     phone: appData.phone || '0544 *** ** 28',
     email: appData.email || 'aday@islahiye-dijital.org',
     programId: appData.programId,
@@ -222,10 +811,6 @@ export const saveDraftApplication = (
 
 /**
  * Başvuruyu tamamlama ve idari incelemeye gönderme
- * SPRINT E02-B:
- * - candidateId + programId + termId birleşimine göre mükerrer aktif başvuru kontrolü yapılır.
- * - Başvuru anında geçerli kriter seti (criteriaVersionId) kaydedilir.
- * - Kriter motoru otomatik ön inceleme puanını ve tavsiyesini hesaplar.
  */
 export const submitApplication = (
   appData: Partial<Application> & {
@@ -239,7 +824,6 @@ export const submitApplication = (
   const all = getStoredApplications();
   const termId = appData.termId || appData.cohortName || 'term-2026-fall';
 
-  // Mükerrer başvuru kontrolü:
   if (hasActiveApplication(appData.candidateId, appData.programId, termId, appData.id)) {
     return {
       success: false,
@@ -248,12 +832,9 @@ export const submitApplication = (
   }
 
   const timestamp = formatCurrentTimestamp();
-
-  // Aktif kriter seti eşleştirmesi
   const activeCriteriaSet = getActiveCriteriaSetForProgram(appData.programId);
   const criteriaVersionId = activeCriteriaSet?.id;
 
-  // Eğer mevcut bir taslak ID'si geldiyse ya da bu programa/döneme ait taslak varsa onu 'submitted' yap:
   let existingIndex = appData.id ? all.findIndex((a) => a.id === appData.id) : -1;
   if (existingIndex === -1) {
     existingIndex = all.findIndex(
@@ -325,7 +906,6 @@ export const submitApplication = (
     all.unshift(finalApp);
   }
 
-  // Puanlama motoru ile otomatik ön değerlendirme hesapla ve kaydet
   try {
     if (activeCriteriaSet) {
       const evaluation = evaluateAndStoreApplication(finalApp, activeCriteriaSet);
@@ -344,7 +924,29 @@ export const submitApplication = (
 
   saveToStorage(all);
 
-  // Bildirim tetikle (Non-blocking)
+  // Canlı backend API ile senkronize et
+  try {
+    educationApi
+      .createApplication({
+        programId: finalApp.programId,
+        termId: finalApp.termId,
+        fullName: finalApp.candidateName,
+        email: finalApp.email,
+        phone: finalApp.phone,
+        birthDate: '1995-01-01',
+        educationLevel: finalApp.educationLevel,
+        occupation: finalApp.occupation,
+        experienceYears: parseInt(finalApp.experienceYears || '1', 10) || 1,
+        motivation: finalApp.statement,
+        address: finalApp.residenceDistrict || 'İslahiye Merkez',
+        specialNeeds: 'Yok',
+        submitNow: true,
+      })
+      .catch((apiErr) => console.warn('API create application sync notice:', apiErr));
+  } catch (err) {
+    console.warn('API call skipped:', err);
+  }
+
   try {
     notifyApplicationSubmitted(finalApp);
   } catch (notifErr) {
@@ -355,7 +957,7 @@ export const submitApplication = (
 };
 
 /**
- * Başvuruyu geri çekme (Yalnızca taslak, gönderildi veya incelemede durumlarında izin verilir)
+ * Başvuruyu geri çekme
  */
 export const withdrawApplication = (
   appId: string,
@@ -401,12 +1003,7 @@ export const withdrawApplication = (
 };
 
 /**
- * Yönetici nihai kararı uygulama (Kabul, Yedek, Reddet, Ek İnceleme)
- * SPRINT E02-B:
- * - internalDecisionNote: Sadece kurum içi idari masada görünür, adaya gösterilmez.
- * - candidateDecisionMessage: Aday paneline iletilecek resmi sonuç açıklaması.
- * - deviationReason: Algoritma tavsiyesinden sapma varsa zorunlu gerekçe.
- * - Eski kararlar silinmez, decisionHistory içinde kayıt altına alınır.
+ * Yönetici nihai kararı uygulama (Kabul, Yedek, Reddet)
  */
 export const updateAdminDecision = (
   appId: string,
@@ -426,15 +1023,12 @@ export const updateAdminDecision = (
   const app = all[index];
   const timestamp = formatCurrentTimestamp();
 
-  // Parametre normalizasyonu (yeni ayrılmış gerekçeler veya geriye dönük çağrı):
   let internalNote = internalDecisionNoteOrJustification.trim();
   let candidateMessage = candidateDecisionMessageOrDecidedBy.trim();
   let managerName = decidedByOrDeviationReason?.trim() || 'Selin Aydın (Yönetici)';
   let devReason = deviationReason?.trim();
 
-  // Eski 4 parametreli imza kontrolü: updateAdminDecision(appId, newStatus, justification, decidedBy)
   if (!devReason && candidateDecisionMessageOrDecidedBy.includes('(')) {
-    // 3. parametre decidedBy gibi görünüyor
     managerName = candidateDecisionMessageOrDecidedBy.trim();
     candidateMessage = internalDecisionNoteOrJustification.trim();
   }
@@ -446,7 +1040,6 @@ export const updateAdminDecision = (
     return { success: false, error: 'Adaya iletilecek sonuç açıklaması zorunludur.' };
   }
 
-  // Karar geçmişi öğesi
   const decisionRecord: DecisionHistoryItem = {
     status: newStatus,
     decidedAt: timestamp,
@@ -464,14 +1057,11 @@ export const updateAdminDecision = (
     internalDecisionNote: internalNote,
     candidateDecisionMessage: candidateMessage,
     deviationReason: devReason,
-    adminJustification: candidateMessage, // Geriye dönük uyumluluk
+    adminJustification: candidateMessage,
     decidedAt: timestamp,
     decidedBy: managerName,
     updatedAt: timestamp,
-    decisionHistory: [
-      ...(app.decisionHistory || []),
-      decisionRecord,
-    ],
+    decisionHistory: [...(app.decisionHistory || []), decisionRecord],
     statusHistory: [
       ...(app.statusHistory || []),
       {
@@ -485,40 +1075,52 @@ export const updateAdminDecision = (
 
   saveToStorage(all);
 
-  // Bildirim tetikle (Non-blocking - Mahremiyet Korumalı)
+  try {
+    educationApi
+      .updateApplicationStatus(appId, {
+        status: reverseStatusMap[newStatus] ?? 1,
+        adminNotes: candidateMessage,
+        internalDecisionNote: internalNote,
+        rejectionReason: newStatus === 'rejected' ? candidateMessage : undefined,
+      })
+      .catch((apiErr) => console.warn('API update application status sync notice:', apiErr));
+  } catch (err) {
+    console.warn('API call skipped:', err);
+  }
+
   try {
     notifyAdminDecision(all[index], candidateMessage);
   } catch (notifErr) {
-    console.warn('Karar bildirimi gönderilirken hata oluştu:', notifErr);
+    console.warn('Yönetici kararı bildirimi tetiklenirken hata oluştu:', notifErr);
   }
 
   return { success: true };
 };
 
 /**
- * Program ve dönem bazlı kontenjan istatistiklerini hesaplar.
+ * Belirli bir program için kontenjan ve başvuru istatistiklerini hesaplar.
  */
-export const getProgramQuotaStats = (
-  programId: string,
-  termId: string = 'term-2026-fall',
-  defaultQuota: number = 20
-): ProgramQuotaStats => {
-  const all = getStoredApplications();
-  const programApps = all.filter(
-    (a) => a.programId === programId && (a.termId || a.cohortName || 'term-2026-fall') === termId
-  );
+export const getProgramQuotaStats = (programId: string, termId?: string): ProgramQuotaStats => {
+  const all = getStoredApplications().filter((a) => {
+    if (a.programId !== programId) return false;
+    if (termId && a.termId && a.termId !== termId) return false;
+    return true;
+  });
+  const defaultQuota = 30;
 
-  const acceptedCount = programApps.filter((a) => a.status === 'accepted').length;
-  const waitlistedCount = programApps.filter((a) => ['waitlisted', 'reserve'].includes(a.status)).length;
-  const pendingCount = programApps.filter((a) => ['submitted', 'under_review', 'pending'].includes(a.status)).length;
-  const rejectedCount = programApps.filter((a) => a.status === 'rejected').length;
-  const withdrawnCount = programApps.filter((a) => a.status === 'withdrawn').length;
+  const acceptedCount = all.filter((a) => a.status === 'accepted').length;
+  const waitlistedCount = all.filter((a) => a.status === 'waitlisted' || a.status === 'reserve').length;
+  const pendingCount = all.filter((a) =>
+    ['submitted', 'under_review', 'pending'].includes(a.status)
+  ).length;
+  const rejectedCount = all.filter((a) => a.status === 'rejected').length;
+  const withdrawnCount = all.filter((a) => a.status === 'withdrawn').length;
 
   return {
     programId,
-    programTitle: programApps[0]?.programTitle || 'Eğitim Programı',
-    termId,
-    cohortName: programApps[0]?.cohortName || '2026 Güz Dönemi',
+    programTitle: all[0]?.programTitle || 'Eğitim Programı',
+    termId: termId || all[0]?.termId || 'term-2026-fall',
+    cohortName: all[0]?.cohortName || '2026 Güz Dönemi',
     quota: defaultQuota,
     acceptedCount,
     waitlistedCount,
@@ -530,16 +1132,11 @@ export const getProgramQuotaStats = (
 };
 
 /**
- * Demo verilerini fabrika ayarlarına sıfırlar (Hem başvuruları hem kriter setlerini sıfırlar)
+ * Başvuru yerel deposunu sıfırlar
  */
 export const resetApplicationsToDefaults = (): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_APPLICATIONS));
+  saveToStorage(INITIAL_APPLICATIONS);
   resetCriteriaToDefaults();
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent(UPDATE_EVENT, { detail: DEMO_APPLICATIONS })
-    );
-  }
 };
 
 /**

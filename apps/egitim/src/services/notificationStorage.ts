@@ -957,6 +957,45 @@ export const publishAdminAnnouncement = (
   return { success: true, announcement: ann };
 };
 
+export const updateAdminAnnouncement = (
+  announcementId: string,
+  updates: Partial<Pick<AdminAnnouncement, 'title' | 'content' | 'targetAudience' | 'targetProgramId' | 'targetProgramTitle' | 'targetGroupId' | 'targetGroupName' | 'status' | 'recipientCount'>>
+): { success: boolean; announcement?: AdminAnnouncement; error?: string } => {
+  const announcements = getStoredAdminAnnouncements();
+  const index = announcements.findIndex((a) => a.id === announcementId);
+
+  if (index === -1) {
+    return { success: false, error: 'Güncellenecek duyuru bulunamadı.' };
+  }
+
+  const ann = {
+    ...announcements[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  announcements[index] = ann;
+  saveAdminAnnouncementsToStorage(announcements);
+
+  return { success: true, announcement: ann };
+};
+
+export const deleteAdminAnnouncement = (
+  announcementId: string
+): { success: boolean; error?: string } => {
+  const announcements = getStoredAdminAnnouncements();
+  const index = announcements.findIndex((a) => a.id === announcementId);
+
+  if (index === -1) {
+    return { success: false, error: 'Silinecek duyuru bulunamadı.' };
+  }
+
+  const updated = announcements.filter((a) => a.id !== announcementId);
+  saveAdminAnnouncementsToStorage(updated);
+
+  return { success: true };
+};
+
 // -----------------------------------------------------------------------------
 // EVENT SUBSCRIPTION & RESET
 // -----------------------------------------------------------------------------

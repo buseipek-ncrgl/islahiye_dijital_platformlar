@@ -26,12 +26,33 @@ import {
 } from '../services/enrollmentStorage';
 import { getStoredApplications } from '../services/applicationStorage';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
+import {
+  getStoredLocations,
+  addStoredLocation,
+  getStoredSchedules,
+  addStoredSchedule,
+  subscribeToFacilityCatalog,
+} from '../services/facilityCatalogService';
+import { VenuePicker } from '../components/common/VenuePicker';
+import { KpiStrip } from '../components/ui/KpiStrip';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
+import { Program } from '../types';
+
+const PREDEFINED_GROUP_NAMES = [
+  'Grup A — Sabah Oturumu',
+  'Grup B — Öğleden Sonra Oturumu',
+  'Grup C — Hafta Sonu Sabah',
+  'Grup D — Hafta Sonu Öğleden Sonra',
+  'Grup E — Hafta İçi Akşam',
+  'Özel Grup Adı Belirt...',
+];
 
 export const GroupManagementPage: React.FC = () => {
   const { currentUser } = useDemoRole();
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [assignments, setAssignments] = useState<GroupAssignment[]>([]);
+  const [programs, setPrograms] = useState<Program[]>(() => getInitialPrograms());
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [filterProgramId, setFilterProgramId] = useState<string>('all');
 
@@ -40,13 +61,18 @@ export const GroupManagementPage: React.FC = () => {
   const [transferTargetAssignment, setTransferTargetAssignment] = useState<GroupAssignment | null>(null);
   const [removeTargetAssignment, setRemoveTargetAssignment] = useState<GroupAssignment | null>(null);
 
+  const [schedules, setSchedules] = useState<string[]>(getStoredSchedules());
+  const [customLocation, setCustomLocation] = useState<string>('');
+  const [customSchedule, setCustomSchedule] = useState<string>('');
+
   // Create form state
-  const [newGroupName, setNewGroupName] = useState<string>('');
+  const [newGroupNamePreset, setNewGroupNamePreset] = useState<string>(PREDEFINED_GROUP_NAMES[0]);
+  const [newGroupName, setNewGroupName] = useState<string>(PREDEFINED_GROUP_NAMES[0]);
   const [newGroupProgramId, setNewGroupProgramId] = useState<string>('prog-01');
   const [newGroupCapacity, setNewGroupCapacity] = useState<number>(20);
   const [newGroupInstructorId, setNewGroupInstructorId] = useState<string>('user-instructor-01');
-  const [newGroupSchedule, setNewGroupSchedule] = useState<string>('Pazartesi & Çarşamba 14:00 - 17:00');
-  const [newGroupLocation, setNewGroupLocation] = useState<string>('Seminer Salonu A');
+  const [newGroupSchedule, setNewGroupSchedule] = useState<string>(getStoredSchedules()[1] || '');
+  const [newGroupLocation, setNewGroupLocation] = useState<string>(getStoredLocations()[0] || '');
 
   // Transfer form state
   const [targetNewGroupId, setTargetNewGroupId] = useState<string>('');
@@ -54,6 +80,11 @@ export const GroupManagementPage: React.FC = () => {
 
   // Remove form state
   const [removeReason, setRemoveReason] = useState<string>('');
+
+  // Scoped modal validation errors (cleared when closing modals)
+  const [createModalError, setCreateModalError] = useState<string | null>(null);
+  const [transferModalError, setTransferModalError] = useState<string | null>(null);
+  const [removeModalError, setRemoveModalError] = useState<string | null>(null);
 
   // Toast / feedback message
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -64,6 +95,10 @@ export const GroupManagementPage: React.FC = () => {
     setGroups(grps);
     setAssignments(asgns);
 
+    fetchLivePrograms().then((progs) => {
+      if (progs && progs.length > 0) setPrograms(progs);
+    });
+
     if (grps.length > 0 && !selectedGroupId) {
       setSelectedGroupId(grps[0].id);
     }
@@ -71,8 +106,14 @@ export const GroupManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const unsub = subscribeToGroupUpdates(loadData);
-    return () => unsub();
+    const unsub1 = subscribeToGroupUpdates(loadData);
+    const unsub2 = subscribeToFacilityCatalog(() => {
+      setSchedules(getStoredSchedules());
+    });
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, []);
 
   // Filtered groups
@@ -124,13 +165,10 @@ export const GroupManagementPage: React.FC = () => {
     { id: 'user-instructor-03', name: 'Fatma Yıldırım', expertise: 'Dijital Pazarlama & İletişim' },
   ];
 
-  // Programs mapping
-  const programOptions = [
-    { id: 'prog-01', title: 'İslahiye Biberi & Tarımsal E-Ticaret' },
-    { id: 'prog-02', title: 'Dış Ticaret & İhracat Yönetimi' },
-    { id: 'prog-03', title: 'Temel Bilgisayar & Dijital Okuryazarlık' },
-    { id: 'prog-04', title: 'Dijital Pazarlama & Sosyal Medya' },
-  ];
+  // Programs mapping (dynamic with fallback)
+  const programOptions = useMemo(() => {
+    return programs.map((p) => ({ id: p.id, title: p.title }));
+  }, [programs]);
 
   // Candidates on waitlist for current group's program
   const waitlistedCandidates = useMemo(() => {
@@ -141,12 +179,32 @@ export const GroupManagementPage: React.FC = () => {
     );
   }, [currentGroup]);
 
-  // Hanlders
+  // Handlers
   const handleCreateGroupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGroupName.trim()) {
-      setFeedback({ type: 'error', message: 'Lütfen grup adı giriniz.' });
+      setCreateModalError('Lütfen grup adı giriniz.');
       return;
+    }
+
+    let finalSchedule = newGroupSchedule;
+    if (newGroupSchedule === 'custom') {
+      if (!customSchedule.trim()) {
+        setCreateModalError('Lütfen yeni ders takvimi / oturum zamanını belirtiniz.');
+        return;
+      }
+      addStoredSchedule(customSchedule.trim());
+      finalSchedule = customSchedule.trim();
+    }
+
+    let finalLocation = newGroupLocation;
+    if (newGroupLocation === 'custom') {
+      if (!customLocation.trim()) {
+        setCreateModalError('Lütfen yeni derslik / konum adını belirtiniz.');
+        return;
+      }
+      addStoredLocation(customLocation.trim());
+      finalLocation = customLocation.trim();
     }
 
     const prog = programOptions.find((p) => p.id === newGroupProgramId);
@@ -161,19 +219,22 @@ export const GroupManagementPage: React.FC = () => {
       capacity: Number(newGroupCapacity),
       instructorIds: inst ? [inst.id] : ['user-instructor-01'],
       instructorNames: inst ? [inst.name] : ['Murat Özkan'],
-      scheduleSummary: newGroupSchedule.trim() || 'Haftalık 6 Saat',
-      location: newGroupLocation.trim() || 'Derslik',
+      scheduleSummary: finalSchedule.trim() || 'Haftalık 6 Saat',
+      location: finalLocation.trim() || 'Derslik',
       status: 'active',
     });
 
     if (res.success && res.group) {
       setFeedback({ type: 'success', message: `"${res.group.name}" başarıyla oluşturuldu.` });
+      setCreateModalError(null);
       setShowCreateModal(false);
       setSelectedGroupId(res.group.id);
       setNewGroupName('');
+      setCustomLocation('');
+      setCustomSchedule('');
       loadData();
     } else {
-      setFeedback({ type: 'error', message: res.error || 'Grup oluşturulamadı.' });
+      setCreateModalError(res.error || 'Grup oluşturulamadı.');
     }
   };
 
@@ -181,11 +242,11 @@ export const GroupManagementPage: React.FC = () => {
     e.preventDefault();
     if (!transferTargetAssignment) return;
     if (!targetNewGroupId) {
-      setFeedback({ type: 'error', message: 'Lütfen hedef grup seçiniz.' });
+      setTransferModalError('Lütfen hedef grup seçiniz.');
       return;
     }
     if (!transferReason.trim()) {
-      setFeedback({ type: 'error', message: 'Lütfen transfer gerekçesi yazınız.' });
+      setTransferModalError('Lütfen transfer gerekçesi yazınız.');
       return;
     }
 
@@ -201,12 +262,13 @@ export const GroupManagementPage: React.FC = () => {
         type: 'success',
         message: `${transferTargetAssignment.candidateName} başarıyla hedef gruba transfer edildi. Önceki yoklama geçmişi korundu.`,
       });
+      setTransferModalError(null);
       setTransferTargetAssignment(null);
       setTargetNewGroupId('');
       setTransferReason('');
       loadData();
     } else {
-      setFeedback({ type: 'error', message: res.error || 'Transfer başarısız oldu.' });
+      setTransferModalError(res.error || 'Transfer başarısız oldu.');
     }
   };
 
@@ -214,7 +276,7 @@ export const GroupManagementPage: React.FC = () => {
     e.preventDefault();
     if (!removeTargetAssignment) return;
     if (!removeReason.trim()) {
-      setFeedback({ type: 'error', message: 'Lütfen gruptan çıkarma gerekçesi yazınız.' });
+      setRemoveModalError('Lütfen gruptan çıkarma gerekçesi yazınız.');
       return;
     }
 
@@ -229,37 +291,35 @@ export const GroupManagementPage: React.FC = () => {
         type: 'success',
         message: `${removeTargetAssignment.candidateName} gruptan çıkarıldı. Grup kontenjanı serbest bırakıldı.`,
       });
+      setRemoveModalError(null);
       setRemoveTargetAssignment(null);
       setRemoveReason('');
       loadData();
     } else {
-      setFeedback({ type: 'error', message: res.error || 'İşlem gerçekleştirilemedi.' });
+      setRemoveModalError(res.error || 'İşlem gerçekleştirilemedi.');
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-brand-navy">Grup & Kontenjan Masası</h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-              Sprint E02-C
-            </span>
-          </div>
-          <p className="text-sm text-slate-600 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Grup & Kontenjan Masası
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Program bazlı gruplar, eğitmen atamaları, kontenjan takibi ve kursiyer yerleşim masası.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-navy hover:bg-slate-800 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition shadow-2xs whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
-            Yeni Grup Oluştur
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Yeni Grup Oluştur</span>
           </button>
         </div>
       </div>
@@ -290,16 +350,44 @@ export const GroupManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Program Filter Bar & Overall Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-            Program Filtresi
-          </label>
+      {/* Standard 4 KPI Strip (Stripe / Canvas LMS Standart Metrik Bandı) */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Toplam Program',
+            value: programOptions.length,
+            icon: <Calendar className="w-4 h-4" />,
+            subtext: '2026 Güz Dönemi',
+          },
+          {
+            label: 'Toplam Grup',
+            value: totalStats.totalGroups,
+            icon: <Layers className="w-4 h-4" />,
+            subtext: 'Aktif şubeler',
+          },
+          {
+            label: 'Toplam Kapasite',
+            value: `${totalStats.totalCapacity} Kişi`,
+            icon: <Users className="w-4 h-4" />,
+            subtext: 'Kontenjan havuzu',
+          },
+          {
+            label: 'Yerleşim & Doluluk',
+            value: `%${totalStats.occupancyRate}`,
+            icon: <CheckCircle2 className="w-4 h-4" />,
+            subtext: `${totalStats.totalAssigned} / ${totalStats.totalCapacity} Kursiyer`,
+          },
+        ]}
+      />
+
+      {/* Program Filter Bar */}
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-slate-600">Program Filtresi:</span>
           <select
             value={filterProgramId}
             onChange={(e) => setFilterProgramId(e.target.value)}
-            className="w-full text-sm border-slate-300 rounded-lg p-2 bg-slate-50 text-slate-800 focus:ring-blue-500 focus:border-blue-500"
+            className="h-9 px-3 rounded-lg border border-slate-300 bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="all">Tüm Programlar ({groups.length} Grup)</option>
             {programOptions.map((p) => (
@@ -308,42 +396,10 @@ export const GroupManagementPage: React.FC = () => {
               </option>
             ))}
           </select>
-          <div className="mt-3 text-xs text-slate-500 flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>Aktif Dönem: 2026 Güz Dönemi</span>
-          </div>
         </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs text-slate-500 font-medium">Toplam Grup</div>
-            <div className="text-2xl font-bold text-brand-navy mt-1">{totalStats.totalGroups}</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs text-slate-500 font-medium">Toplam Kapasite</div>
-            <div className="text-2xl font-bold text-brand-navy mt-1">{totalStats.totalCapacity} Kişi</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-            <Users className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs text-slate-500 font-medium">Yerleşim & Doluluk</div>
-            <div className="text-2xl font-bold text-brand-navy mt-1">
-              {totalStats.totalAssigned} <span className="text-sm font-normal text-slate-500">/ {totalStats.totalCapacity} (%{totalStats.occupancyRate})</span>
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
+        <div className="text-slate-500 flex items-center gap-1.5 text-xs">
+          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+          <span>Aktif Dönem: 2026 Güz Dönemi</span>
         </div>
       </div>
 
@@ -384,15 +440,19 @@ export const GroupManagementPage: React.FC = () => {
                       <h3 className="font-bold text-slate-900 mt-0.5">{grp.name}</h3>
                     </div>
                     <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-semibold shrink-0 ${
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 border ${
                         stats.isFull
-                          ? 'bg-red-100 text-red-800'
-                          : percent >= 75
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : stats.availableSeats <= 3
+                          ? 'bg-amber-50 text-amber-800 border-amber-200 animate-pulse'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                       }`}
                     >
-                      {stats.isFull ? 'Tam Dolu' : `${stats.availableSeats} Boş Koltuk`}
+                      {stats.isFull
+                        ? 'Kontenjan Dolu'
+                        : stats.availableSeats <= 3
+                        ? `Son ${stats.availableSeats} Koltuk!`
+                        : `${stats.availableSeats} Boş Koltuk`}
                     </span>
                   </div>
 
@@ -409,16 +469,20 @@ export const GroupManagementPage: React.FC = () => {
 
                   {/* Capacity Progress Bar */}
                   <div className="mt-3 pt-3 border-t border-slate-100">
-                    <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-slate-500 font-medium">Doluluk Oranı:</span>
-                      <span className="font-semibold text-slate-800">
-                        {stats.assignedCount} / {grp.capacity} Kişi (%{percent})
+                      <span className="font-bold text-slate-800 tabular-nums">
+                        {stats.assignedCount} / {grp.capacity} Kursiyer (%{percent})
                       </span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full transition-all ${
-                          stats.isFull ? 'bg-red-500' : percent >= 75 ? 'bg-amber-500' : 'bg-blue-600'
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          stats.isFull
+                            ? 'bg-rose-500'
+                            : percent >= 80
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-600'
                         }`}
                         style={{ width: `${Math.min(100, percent)}%` }}
                       />
@@ -459,7 +523,7 @@ export const GroupManagementPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs">
                   <div>
-                    <span className="text-slate-400 block font-medium">Atanmış Demo Eğitmen:</span>
+                    <span className="text-slate-400 block font-medium">Atanmış Eğitmen:</span>
                     <span className="font-bold text-slate-800 mt-0.5 block text-sm">
                       {currentGroup.instructorNames?.join(', ') || 'Murat Özkan'}
                     </span>
@@ -604,7 +668,10 @@ export const GroupManagementPage: React.FC = () => {
                 <p className="text-xs text-slate-300 mt-0.5">Program, eğitmen ve kontenjan bilgisi</p>
               </div>
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCreateModalError(null);
+                }}
                 className="text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -612,6 +679,12 @@ export const GroupManagementPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateGroupSubmit} className="p-6 space-y-4 text-xs">
+              {createModalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{createModalError}</span>
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Eğitim Programı *</label>
                 <select
@@ -630,14 +703,39 @@ export const GroupManagementPage: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Grup Adı *</label>
-                <input
-                  type="text"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="Örn: Grup C (Hafta Sonu Sabah)"
-                  className="w-full text-xs border-slate-300 rounded-lg p-2.5"
-                  required
-                />
+                <div className="space-y-2">
+                  <select
+                    value={newGroupNamePreset}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewGroupNamePreset(val);
+                      if (val !== 'Özel Grup Adı Belirt...') {
+                        setNewGroupName(val);
+                      } else {
+                        setNewGroupName('');
+                      }
+                    }}
+                    className="w-full text-xs border-slate-300 rounded-lg p-2.5 bg-slate-50 font-medium"
+                    required
+                  >
+                    {PREDEFINED_GROUP_NAMES.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {newGroupNamePreset === 'Özel Grup Adı Belirt...' && (
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Örn: Grup F — Hafta Sonu İleri Düzey"
+                      className="w-full text-xs border-slate-300 rounded-lg p-2.5"
+                      required
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -671,32 +769,63 @@ export const GroupManagementPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Ders Takvimi / Oturum Özeti *</label>
-                <input
-                  type="text"
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">Ders Takvimi / Oturum Zamanı *</label>
+                  <span className="text-[10px] text-slate-400">Katalog Şablonları</span>
+                </div>
+                <select
                   value={newGroupSchedule}
-                  onChange={(e) => setNewGroupSchedule(e.target.value)}
-                  placeholder="Örn: Salı & Perşembe 14:00 - 17:00"
-                  className="w-full text-xs border-slate-300 rounded-lg p-2.5"
+                  onChange={(e) => {
+                    setNewGroupSchedule(e.target.value);
+                    if (e.target.value !== 'custom') setCustomSchedule('');
+                  }}
+                  className="w-full text-xs border-slate-300 rounded-lg p-2.5 bg-slate-50 font-medium"
                   required
-                />
+                >
+                  {schedules.map((sched) => (
+                    <option key={sched} value={sched}>
+                      {sched}
+                    </option>
+                  ))}
+                  <option value="custom">+ Yeni Takvim / Saat Şablonu Tanımla...</option>
+                </select>
+                {newGroupSchedule === 'custom' && (
+                  <div className="mt-2 space-y-1">
+                    <input
+                      type="text"
+                      value={customSchedule}
+                      onChange={(e) => setCustomSchedule(e.target.value)}
+                      placeholder="Örn: Salı & Cuma 14:00 - 17:00 (Hafta İçi Öğleden Sonra)"
+                      className="w-full text-xs border-slate-300 rounded-lg p-2.5 bg-white"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      Girilen yeni saat şablonu otomatik olarak merkezi takvim kataloğuna kaydedilecektir.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Derslik / Konum</label>
-                <input
-                  type="text"
+                <VenuePicker
                   value={newGroupLocation}
-                  onChange={(e) => setNewGroupLocation(e.target.value)}
-                  placeholder="Örn: Seminer Salonu B"
-                  className="w-full text-xs border-slate-300 rounded-lg p-2.5"
+                  onChange={(val) => {
+                    setNewGroupLocation(val);
+                    if (val !== 'custom') setCustomLocation('');
+                  }}
+                  customValue={customLocation}
+                  onCustomChange={(val) => setCustomLocation(val)}
+                  label="Derslik ve Grup Mekânı"
                 />
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateModalError(null);
+                  }}
                   className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                 >
                   Vazgeç
@@ -727,7 +856,10 @@ export const GroupManagementPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => setTransferTargetAssignment(null)}
+                onClick={() => {
+                  setTransferTargetAssignment(null);
+                  setTransferModalError(null);
+                }}
                 className="text-blue-300 hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -735,6 +867,12 @@ export const GroupManagementPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleTransferSubmit} className="p-6 space-y-4 text-xs">
+              {transferModalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{transferModalError}</span>
+                </div>
+              )}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-slate-500 font-medium">Mevcut Grup:</div>
                 <div className="font-bold text-slate-800 text-sm mt-0.5">
@@ -795,7 +933,10 @@ export const GroupManagementPage: React.FC = () => {
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setTransferTargetAssignment(null)}
+                  onClick={() => {
+                    setTransferTargetAssignment(null);
+                    setTransferModalError(null);
+                  }}
                   className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                 >
                   Vazgeç
@@ -826,7 +967,10 @@ export const GroupManagementPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => setRemoveTargetAssignment(null)}
+                onClick={() => {
+                  setRemoveTargetAssignment(null);
+                  setRemoveModalError(null);
+                }}
                 className="text-red-300 hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -834,6 +978,12 @@ export const GroupManagementPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleRemoveSubmit} className="p-6 space-y-4 text-xs">
+              {removeModalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{removeModalError}</span>
+                </div>
+              )}
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-900">
                 <p className="font-bold">Dikkat: Kontenjan Boşaltılacaktır</p>
                 <p className="mt-1 text-[11px] leading-relaxed">
@@ -858,7 +1008,10 @@ export const GroupManagementPage: React.FC = () => {
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setRemoveTargetAssignment(null)}
+                  onClick={() => {
+                    setRemoveTargetAssignment(null);
+                    setRemoveModalError(null);
+                  }}
                   className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                 >
                   Vazgeç

@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   SlidersHorizontal,
   Plus,
   Save,
   CheckCircle2,
   AlertCircle,
-  Info,
   ShieldAlert,
   RotateCcw,
   Check,
+  Trash2,
 } from 'lucide-react';
-import { DEMO_PROGRAMS } from '../data/educationData';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
+import { Program } from '../types';
 import {
   CriteriaSet,
   Criterion,
@@ -29,13 +30,34 @@ import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { Card, CardContent } from '../components/ui/Card';
+import { ActionConfirmModal } from '../components/common/ActionConfirmModal';
 
 export const CriteriaManagementPage: React.FC = () => {
+  const [programs, setPrograms] = useState<Program[]>(() => getInitialPrograms());
   const [criteriaSets, setCriteriaSets] = useState<CriteriaSet[]>(() =>
     getStoredCriteriaSets()
   );
   const [selectedProgramId, setSelectedProgramId] = useState<string>('prog-01');
   const [selectedVersionId, setSelectedVersionId] = useState<string>('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  useEffect(() => {
+    fetchLivePrograms().then((progs) => {
+      if (progs && progs.length > 0) {
+        setPrograms(progs);
+      }
+    });
+  }, []);
+
+  // Program listesi güncellendiğinde veya boş seçimde ilk geçerli programı seç
+  useEffect(() => {
+    if (programs.length > 0 && (!selectedProgramId || !programs.some((p) => p.id === selectedProgramId))) {
+      setSelectedProgramId(programs[0].id);
+    }
+  }, [programs, selectedProgramId]);
+
+  // Program ID fallback: her zaman geçerli bir program ID'sine bağlanır
+  const effectiveProgramId = programs.find((p) => p.id === selectedProgramId)?.id || programs[0]?.id || 'prog-01';
 
   // Sürüm ve kriter güncellemelerine abone ol
   useEffect(() => {
@@ -45,8 +67,28 @@ export const CriteriaManagementPage: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Seçili programa ait sürümler
-  const programVersions = getAllVersionsForProgram(selectedProgramId);
+  // Seçili programa ait sürümler (fallback ile asla boş kalmaz)
+  const programVersions = useMemo(() => {
+    const list = getAllVersionsForProgram(effectiveProgramId);
+    if (list && list.length > 0) return list;
+    // Fallback: program için henüz sürüm yoksa şablon v1.0 oluştur
+    const template = criteriaSets.find((s) => s.programId === effectiveProgramId) || criteriaSets[0] || getStoredCriteriaSets()[0];
+    if (template) {
+      const progTitle = programs.find((p) => p.id === effectiveProgramId)?.title || template.programTitle;
+      return [
+        {
+          ...template,
+          id: `critset-${effectiveProgramId}-v10`,
+          programId: effectiveProgramId,
+          programTitle: progTitle,
+          version: 'v1.0',
+          status: 'active' as const,
+        },
+      ];
+    }
+    return [];
+  }, [effectiveProgramId, criteriaSets, programs]);
+
   const activeVersion =
     programVersions.find((v) => v.status === 'active') || programVersions[0];
 
@@ -185,42 +227,27 @@ export const CriteriaManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-16">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Top Header & Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <span>Yönetim Masası</span>
-            <span>/</span>
-            <span className="text-slate-800 font-semibold">Kriter & Puanlama Motoru</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-brand-textPrimary mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Dinamik Başvuru Kriterleri & Sürüm Yönetimi
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Program bazlı nesnel değerlendirme kuralları, ağırlık dağılımları ve sürümlü karar algoritmaları.
           </p>
         </div>
 
-        {/* Demo Security & Rules Notice */}
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
-            <Info className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-            <span>Yapay Zekâ Değildir • Açık Kurallı Deterministik Puanlama</span>
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (window.confirm('Tüm kriter setlerini fabrika ayarlarına döndürmek istiyor musunuz?')) {
-                resetCriteriaToDefaults();
-                window.location.reload();
-              }
-            }}
-            title="Demo Kriter Verilerini Sıfırla"
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
+            title="Kriter Verilerini Sıfırla"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </Button>
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+            <span>Sıfırla</span>
+          </button>
         </div>
       </div>
 
@@ -234,14 +261,14 @@ export const CriteriaManagementPage: React.FC = () => {
                 Eğitim Programı:
               </label>
               <select
-                value={selectedProgramId}
+                value={effectiveProgramId}
                 onChange={(e) => {
                   setSelectedProgramId(e.target.value);
                   setSelectedVersionId('');
                 }}
-                className="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-blue cursor-pointer"
               >
-                {DEMO_PROGRAMS.map((prog) => (
+                {programs.map((prog) => (
                   <option key={prog.id} value={prog.id}>
                     {prog.title} ({prog.cohortName})
                   </option>
@@ -255,9 +282,9 @@ export const CriteriaManagementPage: React.FC = () => {
                 Kriter Sürümü:
               </label>
               <select
-                value={currentCriteriaSet?.id || ''}
+                value={currentCriteriaSet?.id || programVersions[0]?.id || ''}
                 onChange={(e) => setSelectedVersionId(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-blue cursor-pointer"
               >
                 {programVersions.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -345,34 +372,31 @@ export const CriteriaManagementPage: React.FC = () => {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Button
             size="sm"
             variant="secondary"
             onClick={() => setAddModalOpen(true)}
-            className="flex items-center gap-1.5"
+            leftIcon={<Plus className="w-3.5 h-3.5 text-slate-600" />}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Yeni Kriter Ekle</span>
+            Yeni Kriter Ekle
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleSaveWorkingDraft}
-            className="flex items-center gap-1.5"
+            leftIcon={<Save className="w-3.5 h-3.5 text-slate-600" />}
           >
-            <Save className="w-3.5 h-3.5" />
-            <span>Taslağı Kaydet</span>
+            Taslağı Kaydet
           </Button>
           <Button
             size="sm"
             variant="primary"
             onClick={() => setPublishModalOpen(true)}
             disabled={!weightValidation.valid}
-            className="flex items-center gap-1.5"
+            leftIcon={<SlidersHorizontal className="w-3.5 h-3.5 text-white" />}
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Yeni Sürüm Olarak Yayınla</span>
+            Yeni Sürüm Olarak Yayınla
           </Button>
         </div>
       </div>
@@ -432,8 +456,10 @@ export const CriteriaManagementPage: React.FC = () => {
                   {workingCriteria.map((crit) => (
                     <tr key={crit.id} className="hover:bg-slate-50/70 transition-colors">
                       {/* Code */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-brand-blue text-[11px]">
-                        {crit.code}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 border border-blue-200/80 font-mono font-bold text-blue-700 text-xs tracking-wide">
+                          {crit.code}
+                        </span>
                       </td>
 
                       {/* Title & Description */}
@@ -468,6 +494,8 @@ export const CriteriaManagementPage: React.FC = () => {
                             ? 'Evet / Hayır'
                             : crit.type === 'verified_statement'
                             ? 'Resmi Beyan'
+                            : crit.type === 'scale_100'
+                            ? 'Puanlama (0-100)'
                             : 'Gerekçe Metni'}
                         </span>
                       </td>
@@ -518,11 +546,13 @@ export const CriteriaManagementPage: React.FC = () => {
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <button
+                          type="button"
                           onClick={() => handleDeleteCriterion(crit.id)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors text-xs p-1"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all text-xs font-medium cursor-pointer"
                           title="Kriteri Kaldır"
                         >
-                          Sil
+                          <Trash2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600" />
+                          <span>Sil</span>
                         </button>
                       </td>
                     </tr>
@@ -585,11 +615,8 @@ export const CriteriaManagementPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-              <strong className="text-slate-800 block">Önemli Kural Ayrımı:</strong>
-              <p>
-                Bu eşikler sistem tarafından asla <strong>otomatik kabul veya ret</strong> üretmez. Karar ancak yetkili yönetici tarafından gerekçelendirilerek verilir.
-              </p>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+              <span className="font-medium text-slate-700">Değerlendirme Eşik Kılavuzu: Belirlenen puan sınırları adayların önceliklendirilmesi ve komisyon incelemesi için karar desteği sağlar.</span>
             </div>
           </CardContent>
         </Card>
@@ -832,6 +859,20 @@ export const CriteriaManagementPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* In-App Custom Confirm Modal */}
+      <ActionConfirmModal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={() => {
+          resetCriteriaToDefaults();
+          window.location.reload();
+        }}
+        title="Kriter Setlerini Sıfırla"
+        message="Tüm kriter setlerini başlangıç fabrika ayarlarına döndürmek istiyor musunuz? Yaptığınız özel katsayı ve eşik değişiklikleri sıfırlanacaktır."
+        confirmText="Evet, Sıfırla"
+        variant="danger"
+      />
     </div>
   );
 };

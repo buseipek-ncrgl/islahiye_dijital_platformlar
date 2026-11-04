@@ -11,14 +11,14 @@ export const Card: React.FC<CardProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    default: 'bg-white border border-brand-border shadow-card',
-    bordered: 'bg-white border-2 border-slate-300 shadow-sm',
-    accent: 'bg-white border-l-4 border-l-brand-blue border border-brand-border shadow-card',
+    default: 'bg-white border border-slate-200 shadow-xs',
+    bordered: 'bg-white border border-slate-300 shadow-xs',
+    accent: 'bg-white border-l-4 border-l-blue-600 border border-slate-200 shadow-xs',
     muted: 'bg-slate-50 border border-slate-200',
   };
 
   return (
-    <div className={`rounded-lg ${variantStyles[variant]} ${className}`} {...props}>
+    <div className={`rounded-xl ${variantStyles[variant]} ${className}`} {...props}>
       {children}
     </div>
   );

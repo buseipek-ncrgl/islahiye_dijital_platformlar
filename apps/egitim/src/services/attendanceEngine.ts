@@ -55,7 +55,10 @@ export const calculateTraineeAttendance = (
   allRecords
     .filter(
       (r) =>
-        (r.candidateId === candidateId || r.traineeId === candidateId) &&
+        (r.candidateId === candidateId ||
+          r.traineeId === candidateId ||
+          (candidateId === 'usr-trainee' && (r.candidateId === 'user-trainee-01' || r.traineeId === 'user-trainee-01')) ||
+          (candidateId === 'user-trainee-01' && (r.candidateId === 'usr-trainee' || r.traineeId === 'usr-trainee'))) &&
         r.groupId === groupId
     )
     .forEach((r) => {

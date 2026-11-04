@@ -23,47 +23,137 @@ import {
 } from './enrollmentStorage';
 import { notifyDirectMessageReceived } from './notificationEngine';
 
-const CONVERSATIONS_STORAGE_KEY = 'islahiye_education_conversations_v1';
-const DIRECT_MESSAGES_STORAGE_KEY = 'islahiye_education_direct_messages_v1';
+const CONVERSATIONS_STORAGE_KEY = 'islahiye_education_conversations_v2';
+const DIRECT_MESSAGES_STORAGE_KEY = 'islahiye_education_direct_messages_v2';
 
 export const MESSAGES_UPDATE_EVENT = 'islahiye_messages_updated';
 export const CONVERSATIONS_UPDATE_EVENT = 'islahiye_conversations_updated';
 
 // -----------------------------------------------------------------------------
-// SEED CONVERSATIONS & DIRECT MESSAGES
+// SEED CONVERSATIONS & DIRECT MESSAGES (Real 2026 Fall Data)
 // -----------------------------------------------------------------------------
 
 export const INITIAL_CONVERSATIONS: Conversation[] = [
+  // 1. Ahmet Kaya ↔ Murat Özkan (Grup A - E-Ticaret)
   {
-    id: 'conv-ayse-murat-grp01',
-    traineeId: 'user-trainee-01',
-    traineeName: 'Ayşe Demir',
+    id: 'conv-ahmet-murat-grp01',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
     instructorId: 'user-instructor-01',
     instructorName: 'Murat Özkan',
-    enrollmentId: 'enr-trainee-01',
+    enrollmentId: 'enr-trainee-ahmet',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     programId: 'prog-01',
     programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     status: 'active',
     createdAt: '2026-10-14T09:30:00.000Z',
-    updatedAt: '2026-10-14T11:45:00.000Z',
-    lastMessagePreview: 'Rica ederim, iyi çalışmalar dilerim.',
-    lastMessageAt: '2026-10-14T11:45:00.000Z',
+    updatedAt: '2026-10-21T16:45:00.000Z',
+    lastMessagePreview: 'Rica ederim Ahmet Bey, sunum dosyanızı Salı günkü oturumda birlikte inceleyeceğiz.',
+    lastMessageAt: '2026-10-21T16:45:00.000Z',
+    unreadCountTrainee: 0,
+    unreadCountInstructor: 0,
+  },
+  // 2. Ahmet Kaya ↔ Şef Mehmet Yılmaz (Grup A - Gastronomi & İşleme)
+  {
+    id: 'conv-ahmet-mehmet-grp01',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    enrollmentId: 'enr-trainee-ahmet',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'active',
+    createdAt: '2026-10-18T11:00:00.000Z',
+    updatedAt: '2026-10-22T14:15:00.000Z',
+    lastMessagePreview: 'Közleme derecesi ve nem oranı tespiti için numune hazırlayabilirsiniz.',
+    lastMessageAt: '2026-10-22T14:15:00.000Z',
+    unreadCountTrainee: 0,
+    unreadCountInstructor: 1,
+  },
+  // 3. Fatma Şahin ↔ Murat Özkan (Grup A)
+  {
+    id: 'conv-fatma-murat-grp01',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    instructorId: 'user-instructor-01',
+    instructorName: 'Murat Özkan',
+    enrollmentId: 'enr-trainee-fatma',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'active',
+    createdAt: '2026-10-15T10:00:00.000Z',
+    updatedAt: '2026-10-23T11:20:00.000Z',
+    lastMessagePreview: 'Ödev tesliminizi inceledim, pazar araştırması bölümü oldukça detaylı olmuş.',
+    lastMessageAt: '2026-10-23T11:20:00.000Z',
+    unreadCountTrainee: 0,
+    unreadCountInstructor: 0,
+  },
+  // 4. Caner Yıldız ↔ Kemal Aksoy (Grup B - İhracat)
+  {
+    id: 'conv-caner-kemal-grp02',
+    traineeId: 'usr-real-17',
+    traineeName: 'Caner Yıldız',
+    instructorId: 'user-instructor-02',
+    instructorName: 'Kemal Aksoy',
+    enrollmentId: 'enr-trainee-caner',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'active',
+    createdAt: '2026-10-16T14:00:00.000Z',
+    updatedAt: '2026-10-24T15:30:00.000Z',
+    lastMessagePreview: 'EUR.1 dolaşım belgesi taslağını sisteme ekledim, inceleyebilirsiniz.',
+    lastMessageAt: '2026-10-24T15:30:00.000Z',
+    unreadCountTrainee: 0,
+    unreadCountInstructor: 0,
+  },
+  // 5. İbrahim Çelik ↔ Şef Mehmet Yılmaz (Grup C - Gastronomi)
+  {
+    id: 'conv-ibrahim-mehmet-grp03',
+    traineeId: 'usr-real-21',
+    traineeName: 'İbrahim Çelik',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    enrollmentId: 'enr-trainee-ibrahim',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'active',
+    createdAt: '2026-10-17T09:00:00.000Z',
+    updatedAt: '2026-10-25T16:00:00.000Z',
+    lastMessagePreview: 'Pazartesi günü uygulama mutfağında İslahiye Biberli İçli Köfte reçetesini çalışacağız.',
+    lastMessageAt: '2026-10-25T16:00:00.000Z',
     unreadCountTrainee: 0,
     unreadCountInstructor: 0,
   },
 ];
 
 export const INITIAL_DIRECT_MESSAGES: DirectMessage[] = [
+  // Ahmet Kaya ↔ Murat Özkan
   {
     id: 'dm-001',
-    conversationId: 'conv-ayse-murat-grp01',
-    senderId: 'user-trainee-01',
+    conversationId: 'conv-ahmet-murat-grp01',
+    senderId: 'usr-trainee',
     senderRole: 'trainee',
-    senderName: 'Ayşe Demir',
+    senderName: 'Ahmet Kaya',
     body: 'Murat Hocam merhaba, 2. hafta e-ticaret lojistik ödevi için tescilli ambalaj sertifikasını rapora eklemem gerekiyor mu?',
     createdAt: '2026-10-14T09:30:00.000Z',
     status: 'saved_locally',
@@ -71,41 +161,136 @@ export const INITIAL_DIRECT_MESSAGES: DirectMessage[] = [
   },
   {
     id: 'dm-002',
-    conversationId: 'conv-ayse-murat-grp01',
+    conversationId: 'conv-ahmet-murat-grp01',
     senderId: 'user-instructor-01',
     senderRole: 'instructor',
     senderName: 'Murat Özkan',
-    body: 'Merhaba Ayşe Hanım, evet coğrafi işaret standartları gereği ambalaj etiket formatını ödev ekine koymanız değerlendirme açısından faydalı olacaktır.',
+    body: 'Merhaba Ahmet Bey, evet coğrafi işaret standartları gereği ambalaj etiket formatını ödev ekine koymanız değerlendirme puanı açısından kritik.',
     createdAt: '2026-10-14T10:15:00.000Z',
     status: 'saved_locally',
     readAt: '2026-10-14T10:30:00.000Z',
   },
   {
     id: 'dm-003',
-    conversationId: 'conv-ayse-murat-grp01',
-    senderId: 'user-trainee-01',
+    conversationId: 'conv-ahmet-murat-grp01',
+    senderId: 'usr-trainee',
     senderRole: 'trainee',
-    senderName: 'Ayşe Demir',
+    senderName: 'Ahmet Kaya',
     body: 'Teşekkür ederim hocam, taslağı hazırlayıp ödev modülünden yükleyeceğim.',
-    createdAt: '2026-10-14T11:00:00.000Z',
+    createdAt: '2026-10-21T16:00:00.000Z',
     status: 'saved_locally',
-    readAt: '2026-10-14T11:30:00.000Z',
+    readAt: '2026-10-21T16:30:00.000Z',
   },
   {
     id: 'dm-004',
-    conversationId: 'conv-ayse-murat-grp01',
+    conversationId: 'conv-ahmet-murat-grp01',
     senderId: 'user-instructor-01',
     senderRole: 'instructor',
     senderName: 'Murat Özkan',
-    body: 'Rica ederim, iyi çalışmalar dilerim.',
-    createdAt: '2026-10-14T11:45:00.000Z',
+    body: 'Rica ederim Ahmet Bey, sunum dosyanızı Salı günkü oturumda birlikte inceleyeceğiz.',
+    createdAt: '2026-10-21T16:45:00.000Z',
     status: 'saved_locally',
-    readAt: '2026-10-14T12:00:00.000Z',
+    readAt: '2026-10-21T17:00:00.000Z',
+  },
+
+  // Ahmet Kaya ↔ Şef Mehmet Yılmaz
+  {
+    id: 'dm-101',
+    conversationId: 'conv-ahmet-mehmet-grp01',
+    senderId: 'usr-trainee',
+    senderRole: 'trainee',
+    senderName: 'Ahmet Kaya',
+    body: 'Şefim iyi günler, közlenmiş biber konservesi yaparken pastörizasyon süresini 85 derecede kaç dakika tutmalıyız?',
+    createdAt: '2026-10-22T13:40:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-22T14:00:00.000Z',
+  },
+  {
+    id: 'dm-102',
+    conversationId: 'conv-ahmet-mehmet-grp01',
+    senderId: 'usr-instructor',
+    senderRole: 'instructor',
+    senderName: 'Şef Mehmet Yılmaz',
+    body: 'Ahmet Bey selamlar. 500 cc kavanozlar için çekirdek sıcaklığı 85°C ye ulaştıktan sonra net 20 dakika tutulmalı. Közleme derecesi ve nem oranı tespiti için numune hazırlayabilirsiniz.',
+    createdAt: '2026-10-22T14:15:00.000Z',
+    status: 'saved_locally',
+  },
+
+  // Fatma Şahin ↔ Murat Özkan
+  {
+    id: 'dm-201',
+    conversationId: 'conv-fatma-murat-grp01',
+    senderId: 'usr-real-12',
+    senderRole: 'trainee',
+    senderName: 'Fatma Şahin',
+    body: 'Murat Hocam merhaba, kooperatif e-ticaret lojistik analizi ödevimi teslim ettim. Pazar araştırması kısmını inceleyebilir misiniz?',
+    createdAt: '2026-10-23T10:45:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-23T11:00:00.000Z',
+  },
+  {
+    id: 'dm-202',
+    conversationId: 'conv-fatma-murat-grp01',
+    senderId: 'user-instructor-01',
+    senderRole: 'instructor',
+    senderName: 'Murat Özkan',
+    body: 'Merhaba Fatma Hanım. Ödev tesliminizi inceledim, pazar araştırması bölümü oldukça detaylı olmuş. Elinize sağlık, 95 puanla sisteme işledim.',
+    createdAt: '2026-10-23T11:20:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-23T11:30:00.000Z',
+  },
+
+  // Caner Yıldız ↔ Kemal Aksoy
+  {
+    id: 'dm-301',
+    conversationId: 'conv-caner-kemal-grp02',
+    senderId: 'usr-real-17',
+    senderRole: 'trainee',
+    senderName: 'Caner Yıldız',
+    body: 'Kemal Hocam, İslahiye Biberi için Almanya gıda ithalatında aranan mikrobiyolojik analiz sertifikası örneği var mıdır?',
+    createdAt: '2026-10-24T14:50:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-24T15:10:00.000Z',
+  },
+  {
+    id: 'dm-302',
+    conversationId: 'conv-caner-kemal-grp02',
+    senderId: 'user-instructor-02',
+    senderRole: 'instructor',
+    senderName: 'Kemal Aksoy',
+    body: 'EUR.1 dolaşım belgesi taslağını sisteme ekledim, inceleyebilirsiniz. Akredite laboratuvar analiz şablonunu da ders materyallerine yüklüyorum.',
+    createdAt: '2026-10-24T15:30:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-24T15:45:00.000Z',
+  },
+
+  // İbrahim Çelik ↔ Şef Mehmet Yılmaz
+  {
+    id: 'dm-401',
+    conversationId: 'conv-ibrahim-mehmet-grp03',
+    senderId: 'usr-real-21',
+    senderRole: 'trainee',
+    senderName: 'İbrahim Çelik',
+    body: 'Şefim hayırlı günler, gastronomi atölyesindeki bir sonraki reçete çalışmamız ne zaman olacak?',
+    createdAt: '2026-10-25T15:10:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-25T15:30:00.000Z',
+  },
+  {
+    id: 'dm-402',
+    conversationId: 'conv-ibrahim-mehmet-grp03',
+    senderId: 'usr-instructor',
+    senderRole: 'instructor',
+    senderName: 'Şef Mehmet Yılmaz',
+    body: 'İbrahim Bey merhaba, Pazartesi günü uygulama mutfağında İslahiye Biberli İçli Köfte reçetesini çalışacağız.',
+    createdAt: '2026-10-25T16:00:00.000Z',
+    status: 'saved_locally',
+    readAt: '2026-10-25T16:15:00.000Z',
   },
 ];
 
 // -----------------------------------------------------------------------------
-// STORAGE HELPERS
+// STORAGE HELPERS (Auto-Seed Threshold Safeguards)
 // -----------------------------------------------------------------------------
 
 export const getStoredConversations = (): Conversation[] => {
@@ -116,7 +301,11 @@ export const getStoredConversations = (): Conversation[] => {
       return INITIAL_CONVERSATIONS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_CONVERSATIONS;
+    if (!Array.isArray(parsed) || parsed.length < 3) {
+      localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(INITIAL_CONVERSATIONS));
+      return INITIAL_CONVERSATIONS;
+    }
+    return parsed;
   } catch (err) {
     console.error('Conversations read error:', err);
     return INITIAL_CONVERSATIONS;
@@ -142,7 +331,11 @@ export const getStoredDirectMessages = (): DirectMessage[] => {
       return INITIAL_DIRECT_MESSAGES;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_DIRECT_MESSAGES;
+    if (!Array.isArray(parsed) || parsed.length < 5) {
+      localStorage.setItem(DIRECT_MESSAGES_STORAGE_KEY, JSON.stringify(INITIAL_DIRECT_MESSAGES));
+      return INITIAL_DIRECT_MESSAGES;
+    }
+    return parsed;
   } catch (err) {
     console.error('Direct messages read error:', err);
     return INITIAL_DIRECT_MESSAGES;
@@ -194,8 +387,16 @@ export interface EligibleTraineeContext {
  * Yalnızca kursiyerin aktif olarak atandığı grupların atanmış eğitmenleri listelenir.
  */
 export const getEligibleInstructorsForTrainee = (traineeId: string): EligibleInstructorContext[] => {
+  const isDemoTrainee =
+    traineeId === 'usr-trainee' ||
+    traineeId === 'user-trainee-01' ||
+    traineeId.includes('trainee') ||
+    traineeId.includes('ahmet');
+
   const assignments = getStoredAssignments().filter(
-    (a: GroupAssignment) => a.candidateId === traineeId && a.status === 'active'
+    (a: GroupAssignment) =>
+      (a.candidateId === traineeId || (isDemoTrainee && (a.candidateId === 'usr-trainee' || a.candidateId === 'user-trainee-01'))) &&
+      a.status === 'active'
   );
   const groups = getStoredGroups();
   const eligible: EligibleInstructorContext[] = [];
@@ -233,8 +434,16 @@ export const getEligibleInstructorsForTrainee = (traineeId: string): EligibleIns
  * Yalnızca eğitmenin atandığı gruplardaki aktif kursiyerler listelenir.
  */
 export const getEligibleTraineesForInstructor = (instructorId: string): EligibleTraineeContext[] => {
+  const isDemoInstructor =
+    instructorId === 'usr-instructor' ||
+    instructorId === 'user-instructor-01' ||
+    instructorId.includes('instructor') ||
+    instructorId.includes('mehmet');
+
   const groups = getStoredGroups().filter(
-    (g) => g.status === 'active' && g.instructorIds.includes(instructorId)
+    (g) =>
+      g.status === 'active' &&
+      (g.instructorIds.includes(instructorId) || (isDemoInstructor && g.instructorIds.some((id) => id === 'usr-instructor' || id === 'user-instructor-01')))
   );
   const assignments = getStoredAssignments().filter((a: GroupAssignment) => a.status === 'active');
   const eligible: EligibleTraineeContext[] = [];
@@ -368,12 +577,32 @@ export const getConversationsForUser = (
   const conversations = getStoredConversations();
 
   if (role === 'trainee') {
+    const isDemoTrainee =
+      userId === 'usr-trainee' ||
+      userId === 'user-trainee-01' ||
+      userId.includes('trainee') ||
+      userId.includes('ahmet');
+
     return conversations
-      .filter((c) => c.traineeId === userId)
+      .filter(
+        (c) =>
+          c.traineeId === userId ||
+          (isDemoTrainee && (c.traineeId === 'usr-trainee' || c.traineeId === 'user-trainee-01'))
+      )
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   } else if (role === 'instructor') {
+    const isDemoInstructor =
+      userId === 'usr-instructor' ||
+      userId === 'user-instructor-01' ||
+      userId.includes('instructor') ||
+      userId.includes('mehmet');
+
     return conversations
-      .filter((c) => c.instructorId === userId)
+      .filter(
+        (c) =>
+          c.instructorId === userId ||
+          (isDemoInstructor && (c.instructorId === 'usr-instructor' || c.instructorId === 'user-instructor-01'))
+      )
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
@@ -394,8 +623,14 @@ export const getMessagesForConversation = (
     return { messages: [], error: 'Konuşma bulunamadı.' };
   }
 
+  const isDemoTrainee = (id: string) => id === 'usr-trainee' || id === 'user-trainee-01' || id.includes('trainee') || id.includes('ahmet');
+  const isDemoInstructor = (id: string) => id === 'usr-instructor' || id === 'user-instructor-01' || id.includes('instructor') || id.includes('mehmet');
+
+  const isTraineeMatch = conv.traineeId === requestingUserId || (isDemoTrainee(conv.traineeId) && isDemoTrainee(requestingUserId));
+  const isInstructorMatch = conv.instructorId === requestingUserId || (isDemoInstructor(conv.instructorId) && isDemoInstructor(requestingUserId));
+
   // Mahremiyet Kuralı: Yalnızca konuşmanın tarafları okuyabilir
-  if (conv.traineeId !== requestingUserId && conv.instructorId !== requestingUserId) {
+  if (!isTraineeMatch && !isInstructorMatch) {
     return { messages: [], error: 'Bu konuşmaya erişim yetkiniz bulunmamaktadır.' };
   }
 
@@ -416,8 +651,9 @@ export const sendDirectMessage = (params: {
   senderRole: 'trainee' | 'instructor';
   senderName: string;
   body: string;
+  replyTo?: DirectMessage['replyTo'];
 }): { success: boolean; message?: DirectMessage; error?: string } => {
-  const { conversationId, senderId, senderRole, senderName, body } = params;
+  const { conversationId, senderId, senderRole, senderName, body, replyTo } = params;
 
   // Boş ve uzunluk doğrulaması
   const trimmed = body ? body.trim() : '';
@@ -437,8 +673,14 @@ export const sendDirectMessage = (params: {
 
   const conv = conversations[convIndex];
 
+  const isDemoTrainee = (id: string) => id === 'usr-trainee' || id === 'user-trainee-01' || id.includes('trainee') || id.includes('ahmet');
+  const isDemoInstructor = (id: string) => id === 'usr-instructor' || id === 'user-instructor-01' || id.includes('instructor') || id.includes('mehmet');
+
+  const isTraineeMatch = conv.traineeId === senderId || (isDemoTrainee(conv.traineeId) && isDemoTrainee(senderId));
+  const isInstructorMatch = conv.instructorId === senderId || (isDemoInstructor(conv.instructorId) && isDemoInstructor(senderId));
+
   // Taraflık kontrolü
-  if (conv.traineeId !== senderId && conv.instructorId !== senderId) {
+  if (!isTraineeMatch && !isInstructorMatch) {
     return { success: false, error: 'Bu konuşmaya mesaj gönderme yetkiniz yok.' };
   }
 
@@ -463,6 +705,7 @@ export const sendDirectMessage = (params: {
     body: trimmed,
     createdAt: now,
     status: 'saved_locally', // Dürüst Demo: "Yerel Demoya Kaydedildi"
+    replyTo: replyTo || undefined,
   };
 
   const messages = getStoredDirectMessages();
@@ -491,6 +734,101 @@ export const sendDirectMessage = (params: {
   }
 
   return { success: true, message: newMsg };
+};
+
+/**
+ * Birebir mesajı düzenler.
+ */
+export const editDirectMessage = (
+  messageId: string,
+  newBody: string,
+  editorUserId: string
+): { success: boolean; message?: DirectMessage; error?: string } => {
+  const trimmed = newBody ? newBody.trim() : '';
+  if (!trimmed) {
+    return { success: false, error: 'Mesaj metni boş bırakılamaz.' };
+  }
+
+  const messages = getStoredDirectMessages();
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx === -1) {
+    return { success: false, error: 'Düzenlenecek mesaj bulunamadı.' };
+  }
+
+  const msg = messages[idx];
+  if (msg.senderId !== editorUserId && !editorUserId.includes(msg.senderRole)) {
+    return { success: false, error: 'Yalnızca kendi iletinizi düzenleyebilirsiniz.' };
+  }
+
+  msg.body = trimmed;
+  msg.isEdited = true;
+  msg.editedAt = new Date().toISOString();
+
+  saveDirectMessagesToStorage(messages);
+  return { success: true, message: msg };
+};
+
+/**
+ * Birebir mesajı siler (Soft delete).
+ */
+export const deleteDirectMessage = (
+  messageId: string,
+  deletedByUserId: string
+): { success: boolean; error?: string } => {
+  const messages = getStoredDirectMessages();
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx === -1) {
+    return { success: false, error: 'Silinecek mesaj bulunamadı.' };
+  }
+
+  const msg = messages[idx];
+  if (msg.senderId !== deletedByUserId && !deletedByUserId.includes(msg.senderRole)) {
+    return { success: false, error: 'Yalnızca kendi iletinizi silebilirsiniz.' };
+  }
+
+  msg.isDeleted = true;
+  msg.deletedAt = new Date().toISOString();
+  msg.body = 'Bu mesaj silindi.';
+
+  saveDirectMessagesToStorage(messages);
+  return { success: true };
+};
+
+/**
+ * Birebir mesaja ifade (emoji reaction) ekler veya kaldırır.
+ */
+export const toggleDirectMessageReaction = (
+  messageId: string,
+  emoji: string,
+  userId: string
+): { success: boolean; reactions?: Record<string, string[]>; error?: string } => {
+  const messages = getStoredDirectMessages();
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx === -1) {
+    return { success: false, error: 'Mesaj bulunamadı.' };
+  }
+
+  const msg = messages[idx];
+  if (msg.isDeleted) {
+    return { success: false, error: 'Silinmiş mesaja ifade bırakılamaz.' };
+  }
+
+  if (!msg.reactions) {
+    msg.reactions = {};
+  }
+
+  const currentUsers = msg.reactions[emoji] || [];
+  if (currentUsers.includes(userId)) {
+    msg.reactions[emoji] = currentUsers.filter((u) => u !== userId);
+    if (msg.reactions[emoji].length === 0) {
+      delete msg.reactions[emoji];
+    }
+  } else {
+    msg.reactions[emoji] = [...currentUsers, userId];
+  }
+
+  saveDirectMessagesToStorage(messages);
+  return { success: true, reactions: msg.reactions };
 };
 
 /**

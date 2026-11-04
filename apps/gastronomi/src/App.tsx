@@ -8,6 +8,8 @@ import { NewsPage } from './pages/NewsPage';
 import { NewsDetailPage } from './pages/NewsDetailPage';
 import { EventsPage } from './pages/EventsPage';
 import { AnnouncementsPage } from './pages/AnnouncementsPage';
+import { DishesCatalogPage } from './pages/DishesCatalogPage';
+import { DishDetailPage } from './pages/DishDetailPage';
 import { AdminLayout } from './components/admin/layout/AdminLayout';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminContentListPage } from './pages/admin/AdminContentListPage';
@@ -30,6 +32,10 @@ export const App: React.FC = () => {
       <Routes>
         {/* Visitor Portal Routes */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/yemekler" element={<DishesCatalogPage />} />
+        <Route path="/yemekler/:slug" element={<DishDetailPage />} />
+        <Route path="/tarifler" element={<DishesCatalogPage />} />
+        <Route path="/tarifler/:slug" element={<DishDetailPage />} />
         <Route path="/lezzet-haritasi" element={<MapPage />} />
         <Route path="/mutfak-mirasi" element={<HeritagePage />} />
         <Route path="/mutfak-mirasi/:slug" element={<HeritageStoryDetailPage />} />

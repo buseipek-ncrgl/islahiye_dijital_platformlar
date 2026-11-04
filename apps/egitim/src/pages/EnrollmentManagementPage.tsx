@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  UserCheck,
   Search,
   CheckCircle2,
   AlertCircle,
   Users,
   ShieldCheck,
   RotateCcw,
-  PlusCircle,
+  Check,
+  LayoutGrid,
+  List,
+  Layers,
+  GraduationCap,
+  Clock,
 } from 'lucide-react';
-import { DEMO_PROGRAMS } from '../data/educationData';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
+import { Program } from '../types';
 import {
   Enrollment,
   Group,
@@ -22,7 +27,9 @@ import {
   confirmEnrollment,
   cancelEnrollment,
   assignTraineeToGroup,
-  getGroupCapacityStats,
+  batchConfirmEnrollments,
+  batchAssignTraineesToGroup,
+  batchCancelEnrollments,
   subscribeToEnrollmentUpdates,
   subscribeToGroupUpdates,
   resetEnrollmentsToDefaults,
@@ -31,9 +38,11 @@ import { getStoredApplications } from '../services/applicationStorage';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
-import { Card, CardContent } from '../components/ui/Card';
+import { KpiStrip } from '../components/ui/KpiStrip';
+import { ActionConfirmModal } from '../components/common/ActionConfirmModal';
 
 export const EnrollmentManagementPage: React.FC = () => {
+  const [programs, setPrograms] = useState<Program[]>(() => getInitialPrograms());
   const [enrollments, setEnrollments] = useState<Enrollment[]>(() =>
     getStoredEnrollments()
   );
@@ -45,6 +54,15 @@ export const EnrollmentManagementPage: React.FC = () => {
   const [selectedProgramId, setSelectedProgramId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  useEffect(() => {
+    fetchLivePrograms().then((progs) => {
+      if (progs && progs.length > 0) setPrograms(progs);
+    });
+  }, []);
 
   // Sync state
   useEffect(() => {
@@ -65,10 +83,17 @@ export const EnrollmentManagementPage: React.FC = () => {
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Modal States
+  // Single Action Modal States
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [detailModalEnrollment, setDetailModalEnrollment] = useState<Enrollment | null>(null);
+
+  // Bulk Action Modals
+  const [bulkAssignModalOpen, setBulkAssignModalOpen] = useState(false);
+  const [bulkCancelModalOpen, setBulkCancelModalOpen] = useState(false);
+  const [bulkTargetGroupId, setBulkTargetGroupId] = useState<string>('');
+  const [bulkCancelReason, setBulkCancelReason] = useState<string>('');
 
   const [activeEnrollment, setActiveEnrollment] = useState<Enrollment | null>(null);
   const [selectedTargetGroupId, setSelectedTargetGroupId] = useState<string>('');
@@ -85,6 +110,61 @@ export const EnrollmentManagementPage: React.FC = () => {
     const apps = getStoredApplications();
     const app = apps.find((a) => a.id === applicationId);
     return app?.evaluationResult?.totalWeightedScore ?? app?.autoScore?.total ?? '—';
+  };
+
+  // Telemetry KPI Stats
+  const macroStats = useMemo(() => {
+    const total = enrollments.length;
+    const pending = enrollments.filter((e) => e.status === 'pending_confirmation').length;
+    const confirmedAll = enrollments.filter((e) => e.status === 'confirmed');
+    const assigned = confirmedAll.filter((e) => getAssignmentForEnrollment(e.id)).length;
+    const pendingGroup = confirmedAll.filter((e) => !getAssignmentForEnrollment(e.id)).length;
+    const cancelled = enrollments.filter((e) => e.status === 'cancelled').length;
+
+    return { total, pending, assigned, pendingGroup, cancelled };
+  }, [enrollments, assignments]);
+
+  // Filter Data
+  const filteredEnrollments = useMemo(() => {
+    return enrollments.filter((item) => {
+      const matchSearch =
+        item.candidateName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.candidateEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.applicationId.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchProgram =
+        selectedProgramId === 'all' || item.programId === selectedProgramId;
+
+      const assignment = getAssignmentForEnrollment(item.id);
+
+      let matchStatus = true;
+      if (statusFilter === 'pending_confirmation') {
+        matchStatus = item.status === 'pending_confirmation';
+      } else if (statusFilter === 'confirmed_pending_group') {
+        matchStatus = item.status === 'confirmed' && !assignment;
+      } else if (statusFilter === 'assigned') {
+        matchStatus = item.status === 'confirmed' && !!assignment;
+      } else if (statusFilter === 'cancelled') {
+        matchStatus = item.status === 'cancelled';
+      }
+
+      return matchSearch && matchProgram && matchStatus;
+    });
+  }, [enrollments, searchQuery, selectedProgramId, statusFilter, assignments]);
+
+  // Multi-select handlers
+  const handleToggleSelectAll = () => {
+    if (selectedEnrollmentIds.length === filteredEnrollments.length) {
+      setSelectedEnrollmentIds([]);
+    } else {
+      setSelectedEnrollmentIds(filteredEnrollments.map((e) => e.id));
+    }
+  };
+
+  const handleToggleSingleSelect = (id: string) => {
+    setSelectedEnrollmentIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
   };
 
   // Actions
@@ -167,86 +247,129 @@ export const EnrollmentManagementPage: React.FC = () => {
     }
   };
 
-  // Filter Data
-  const filteredEnrollments = enrollments.filter((item) => {
-    const matchSearch =
-      item.candidateName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.candidateEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.applicationId.toLowerCase().includes(searchQuery.toLowerCase());
+  // Bulk Handlers
+  const handleBulkConfirm = () => {
+    if (selectedEnrollmentIds.length === 0) return;
+    const res = batchConfirmEnrollments(
+      selectedEnrollmentIds,
+      'Selin Aydın (Yönetici)',
+      'Toplu kesin kayıt onay işlemi gerçekleştirildi.'
+    );
+    setSuccessNotice(`${res.successCount} adayın kesin kaydı başarıyla onaylandı.`);
+    setSelectedEnrollmentIds([]);
+    setEnrollments(getStoredEnrollments());
+    setTimeout(() => setSuccessNotice(null), 4000);
+  };
 
-    const matchProgram =
-      selectedProgramId === 'all' || item.programId === selectedProgramId;
+  const handleBulkAssignExecute = () => {
+    if (selectedEnrollmentIds.length === 0 || !bulkTargetGroupId) return;
+    const res = batchAssignTraineesToGroup(
+      selectedEnrollmentIds,
+      bulkTargetGroupId,
+      'Selin Aydın (Yönetici)'
+    );
+    setSuccessNotice(`${res.successCount} kursiyer seçilen gruba başarıyla yerleştirildi.`);
+    setBulkAssignModalOpen(false);
+    setSelectedEnrollmentIds([]);
+    setAssignments(getStoredAssignments());
+    setTimeout(() => setSuccessNotice(null), 4000);
+  };
 
-    const assignment = getAssignmentForEnrollment(item.id);
-
-    let matchStatus = true;
-    if (statusFilter === 'pending_confirmation') {
-      matchStatus = item.status === 'pending_confirmation';
-    } else if (statusFilter === 'confirmed_pending_group') {
-      matchStatus = item.status === 'confirmed' && !assignment;
-    } else if (statusFilter === 'assigned') {
-      matchStatus = item.status === 'confirmed' && !!assignment;
-    } else if (statusFilter === 'cancelled') {
-      matchStatus = item.status === 'cancelled';
+  const handleBulkCancelExecute = () => {
+    if (selectedEnrollmentIds.length === 0 || !bulkCancelReason.trim()) {
+      setErrorMessage('Lütfen toplu iptal gerekçesini belirtiniz.');
+      return;
     }
-
-    return matchSearch && matchProgram && matchStatus;
-  });
+    const res = batchCancelEnrollments(
+      selectedEnrollmentIds,
+      bulkCancelReason.trim(),
+      'Selin Aydın (Yönetici)'
+    );
+    setSuccessNotice(`${res.successCount} kayıt iptal edildi.`);
+    setBulkCancelModalOpen(false);
+    setSelectedEnrollmentIds([]);
+    setEnrollments(getStoredEnrollments());
+    setAssignments(getStoredAssignments());
+    setTimeout(() => setSuccessNotice(null), 4000);
+  };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-16">
+    <div className="max-w-7xl mx-auto space-y-6 pb-24">
       {/* Top Breadcrumb & Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <span>Yönetim Masası</span>
-            <span>/</span>
-            <span className="text-slate-800 font-semibold">Kesin Kayıt & Aktivasyon</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-brand-textPrimary mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Kesin Kayıt & Kontenjan Onay Masası
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Kabul edilmiş adayların kontrollü kesin kaydı, grup yerleşimleri ve kursiyer aktivasyon yönetimi.
           </p>
         </div>
 
         {/* Demo reset */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (window.confirm('Tüm kayıt ve grup atamalarını fabrika ayarlarına sıfırlamak istiyor musunuz?')) {
-                resetEnrollmentsToDefaults();
-                window.location.reload();
-              }
-            }}
-            className="flex items-center gap-1.5"
-            title="Demo Kayıt Verilerini Sıfırla"
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
+            title="Kayıt Verilerini Sıfırla"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="text-xs">Kayıt Verilerini Sıfırla</span>
-          </Button>
+            <RotateCcw className="w-4 h-4 shrink-0" />
+            <span>Kayıt Verilerini Sıfırla</span>
+          </button>
         </div>
       </div>
 
       {/* Distinction Info Banner */}
-      <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs text-blue-950 space-y-1.5">
-        <div className="flex items-center gap-2 font-bold text-brand-blue">
-          <ShieldCheck className="w-4 h-4 text-brand-blue shrink-0" />
-          <span>Aşama Ayrımı Prensibi (Sprint E02-C)</span>
+      <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-950 space-y-1.5">
+        <div className="flex items-center gap-2 font-bold text-blue-900">
+          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>Aşama Ayrımı & Kursiyerlik Aktivasyon İlkesi</span>
         </div>
         <p className="leading-relaxed text-[11px] text-slate-700">
-          <strong>1. Kabul Edildi:</strong> Aday değerlendirmeyi geçti, ancak kesin kayıt henüz onaylanmadı. •{' '}
-          <strong>2. Kesin Kayıt:</strong> Yönetici tarafından evrak ve ön koşullar teyit edildi. •{' '}
-          <strong>3. Gruba Yerleştirildi:</strong> Kursiyer sınıf grubuna atandı ve kursiyer paneli aktif oldu.
+          <strong>1. Kabul Edildi:</strong> Aday değerlendirmeyi geçti, ancak kesin kayıt evrakı henüz onaylanmadı. •{' '}
+          <strong>2. Kesin Kayıt Onaylandı:</strong> Yönetici tarafından evrak ve ön koşullar teyit edildi. •{' '}
+          <strong>3. Gruba Yerleştirildi:</strong> Kursiyer eğitim grubuna atandı ve ders programına erişimi aktif oldu.
         </p>
       </div>
 
+      {/* Telemetry KPI Strip (Stripe / Canvas LMS Standart Metrik Bandı) */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Toplam Kayıt Havuzu',
+            value: macroStats.total,
+            icon: <Users className="w-4 h-4" />,
+            subtext: 'Dönem asil adayları',
+          },
+          {
+            label: 'Onay Bekleyenler',
+            value: macroStats.pending,
+            icon: <Clock className="w-4 h-4" />,
+            subtext: 'Evrak kontrolü bekliyor',
+            badge: macroStats.pending > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                İnceleme
+              </span>
+            ) : undefined,
+          },
+          {
+            label: 'Grup Bekleyenler',
+            value: macroStats.pendingGroup,
+            icon: <Layers className="w-4 h-4" />,
+            subtext: 'Kaydı onaylı, şube atanacak',
+          },
+          {
+            label: 'Gruba Yerleşenler',
+            value: macroStats.assigned,
+            icon: <GraduationCap className="w-4 h-4" />,
+            subtext: 'Aktif kursiyer statüsünde',
+          },
+        ]}
+      />
+
       {/* Notifications */}
       {successNotice && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-3 animate-fadeIn">
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successNotice}</span>
@@ -260,240 +383,466 @@ export const EnrollmentManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <Card className="bg-white border-slate-200 shadow-xs">
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-            {/* Search */}
-            <div className="relative w-full md:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Aday adı veya e-posta ile ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
-              />
-            </div>
-
-            {/* Selects */}
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <select
-                value={selectedProgramId}
-                onChange={(e) => setSelectedProgramId(e.target.value)}
-                className="h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue"
-              >
-                <option value="all">Tüm Programlar</option>
-                {DEMO_PROGRAMS.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue"
-              >
-                <option value="all">Tüm Durumlar ({enrollments.length})</option>
-                <option value="pending_confirmation">Kesin Kayıt Bekleyenler</option>
-                <option value="confirmed_pending_group">Grup Ataması Bekleyenler</option>
-                <option value="assigned">Gruba Yerleştirilenler (Aktif)</option>
-                <option value="cancelled">İptal Edilenler</option>
-              </select>
-            </div>
+      {/* Filter, Search and View Switcher Toolbar (Standart Tek Satır Hizalama) */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+          {/* Search */}
+          <div className="relative flex items-center min-w-[240px] max-w-xs w-full sm:w-auto">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Aday adı veya e-posta ile ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white w-full text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Enrollments Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3.5 px-4">Aday & İletişim</th>
-                <th className="py-3.5 px-4">Program & Dönem</th>
-                <th className="py-3.5 px-3 text-center">Puan</th>
-                <th className="py-3.5 px-3">Kesin Kayıt Durumu</th>
-                <th className="py-3.5 px-3">Atandığı Grup</th>
-                <th className="py-3.5 px-4 text-right">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredEnrollments.length > 0 ? (
-                filteredEnrollments.map((enr) => {
-                  const assignment = getAssignmentForEnrollment(enr.id);
-                  const score = getScoreForApplication(enr.applicationId);
+          {/* Program Select */}
+          <select
+            value={selectedProgramId}
+            onChange={(e) => setSelectedProgramId(e.target.value)}
+            className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Tüm Programlar</option>
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
 
-                  return (
-                    <tr key={enr.id} className="hover:bg-slate-50/70 transition-colors">
-                      {/* Candidate */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 leading-tight">
-                          {enr.candidateName}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          {enr.candidateEmail} • {enr.candidatePhone || '—'}
-                        </div>
-                      </td>
+          {/* Status Select */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Tüm Durumlar ({enrollments.length})</option>
+            <option value="pending_confirmation">Kesin Kayıt Bekleyenler ({macroStats.pending})</option>
+            <option value="confirmed_pending_group">Grup Ataması Bekleyenler ({macroStats.pendingGroup})</option>
+            <option value="assigned">Gruba Yerleştirilenler ({macroStats.assigned})</option>
+            <option value="cancelled">İptal Edilenler ({macroStats.cancelled})</option>
+          </select>
+        </div>
 
-                      {/* Program & Term */}
-                      <td className="py-3.5 px-4 max-w-[200px]">
-                        <div className="font-semibold text-slate-800 truncate" title={enr.programTitle}>
-                          {enr.programTitle}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          {enr.cohortName}
-                        </div>
-                      </td>
-
-                      {/* Score */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span className="font-extrabold text-slate-900 tabular-nums">
-                          {score}
-                        </span>
-                      </td>
-
-                      {/* Enrollment Status */}
-                      <td className="py-3.5 px-3">
-                        {enr.status === 'confirmed' ? (
-                          <StatusBadge label="Kesin Kayıt Onaylandı" variant="success" size="sm" />
-                        ) : enr.status === 'cancelled' ? (
-                          <StatusBadge label="İptal Edildi" variant="danger" size="sm" />
-                        ) : (
-                          <StatusBadge label="Onay Bekliyor" variant="warning" size="sm" />
-                        )}
-                      </td>
-
-                      {/* Assigned Group */}
-                      <td className="py-3.5 px-3">
-                        {assignment ? (
-                          <div className="space-y-0.5">
-                            <span className="font-bold text-brand-blue flex items-center gap-1">
-                              <Users className="w-3.5 h-3.5" />
-                              <span>{assignment.groupName}</span>
-                            </span>
-                            <span className="text-[10px] text-slate-400 block">
-                              Atandı: {assignment.assignedAt}
-                            </span>
-                          </div>
-                        ) : enr.status === 'confirmed' ? (
-                          <span className="text-amber-800 font-semibold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                            Grup Bekliyor
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">—</span>
-                        )}
-                      </td>
-
-                      {/* Action Buttons */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {enr.status === 'pending_confirmation' && (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              onClick={() => handleOpenConfirmModal(enr)}
-                              className="text-xs flex items-center gap-1"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Kesin Kaydı Onayla</span>
-                            </Button>
-                          )}
-
-                          {enr.status === 'confirmed' && !assignment && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleOpenAssignModal(enr)}
-                              className="text-xs flex items-center gap-1"
-                            >
-                              <PlusCircle className="w-3.5 h-3.5" />
-                              <span>Gruba Yerleştir</span>
-                            </Button>
-                          )}
-
-                          {enr.status === 'confirmed' && assignment && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenAssignModal(enr)}
-                              className="text-xs"
-                            >
-                              Grup Değiştir
-                            </Button>
-                          )}
-
-                          {enr.status !== 'cancelled' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleOpenCancelModal(enr)}
-                              className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50"
-                            >
-                              İptal
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
-                    Kriterlere uygun kayıt bulunamadı.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-slate-100 shrink-0 h-9">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+              viewMode === 'list'
+                ? 'bg-white shadow-2xs text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Tablo / Liste Görünümü"
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Liste</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+              viewMode === 'grid'
+                ? 'bg-white shadow-2xs text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Kart Görünümü"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Kartlar</span>
+          </button>
         </div>
       </div>
 
-      {/* MODAL 1: KESİN KAYIT ONAYLAMA */}
+      {/* VIEW 1: ENROLLMENTS TABLE (LIST VIEW) */}
+      {viewMode === 'list' && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+          <div className="overflow-x-auto max-h-[580px] overflow-y-auto relative">
+            <table className="w-full text-left text-xs min-w-[900px] border-collapse">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4 w-10 text-center bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedEnrollmentIds.length === filteredEnrollments.length &&
+                        filteredEnrollments.length > 0
+                      }
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    />
+                  </th>
+                  <th className="py-3.5 px-4 bg-slate-50">Aday & İletişim</th>
+                  <th className="py-3.5 px-4 bg-slate-50">Program & Dönem</th>
+                  <th className="py-3.5 px-3 text-center bg-slate-50">Puan</th>
+                  <th className="py-3.5 px-3 bg-slate-50">Kesin Kayıt Durumu</th>
+                  <th className="py-3.5 px-3 bg-slate-50">Atandığı Grup</th>
+                  <th className="py-3.5 px-4 text-right bg-slate-50 min-w-[210px] whitespace-nowrap">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredEnrollments.length > 0 ? (
+                  filteredEnrollments.map((enr) => {
+                    const assignment = getAssignmentForEnrollment(enr.id);
+                    const score = getScoreForApplication(enr.applicationId);
+                    const isSelected = selectedEnrollmentIds.includes(enr.id);
+
+                    return (
+                      <tr
+                        key={enr.id}
+                        className={`transition-colors ${
+                          isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/70'
+                        }`}
+                      >
+                        {/* Checkbox */}
+                        <td className="py-3.5 px-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSingleSelect(enr.id)}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                          />
+                        </td>
+
+                        {/* Candidate */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 font-bold text-slate-700 flex items-center justify-center shrink-0">
+                              {enr.candidateName.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 leading-tight">
+                                {enr.candidateName}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">
+                                {enr.candidateEmail} • {enr.candidatePhone || '—'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Program & Term */}
+                        <td className="py-3.5 px-4 max-w-[200px]">
+                          <div
+                            className="font-semibold text-slate-800 truncate"
+                            title={enr.programTitle}
+                          >
+                            {enr.programTitle}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {enr.cohortName}
+                          </div>
+                        </td>
+
+                        {/* Score */}
+                        <td className="py-3.5 px-3 text-center">
+                          <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tabular-nums">
+                            {score}
+                          </span>
+                        </td>
+
+                        {/* Enrollment Status */}
+                        <td className="py-3.5 px-3">
+                          {enr.status === 'confirmed' ? (
+                            <StatusBadge
+                              label="Kesin Kayıt Onaylandı"
+                              variant="success"
+                              size="sm"
+                            />
+                          ) : enr.status === 'cancelled' ? (
+                            <StatusBadge label="İptal Edildi" variant="danger" size="sm" />
+                          ) : (
+                            <StatusBadge label="Onay Bekliyor" variant="warning" size="sm" />
+                          )}
+                        </td>
+
+                        {/* Assigned Group */}
+                        <td className="py-3.5 px-3">
+                          {assignment ? (
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-brand-blue flex items-center gap-1">
+                                <Users className="w-3.5 h-3.5" />
+                                <span>{assignment.groupName}</span>
+                              </span>
+                              <span className="text-[10px] text-slate-400 block">
+                                Atandı: {assignment.assignedAt}
+                              </span>
+                            </div>
+                          ) : enr.status === 'confirmed' ? (
+                            <span className="text-amber-800 font-semibold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              Grup Bekliyor
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
+                        </td>
+
+                        {/* Action Buttons */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[210px]">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDetailModalEnrollment(enr)}
+                              className="h-8 px-2.5 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium transition inline-flex items-center shadow-2xs cursor-pointer"
+                              title="Detay & Evrak İncele"
+                            >
+                              İncele
+                            </button>
+
+                            {enr.status === 'pending_confirmation' && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenConfirmModal(enr)}
+                                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5 shrink-0" />
+                                <span>Onayla</span>
+                              </button>
+                            )}
+
+                            {enr.status === 'confirmed' && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignModal(enr)}
+                                className="h-8 px-3 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap cursor-pointer"
+                              >
+                                <Users className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span>{assignment ? 'Grup Değiştir' : 'Gruba Ata'}</span>
+                              </button>
+                            )}
+
+                            {enr.status !== 'cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCancelModal(enr)}
+                                className="h-8 px-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition cursor-pointer"
+                              >
+                                İptal
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      Kayıt kriterlerine uygun başvuru bulunamadı.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2: ENROLLMENTS CARDS (GRID VIEW) */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredEnrollments.map((enr) => {
+            const assignment = getAssignmentForEnrollment(enr.id);
+            const score = getScoreForApplication(enr.applicationId);
+            const isSelected = selectedEnrollmentIds.includes(enr.id);
+
+            return (
+              <div
+                key={enr.id}
+                className={`p-4 rounded-xl border bg-white shadow-2xs hover:shadow-sm transition flex flex-col justify-between ${
+                  isSelected ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSingleSelect(enr.id)}
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                      />
+                      <div className="w-8 h-8 rounded-full bg-slate-100 font-bold text-slate-700 flex items-center justify-center text-xs">
+                        {enr.candidateName.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-xs leading-snug">
+                          {enr.candidateName}
+                        </h3>
+                        <div className="text-[10px] text-slate-400">{enr.candidateEmail}</div>
+                      </div>
+                    </div>
+
+                    <span className="font-mono text-xs font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      {score} Puan
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-100">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Program:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[170px]" title={enr.programTitle}>
+                        {enr.programTitle}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Kesin Kayıt:</span>
+                      {enr.status === 'confirmed' ? (
+                        <StatusBadge label="Onaylandı" variant="success" size="sm" />
+                      ) : enr.status === 'cancelled' ? (
+                        <StatusBadge label="İptal Edildi" variant="danger" size="sm" />
+                      ) : (
+                        <StatusBadge label="Onay Bekliyor" variant="warning" size="sm" />
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Atanan Şube:</span>
+                      {assignment ? (
+                        <span className="font-bold text-blue-700">{assignment.groupName}</span>
+                      ) : enr.status === 'confirmed' ? (
+                        <span className="text-amber-700 font-semibold text-[11px]">Grup Bekliyor</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDetailModalEnrollment(enr)}
+                    className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold"
+                  >
+                    Detay
+                  </button>
+                  {enr.status === 'pending_confirmation' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => handleOpenConfirmModal(enr)}
+                      className="text-xs"
+                    >
+                      Onayla
+                    </Button>
+                  )}
+                  {enr.status === 'confirmed' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenAssignModal(enr)}
+                      className="text-xs text-blue-700 border-blue-200"
+                    >
+                      {assignment ? 'Grup Değiştir' : 'Gruba Ata'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Floating Bulk Action Ribbon */}
+      {selectedEnrollmentIds.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-2xl p-4 shadow-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4 max-w-3xl w-[92vw] animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+              {selectedEnrollmentIds.length}
+            </div>
+            <div>
+              <div className="text-xs font-bold">
+                {selectedEnrollmentIds.length} Kursiyer Seçildi
+              </div>
+              <div className="text-[10px] text-slate-400">
+                Toplu kesin kayıt veya grup ataması yapın
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBulkConfirm}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Toplu Onayla</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBulkTargetGroupId(groups[0]?.id || '');
+                setBulkAssignModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Gruba Ata</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBulkCancelReason('');
+                setBulkCancelModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs"
+            >
+              <span>İptal Et</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedEnrollmentIds([])}
+              className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white transition"
+            >
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
       <Modal
         isOpen={confirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
-        title="Adayın Kesin Kaydını Onaylayınız"
+        title="Kesin Kayıt Onayı"
       >
         <div className="space-y-4 text-xs">
-          {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
             <div className="font-bold text-slate-900 text-sm">
               {activeEnrollment?.candidateName}
             </div>
             <div className="text-slate-600">
-              <strong>Program:</strong> {activeEnrollment?.programTitle} ({activeEnrollment?.cohortName})
+              Program: <strong>{activeEnrollment?.programTitle}</strong>
             </div>
             <div className="text-slate-500 text-[11px]">
-              E-Posta: {activeEnrollment?.candidateEmail} • Telefon: {activeEnrollment?.candidatePhone}
+              Dönem: {activeEnrollment?.cohortName} • Ref: {activeEnrollment?.applicationId}
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="font-bold text-slate-800">Kayıt Onay Notu:</label>
+          {errorMessage && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Yönetici Onay Notu:
+            </label>
             <textarea
-              rows={2}
+              rows={3}
               value={confirmNotes}
               onChange={(e) => setConfirmNotes(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs resize-none"
+              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white"
             />
           </div>
 
-          <div className="text-[11px] text-slate-500 leading-relaxed">
-            Bu işlem adayın programa kesin kaydını oluşturur. Kesin kayıt sonrasında kursiyer bir eğitim grubuna atanabilecektir.
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button
               variant="outline"
               size="sm"
@@ -502,8 +851,8 @@ export const EnrollmentManagementPage: React.FC = () => {
               Vazgeç
             </Button>
             <Button
-              size="sm"
               variant="primary"
+              size="sm"
               onClick={handleExecuteConfirm}
             >
               Kesin Kaydı Onayla
@@ -512,79 +861,49 @@ export const EnrollmentManagementPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* MODAL 2: GRUBA YERLEŞTİRME */}
+      {/* Assign to Group Modal */}
       <Modal
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         title="Kursiyeri Eğitim Grubuna Yerleştir"
       >
         <div className="space-y-4 text-xs">
-          {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
             <div className="font-bold text-slate-900 text-sm">
               {activeEnrollment?.candidateName}
             </div>
             <div className="text-slate-600">
-              {activeEnrollment?.programTitle} ({activeEnrollment?.cohortName})
+              Program: {activeEnrollment?.programTitle}
             </div>
           </div>
 
-          {/* Group Selection with Capacity Display */}
-          <div className="space-y-2">
-            <label className="font-bold text-slate-800 block">
-              Atanacak Eğitim Grubu ve Kontenjan:
+          {errorMessage && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Hedef Şube / Eğitim Grubu:
             </label>
-            <div className="space-y-2">
+            <select
+              value={selectedTargetGroupId}
+              onChange={(e) => setSelectedTargetGroupId(e.target.value)}
+              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white"
+            >
               {groups
                 .filter((g) => g.programId === activeEnrollment?.programId)
-                .map((g) => {
-                  const stats = getGroupCapacityStats(g.id);
-                  const isSelected = selectedTargetGroupId === g.id;
-
-                  return (
-                    <div
-                      key={g.id}
-                      onClick={() => !stats.isFull && setSelectedTargetGroupId(g.id)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                        isSelected
-                          ? 'border-brand-blue bg-blue-50/60 ring-2 ring-brand-blue/20'
-                          : stats.isFull
-                          ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="space-y-0.5">
-                        <div className="font-bold text-slate-900">{g.name}</div>
-                        <div className="text-[11px] text-slate-500">
-                          {g.scheduleSummary} • {g.instructorNames.join(', ')}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="font-extrabold text-xs tabular-nums text-slate-800">
-                          {stats.assignedCount} / {stats.capacity} Kişi
-                        </div>
-                        {stats.isFull ? (
-                          <span className="text-[10px] font-bold text-rose-700">Dolu</span>
-                        ) : (
-                          <span className="text-[10px] text-emerald-700 font-semibold">
-                            {stats.availableSeats} Boş Kontenjan
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} — {g.location || 'Derslik'} (Mevcut: {assignments.filter((a) => a.groupId === g.id).length} / {g.capacity || 20})
+                  </option>
+                ))}
+            </select>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button
               variant="outline"
               size="sm"
@@ -593,48 +912,54 @@ export const EnrollmentManagementPage: React.FC = () => {
               Vazgeç
             </Button>
             <Button
-              size="sm"
               variant="primary"
+              size="sm"
               onClick={handleExecuteAssign}
-              disabled={!selectedTargetGroupId}
             >
-              Gruba Yerleştir ve Aktif Et
+              Gruba Ata
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* MODAL 3: KAYIT İPTALİ */}
+      {/* Cancel Modal */}
       <Modal
         isOpen={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
         title="Kesin Kayıt İptali"
       >
         <div className="space-y-4 text-xs">
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="font-bold text-slate-900 text-sm">
+              {activeEnrollment?.candidateName}
+            </div>
+            <div className="text-rose-700 font-semibold">
+              Bu adayın kesin kaydı iptal edilecek ve varsa grup ataması kaldırılacaktır.
+            </div>
+          </div>
+
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-[11px]">
-            ⚠️ Bu işlem kursiyerin kesin kaydını iptal eder, ilişkili grup kontenjanını boşaltır ve kursiyer erişimini kapatır.
-          </div>
-
-          <div className="space-y-1">
-            <label className="font-bold text-slate-800">İptal Gerekçesi (Zorunlu):</label>
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              İptal Gerekçesi (Zorunlu):
+            </label>
             <textarea
               rows={3}
-              placeholder="Örn: Kursiyer feragat talebinde bulundu veya devamsızlık sebebiyle ilişiği kesildi."
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs resize-none"
+              placeholder="Örn: Kursiyer feragat dilekçesi ile kaydını dondurmak istediğini bildirdi."
+              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white"
               required
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button
               variant="outline"
               size="sm"
@@ -643,8 +968,8 @@ export const EnrollmentManagementPage: React.FC = () => {
               Vazgeç
             </Button>
             <Button
-              size="sm"
               variant="danger"
+              size="sm"
               onClick={handleExecuteCancel}
             >
               Kaydı İptal Et
@@ -652,6 +977,166 @@ export const EnrollmentManagementPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Bulk Assign Modal */}
+      <Modal
+        isOpen={bulkAssignModalOpen}
+        onClose={() => setBulkAssignModalOpen(false)}
+        title={`Seçili ${selectedEnrollmentIds.length} Kursiyeri Gruba Ata`}
+      >
+        <div className="space-y-4 text-xs">
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Hedef Şube / Eğitim Grubu Seçiniz:
+            </label>
+            <select
+              value={bulkTargetGroupId}
+              onChange={(e) => setBulkTargetGroupId(e.target.value)}
+              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} — {g.location || 'Derslik'} ({assignments.filter((a) => a.groupId === g.id).length}/{g.capacity || 20})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkAssignModalOpen(false)}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleBulkAssignExecute}
+            >
+              Toplu Gruba Yerleştir
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Cancel Modal */}
+      <Modal
+        isOpen={bulkCancelModalOpen}
+        onClose={() => setBulkCancelModalOpen(false)}
+        title={`Seçili ${selectedEnrollmentIds.length} Kaydı İptal Et`}
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
+            Seçilen {selectedEnrollmentIds.length} kursiyerin kaydı iptal edilecek ve denetim kütüğüne tescil edilecektir.
+          </div>
+
+          {errorMessage && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Toplu İptal Gerekçesi (Zorunlu):
+            </label>
+            <textarea
+              rows={3}
+              value={bulkCancelReason}
+              onChange={(e) => setBulkCancelReason(e.target.value)}
+              placeholder="Örn: Evrak teslim süresi dolduğu için feragat sayıldı."
+              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkCancelModalOpen(false)}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleBulkCancelExecute}
+            >
+              Toplu İptal Et
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Candidate Detail Modal */}
+      {detailModalEnrollment && (
+        <Modal
+          isOpen={!!detailModalEnrollment}
+          onClose={() => setDetailModalEnrollment(null)}
+          title="Kursiyer Kesin Kayıt & Dosya Detayı"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[11px] text-slate-400">
+                  Ref: {detailModalEnrollment.applicationId}
+                </span>
+                {detailModalEnrollment.status === 'confirmed' ? (
+                  <StatusBadge label="Kesin Kayıt Onaylandı" variant="success" size="sm" />
+                ) : detailModalEnrollment.status === 'cancelled' ? (
+                  <StatusBadge label="İptal Edildi" variant="danger" size="sm" />
+                ) : (
+                  <StatusBadge label="Onay Bekliyor" variant="warning" size="sm" />
+                )}
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                {detailModalEnrollment.candidateName}
+              </h3>
+              <div className="text-slate-600 space-y-1 pt-1">
+                <div>E-Posta: <strong>{detailModalEnrollment.candidateEmail}</strong></div>
+                <div>Telefon: <strong>{detailModalEnrollment.candidatePhone || '—'}</strong></div>
+                <div>Program: <strong>{detailModalEnrollment.programTitle}</strong></div>
+                <div>Dönem: <strong>{detailModalEnrollment.cohortName}</strong></div>
+                <div>Kriter Puanı: <strong className="font-mono text-blue-700">{getScoreForApplication(detailModalEnrollment.applicationId)} / 100</strong></div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-950 text-[11px] space-y-1">
+              <div className="font-bold">Kurumsal Tescil Durumu:</div>
+              <p>
+                Adayın beyanları ve ön koşul evrakları komisyonca incelenmiş olup kesin kayıt aşamasına aktarılmıştır.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDetailModalEnrollment(null)}
+              >
+                Kapat
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* In-App Custom Confirm Modal */}
+      <ActionConfirmModal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={() => {
+          resetEnrollmentsToDefaults();
+          window.location.reload();
+        }}
+        title="Kayıt ve Grup Atamalarını Sıfırla"
+        message="Tüm kayıt ve grup atamalarını başlangıç fabrika ayarlarına sıfırlamak istiyor musunuz? Manuel yapılan tüm öğrenci yerleşimleri sıfırlanacaktır."
+        confirmText="Evet, Sıfırla"
+        variant="danger"
+      />
     </div>
   );
 };

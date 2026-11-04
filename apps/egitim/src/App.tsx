@@ -5,7 +5,6 @@ import { PublicEducationLayout } from './components/public/PublicEducationLayout
 import { EducationLayout } from './components/layout/EducationLayout';
 
 // Public Visitor Pages
-import { PublicHomePage } from './pages/PublicHomePage';
 import { CatalogPage } from './pages/CatalogPage';
 import { ProgramDetailPage } from './pages/ProgramDetailPage';
 import { LoginPage } from './pages/LoginPage';
@@ -15,13 +14,26 @@ import { CertificateVerifyPage } from './pages/CertificateVerifyPage';
 
 // Authenticated Role Dashboards
 import { TraineeDashboardPage } from './pages/TraineeDashboardPage';
+import { TraineeCoursesPage } from './pages/TraineeCoursesPage';
+import { TraineeCalendarPage } from './pages/TraineeCalendarPage';
+import { TraineeAssignmentsPage } from './pages/TraineeAssignmentsPage';
+import { TraineeAttendancePage } from './pages/TraineeAttendancePage';
+import { TraineeCertificatesPage } from './pages/TraineeCertificatesPage';
+import { TraineeProfilePage } from './pages/TraineeProfilePage';
 import { InstructorDashboardPage } from './pages/InstructorDashboardPage';
+import { InstructorCoursesPage } from './pages/InstructorCoursesPage';
+import { InstructorCalendarPage } from './pages/InstructorCalendarPage';
+import { InstructorAssignmentsPage } from './pages/InstructorAssignmentsPage';
+import { InstructorGroupsPage } from './pages/InstructorGroupsPage';
+import { InstructorProgressPage } from './pages/InstructorProgressPage';
+import { InstructorProfilePage } from './pages/InstructorProfilePage';
 import { AdminOverviewPage } from './pages/AdminOverviewPage';
 import { ApplicationDecisionPage } from './pages/ApplicationDecisionPage';
 
-// Candidate Portal & Application Flow (Sprint E02-A)
+// Candidate Portal & Application Flow
 import { CandidateDashboardPage } from './pages/CandidateDashboardPage';
 import { CandidateApplicationFormPage } from './pages/CandidateApplicationFormPage';
+import { CandidateProfilePage } from './pages/CandidateProfilePage';
 
 // Criteria & Scoring Desk (Sprint E02-B)
 import { CriteriaManagementPage } from './pages/CriteriaManagementPage';
@@ -60,33 +72,36 @@ import { SuperAdminDashboardPage } from './pages/SuperAdminDashboardPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { RolePermissionsPage } from './pages/RolePermissionsPage';
 import { SystemSettingsPage } from './pages/SystemSettingsPage';
+import { FacilityManagementPage } from './pages/FacilityManagementPage';
 import { CentralAuditLogPage } from './pages/CentralAuditLogPage';
 import { OperationalReportsPage } from './pages/OperationalReportsPage';
 
 // UX-01: Professional Registration & Dedicated Demo Hub
 import { RegisterPage } from './pages/RegisterPage';
 import { DemoHubPage } from './pages/DemoHubPage';
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <DemoRoleProvider>
+        <ScrollToTop />
         <Routes>
           {/* ================================================================= */}
           {/* 1. HALKA AÇIK ZİYARETÇİ DENEYİMİ (PublicEducationLayout - Sidebarsız) */}
           {/* ================================================================= */}
           <Route element={<PublicEducationLayout />}>
-            {/* Halka Açık Ana Sayfa */}
-            <Route path="/" element={<PublicHomePage />} />
+            {/* Doğrudan Giriş Sayfasından Açılış */}
+            <Route path="/" element={<LoginPage />} />
+
+            {/* Giriş Rotası Yönlendirmesi */}
+            <Route path="/giris" element={<Navigate to="/" replace />} />
 
             {/* Eğitim Kataloğu */}
             <Route path="/egitimler" element={<CatalogPage />} />
 
             {/* Program Detay & Müfredat */}
             <Route path="/egitimler/:id" element={<ProgramDetailPage />} />
-
-            {/* Giriş & Demo Rol Masası */}
-            <Route path="/giris" element={<LoginPage />} />
 
             {/* Yeni Aday Hesap Oluşturma (Sprint UX-01) */}
             <Route path="/hesap-olustur" element={<RegisterPage />} />
@@ -115,12 +130,62 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Dinamik Aday Başvuru Formu (Sprint E02-A) */}
+          {/* Aday Paneli - Eğitim Kataloğu & Başvuru */}
+          <Route
+            path="/aday/katalog"
+            element={
+              <EducationLayout>
+                <CatalogPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Aday Paneli - Program Detay & Müfredat */}
+          <Route
+            path="/aday/katalog/:id"
+            element={
+              <EducationLayout>
+                <ProgramDetailPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Aday Paneli - Dönem Takvimi */}
+          <Route
+            path="/aday/takvim"
+            element={
+              <EducationLayout>
+                <CalendarPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Aday Paneli - Başvuru Rehberi */}
+          <Route
+            path="/aday/rehber"
+            element={
+              <EducationLayout>
+                <ApplicationGuidePage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Dinamik Aday Başvuru Formu */}
           <Route
             path="/aday/basvuru/:programId"
             element={
               <EducationLayout>
                 <CandidateApplicationFormPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Aday Profilim & Kütük Kaydım */}
+          <Route
+            path="/aday/profil"
+            element={
+              <EducationLayout>
+                <CandidateProfilePage />
               </EducationLayout>
             }
           />
@@ -131,6 +196,56 @@ export const App: React.FC = () => {
             element={
               <EducationLayout>
                 <TraineeDashboardPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer Derslerim & Müfredat */}
+          <Route
+            path="/kursiyer/dersler"
+            element={
+              <EducationLayout>
+                <TraineeCoursesPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer Eğitim Takvimi */}
+          <Route
+            path="/kursiyer/takvim"
+            element={
+              <EducationLayout>
+                <TraineeCalendarPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer Ödevlerim & Teslim Masası */}
+          <Route
+            path="/kursiyer/odevler"
+            element={
+              <EducationLayout>
+                <TraineeAssignmentsPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer Devam Durumum & Yoklama */}
+          <Route
+            path="/kursiyer/devam"
+            element={
+              <EducationLayout>
+                <TraineeAttendancePage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer Belgelerim & Karekod */}
+          <Route
+            path="/kursiyer/belgeler"
+            element={
+              <EducationLayout>
+                <TraineeCertificatesPage />
               </EducationLayout>
             }
           />
@@ -155,12 +270,110 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Eğitmen Operasyon & Manuel Yoklama Paneli */}
+          {/* Kursiyer Profilim & Kütük Bilgilerim */}
+          <Route
+            path="/kursiyer/profil"
+            element={
+              <EducationLayout>
+                <TraineeProfilePage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer - Eğitim Kataloğu (Portal İçinde) */}
+          <Route
+            path="/kursiyer/katalog"
+            element={
+              <EducationLayout>
+                <CatalogPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer - Program Detay (Portal İçinde) */}
+          <Route
+            path="/kursiyer/katalog/:id"
+            element={
+              <EducationLayout>
+                <ProgramDetailPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Kursiyer - Karekod Belge Doğrulama (Portal İçinde) */}
+          <Route
+            path="/kursiyer/belge-dogrula"
+            element={
+              <EducationLayout>
+                <CertificateVerifyPage />
+              </EducationLayout>
+            }
+          />
+          <Route
+            path="/kursiyer/belge-dogrula/:verificationCode"
+            element={
+              <EducationLayout>
+                <CertificateVerifyPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Eğitmen Genel Bakış & Dashboard */}
           <Route
             path="/egitmen"
             element={
               <EducationLayout>
                 <InstructorDashboardPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Eğitmen Derslerim & Manuel Yoklama */}
+          <Route
+            path="/egitmen/dersler"
+            element={
+              <EducationLayout>
+                <InstructorCoursesPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Eğitmen Eğitim Takvimi */}
+          <Route
+            path="/egitmen/takvim"
+            element={
+              <EducationLayout>
+                <InstructorCalendarPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Eğitmen Ödevler & Puanlama Masası */}
+          <Route
+            path="/egitmen/odevler"
+            element={
+              <EducationLayout>
+                <InstructorAssignmentsPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Eğitmen Atanmış Gruplarım */}
+          <Route
+            path="/egitmen/gruplar"
+            element={
+              <EducationLayout>
+                <InstructorGroupsPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Eğitmen Kursiyer Akademik İlerlemesi */}
+          <Route
+            path="/egitmen/ilerleme"
+            element={
+              <EducationLayout>
+                <InstructorProgressPage />
               </EducationLayout>
             }
           />
@@ -185,12 +398,32 @@ export const App: React.FC = () => {
             }
           />
 
+          {/* Eğitmen Profilim & Kütük Kaydım */}
+          <Route
+            path="/egitmen/profil"
+            element={
+              <EducationLayout>
+                <InstructorProfilePage />
+              </EducationLayout>
+            }
+          />
+
           {/* İdari Yönetim Genel Bakış */}
           <Route
             path="/yonetim"
             element={
               <EducationLayout>
                 <AdminOverviewPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Yönetici Eğitim Kataloğu & Program Masası */}
+          <Route
+            path="/yonetim/egitimler"
+            element={
+              <EducationLayout>
+                <CatalogPage />
               </EducationLayout>
             }
           />
@@ -371,6 +604,16 @@ export const App: React.FC = () => {
             element={
               <EducationLayout>
                 <SystemSettingsPage />
+              </EducationLayout>
+            }
+          />
+
+          {/* Derslik ve Mekân Kataloğu Yönetimi */}
+          <Route
+            path="/yonetim/mekanlar"
+            element={
+              <EducationLayout>
+                <FacilityManagementPage />
               </EducationLayout>
             }
           />

@@ -1,34 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Clock,
-  MapPin,
-  Upload,
-  MessageSquare,
-  CheckCircle2,
-  AlertTriangle,
-  ShieldCheck,
-  Calendar,
-  AlertCircle,
   BookOpen,
+  Calendar,
+  CheckSquare,
+  Award,
+  ArrowRight,
+  ChevronRight,
   FileText,
-  Check,
-  ExternalLink,
-  History,
-  X,
-  Hash,
+  Bell,
+  MessageSquare,
+  Info,
+  BarChart3,
+  MapPin,
+  Clock,
+  User,
 } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { StatusBadge } from '../components/ui/StatusBadge';
-import { Modal } from '../components/ui/Modal';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
+import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
+import { KpiStrip } from '../components/ui/KpiStrip';
 import {
   getActiveAssignmentForCandidate,
   getGroupById,
-  subscribeToGroupUpdates,
+  getStoredGroups,
 } from '../services/enrollmentStorage';
-import { getApplicationsByCandidateId } from '../services/applicationStorage';
 import {
   getSessionsByGroup,
   getStoredAttendanceRecords,
@@ -39,1532 +35,964 @@ import { calculateTraineeAttendance } from '../services/attendanceEngine';
 import {
   getCourseAssignmentsByGroup,
   getLatestSubmission,
-  getEvaluationForSubmission,
-  submitAssignment,
   subscribeToAssignmentUpdates,
 } from '../services/assignmentStorage';
-import {
-  calculateTraineeAssignmentPerformance,
-} from '../services/assignmentEngine';
-import { calculateFinalEligibility } from '../services/successEngine';
-import {
-  getSuccessDecisionByEnrollment,
-  subscribeToSuccessDecisionUpdates,
-} from '../services/successDecisionStorage';
+import { calculateTraineeAssignmentPerformance } from '../services/assignmentEngine';
 import {
   getCertificatesByCandidateId,
   subscribeToCertificateUpdates,
-  checkCertificateAcademicDiscrepancy,
 } from '../services/certificateStorage';
-import { downloadCertificatePDF } from '../services/pdfEngine';
-import { CertificatePreviewModal } from '../components/certificate/CertificatePreviewModal';
 import {
-  Session,
-  Assignment,
-  AssignmentSubmission,
-  FinalEligibilityResult,
-  SuccessDecisionRecord,
-  CertificateRecord,
-} from '../types';
-import { Award, Download, QrCode } from 'lucide-react';
+  getStoredAdminAnnouncements,
+  subscribeToAdminAnnouncementUpdates,
+} from '../services/notificationStorage';
+import {
+  getStoredConversations,
+  CONVERSATIONS_UPDATE_EVENT,
+} from '../services/messageStorage';
+import {
+  getStoredTraineeProfile,
+  subscribeToProfileUpdates,
+} from '../services/traineeProfileStorage';
+import { Session, AdminAnnouncement } from '../types';
 
 export const TraineeDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, setRole } = useDemoRole();
+  const { currentUser } = useDemoRole();
 
-  // Modallar
-  const [selectedAssignmentForSubmit, setSelectedAssignmentForSubmit] = useState<Assignment | null>(null);
-  const [sessionDetailModal, setSessionDetailModal] = useState<Session | null>(null);
-  const [selectedSubmissionForView, setSelectedSubmissionForView] = useState<{
-    assignment: Assignment;
-    submission: AssignmentSubmission;
-  } | null>(null);
-  const [previewCert, setPreviewCert] = useState<CertificateRecord | null>(null);
-
-  // Form State
-  const [submitText, setSubmitText] = useState('');
-  const [submitLink, setSubmitLink] = useState('');
-  const [submitFileName, setSubmitFileName] = useState('');
-  const [submitFileSize, setSubmitFileSize] = useState('1.5 MB');
-
-  // Feedback Toast
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  // Data Refresh Trigger
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [profile, setProfile] = useState(getStoredTraineeProfile);
+  const [selectedSessionModal, setSelectedSessionModal] = useState<Session | null>(null);
+  const [selectedAnnouncementModal, setSelectedAnnouncementModal] = useState<AdminAnnouncement | null>(null);
+  const [hoveredSegment, setHoveredSegment] = useState<'all' | 'completed' | 'in_progress' | 'not_started'>('all');
 
+  // Reaktif veri güncellemeleri
   useEffect(() => {
-    const unsub1 = subscribeToGroupUpdates(() => setRefreshTrigger((p) => p + 1));
-    const unsub2 = subscribeToSessionUpdates(() => setRefreshTrigger((p) => p + 1));
-    const unsub3 = subscribeToAttendanceUpdates(() => setRefreshTrigger((p) => p + 1));
-    const unsub4 = subscribeToAssignmentUpdates(() => setRefreshTrigger((p) => p + 1));
-    const unsub5 = subscribeToSuccessDecisionUpdates(() => setRefreshTrigger((p) => p + 1));
-    const unsub6 = subscribeToCertificateUpdates(() => setRefreshTrigger((p) => p + 1));
+    const unsubSession = subscribeToSessionUpdates(() => setRefreshTrigger((p) => p + 1));
+    const unsubAttendance = subscribeToAttendanceUpdates(() => setRefreshTrigger((p) => p + 1));
+    const unsubAssignment = subscribeToAssignmentUpdates(() => setRefreshTrigger((p) => p + 1));
+    const unsubCertificate = subscribeToCertificateUpdates(() => setRefreshTrigger((p) => p + 1));
+    const unsubAnnouncements = subscribeToAdminAnnouncementUpdates(() => setRefreshTrigger((p) => p + 1));
+    const unsubProfile = subscribeToProfileUpdates((updated) => setProfile(updated));
+
+    const handleConv = () => setRefreshTrigger((p) => p + 1);
+    window.addEventListener(CONVERSATIONS_UPDATE_EVENT, handleConv);
+
     return () => {
-      unsub1();
-      unsub2();
-      unsub3();
-      unsub4();
-      unsub5();
-      unsub6();
+      unsubSession();
+      unsubAttendance();
+      unsubAssignment();
+      unsubCertificate();
+      unsubAnnouncements();
+      unsubProfile();
+      window.removeEventListener(CONVERSATIONS_UPDATE_EVENT, handleConv);
     };
   }, []);
 
-  // Kursiyerin kendi düzenlenmiş veya kayıtlı belgeleri (Sprint E03-D)
-  const traineeCertificates = useMemo(() => {
-    return getCertificatesByCandidateId(currentUser.id);
-  }, [currentUser.id, refreshTrigger]);
-
-  // Kursiyerin aktif grup ataması
+  // Aktif Kayıt & Grup
   const activeAssignment = useMemo(() => {
     return getActiveAssignmentForCandidate(currentUser.id);
-  }, [currentUser.id]);
+  }, [currentUser.id, refreshTrigger]);
 
-  // Atanmış grup detayları
   const assignedGroup = useMemo(() => {
-    if (!activeAssignment) return null;
-    return getGroupById(activeAssignment.groupId) || null;
-  }, [activeAssignment]);
+    if (activeAssignment) {
+      const g = getGroupById(activeAssignment.groupId);
+      if (g) return g;
+    }
+    const allGroups = getStoredGroups();
+    return allGroups[0] || null;
+  }, [activeAssignment, refreshTrigger]);
 
-  // Grup oturumları
+  // Oturumlar
   const groupSessions = useMemo(() => {
     if (!assignedGroup) return [];
     return getSessionsByGroup(assignedGroup.id);
-  }, [assignedGroup]);
+  }, [assignedGroup, refreshTrigger]);
 
-  // Dinamik Devam Oranı Hesaplaması (attendanceEngine üzerinden)
+  // Yoklama Verileri
   const attendanceCalc = useMemo(() => {
     if (!assignedGroup) return null;
     return calculateTraineeAttendance(currentUser.id, assignedGroup.id, {
       enrollmentDate: activeAssignment?.assignedAt,
     });
-  }, [currentUser.id, assignedGroup, activeAssignment]);
+  }, [currentUser.id, assignedGroup, activeAssignment, refreshTrigger]);
 
-  // Sıradaki / En Yakın Oturum
-  const nextSession = useMemo(() => {
-    if (groupSessions.length === 0) return null;
-    const openSess = groupSessions.find((s) => s.status === 'attendance_open' || s.status === 'active');
-    if (openSess) return openSess;
-    const scheduledSess = groupSessions.find((s) => s.status === 'scheduled');
-    return scheduledSess || groupSessions[groupSessions.length - 1];
-  }, [groupSessions]);
-
-  // Kursiyerin kendi yoklama kayıtları haritası
   const traineeAttendanceMap = useMemo(() => {
     const all = getStoredAttendanceRecords();
     const map = new Map<string, string>();
     all
-      .filter((r) => r.candidateId === currentUser.id || r.traineeId === currentUser.id)
+      .filter((r) => r.traineeId === currentUser.id)
       .forEach((r) => map.set(r.sessionId, r.status));
     return map;
-  }, [currentUser.id]);
+  }, [currentUser.id, refreshTrigger]);
 
-  // Kursiyerin diğer program başvuruları
-  const otherApplications = useMemo(() => {
-    const allApps = getApplicationsByCandidateId(currentUser.id);
-    if (!activeAssignment) return allApps;
-    return allApps.filter((a) => a.programId !== activeAssignment.programId);
-  }, [currentUser.id, activeAssignment]);
-
-  // =========================================================================
-  // DİNAMİK ÖDEVLER VE BAŞARI ÖN KONTROLÜ
-  // =========================================================================
-
-  // Yalnızca yayınlanmış (published) ödevler kursiyere gösterilir
+  // Ödevler & Performans
   const groupAssignments = useMemo(() => {
     if (!assignedGroup) return [];
-    return getCourseAssignmentsByGroup(assignedGroup.id, false);
-  }, [assignedGroup]);
+    return getCourseAssignmentsByGroup(assignedGroup.id);
+  }, [assignedGroup, refreshTrigger]);
 
-  // Kursiyer ödev performansı
   const assignmentPerf = useMemo(() => {
     if (!assignedGroup) return null;
     return calculateTraineeAssignmentPerformance(currentUser.id, assignedGroup.id);
-  }, [currentUser.id, assignedGroup, groupAssignments]);
+  }, [currentUser.id, assignedGroup, refreshTrigger]);
 
-  // Sprint E03-C: Nihai Başarı Motoru ve Yönetici Kararı
-  const finalEligibility: FinalEligibilityResult | null = useMemo(() => {
-    if (!activeAssignment) return null;
-    return calculateFinalEligibility(activeAssignment.enrollmentId, activeAssignment.termId);
-  }, [activeAssignment, refreshTrigger]);
+  // Belgeler
+  const traineeCertificates = useMemo(() => {
+    return getCertificatesByCandidateId(currentUser.id);
+  }, [currentUser.id, refreshTrigger]);
 
-  const successDecision: SuccessDecisionRecord | null = useMemo(() => {
-    if (!activeAssignment) return null;
-    return getSuccessDecisionByEnrollment(activeAssignment.enrollmentId);
-  }, [activeAssignment, refreshTrigger]);
+  // Duyurular
+  const announcements = useMemo(() => {
+    const all = getStoredAdminAnnouncements();
+    return all.filter((a) => a.status === 'published').slice(0, 3);
+  }, [refreshTrigger]);
 
-  // Acil / Sıradaki Teslim Bekleyen Ödev (not submitted veya revision requested)
-  const urgentAssignment = useMemo(() => {
-    if (groupAssignments.length === 0) return null;
+  // Mesajlar (Atanmış Eğitmen Görüşmeleri)
+  const conversations = useMemo(() => {
+    const all = getStoredConversations();
+    return all.filter((c) => c.traineeId === currentUser.id || c.instructorId === currentUser.id).slice(0, 3);
+  }, [currentUser.id, refreshTrigger]);
 
-    // Önce revizyon istenmiş olan varsa en yüksek öncelik
-    for (const asgn of groupAssignments) {
-      const sub = getLatestSubmission(asgn.id, currentUser.id);
-      if (sub && sub.status === 'revision_requested') {
-        return { assignment: asgn, latestSub: sub, isRevision: true };
-      }
+  // İsim formatlama
+  const firstName = useMemo(() => {
+    const name = profile.fullName || currentUser.fullName || 'Kursiyer';
+    return name.split(' ')[0];
+  }, [profile.fullName, currentUser.fullName]);
+
+  // Bugünün Türkçe Tarihi
+  const formattedTodayDate = useMemo(() => {
+    const now = new Date();
+    const days = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+    ];
+    return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}, ${days[now.getDay()]}`;
+  }, []);
+
+  // Yaklaşan Ders
+  const upcomingSession = useMemo(() => {
+    const sorted = [...groupSessions].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const future = sorted.find((s) => s.status === 'scheduled');
+    return future || sorted[sorted.length - 1] || null;
+  }, [groupSessions]);
+
+  // Metrik Hesaplamaları (Gerçek Veri Bağlantısı)
+  const attendedCount = attendanceCalc?.attendedCount ?? 0;
+  const totalHeldSessions = attendanceCalc?.completedSessionsCount ?? groupSessions.filter((s) => s.status === 'completed').length;
+  const attendanceRate = attendanceCalc?.attendanceRate ?? 0;
+
+  const mandatoryTotal = assignmentPerf?.mandatoryAssignmentsTotal ?? groupAssignments.filter((a) => a.isMandatory || a.isRequired).length;
+  const mandatoryApproved = assignmentPerf?.mandatoryAssignmentsApproved ?? 0;
+
+  // Modül ve Oturum İlerlemesi
+  const completedModules = groupSessions.filter((s) => s.status === 'completed').length;
+  const inProgressModules = groupSessions.filter((s) => s.status === 'attendance_open' || s.status === 'active').length;
+  const notStartedModules = groupSessions.filter((s) => s.status === 'scheduled').length;
+  const overallProgressPercentage = groupSessions.length > 0 ? Math.round((completedModules / groupSessions.length) * 100) : 0;
+
+  // Görüntülenecek Mesajlar
+  const displayMessages = useMemo(() => {
+    if (conversations.length > 0) {
+      return conversations.map((c) => ({
+        id: c.id,
+        initials: (c.instructorName || 'Eğitmen')
+          .split(' ')
+          .map((p) => p[0])
+          .join('')
+          .slice(0, 2),
+        color: 'bg-blue-600 text-white',
+        name: c.instructorName,
+        text: c.lastMessagePreview || 'Yeni mesaj...',
+        time: c.lastMessageAt
+          ? new Date(c.lastMessageAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+          : '14:32',
+        unread: (c.unreadCountTrainee || 0) > 0,
+      }));
     }
-
-    // Sonra henüz teslim edilmemiş zorunlu ödevler
-    for (const asgn of groupAssignments) {
-      const sub = getLatestSubmission(asgn.id, currentUser.id);
-      if (!sub && asgn.isMandatory) {
-        return { assignment: asgn, latestSub: null, isRevision: false };
-      }
-    }
-
-    // Sonra henüz teslim edilmemiş isteğe bağlı ödevler
-    for (const asgn of groupAssignments) {
-      const sub = getLatestSubmission(asgn.id, currentUser.id);
-      if (!sub) {
-        return { assignment: asgn, latestSub: null, isRevision: false };
-      }
-    }
-
-    return null;
-  }, [groupAssignments, currentUser.id]);
-
-  // Teslim Modalı Açma
-  const handleOpenSubmitModal = (asgn: Assignment) => {
-    setSelectedAssignmentForSubmit(asgn);
-    const prevSub = getLatestSubmission(asgn.id, currentUser.id);
-    if (prevSub && prevSub.status === 'revision_requested') {
-      setSubmitText(prevSub.content.text || '');
-      setSubmitLink(prevSub.content.linkUrl || '');
-      setSubmitFileName(prevSub.content.fileName || '');
-    } else {
-      setSubmitText('');
-      setSubmitLink('');
-      setSubmitFileName('');
-    }
-  };
-
-  // Ödev Teslim Etme / Yeniden Gönderme
-  const handleSubmitAssignment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAssignmentForSubmit || !activeAssignment) return;
-
-    if (!submitText.trim() && !submitLink.trim() && !submitFileName.trim()) {
-      setFeedback({
-        type: 'error',
-        message: 'Lütfen açıklama metni, bağlantı URL veya dosya ekinden en az birini doldurunuz.',
-      });
-      return;
-    }
-
-    const res = submitAssignment({
-      assignmentId: selectedAssignmentForSubmit.id,
-      enrollmentId: activeAssignment.enrollmentId,
-      traineeId: currentUser.id,
-      traineeName: currentUser.fullName,
-      content: {
-        text: submitText.trim() || undefined,
-        linkUrl: submitLink.trim() || undefined,
-        fileName: submitFileName.trim() || undefined,
-        fileSize: submitFileName.trim() ? submitFileSize : undefined,
-      },
-    });
-
-    if (res.success) {
-      const isResubmit = res.submission && res.submission.submissionVersion > 1;
-      setFeedback({
-        type: 'success',
-        message: isResubmit
-          ? `Ödev düzeltmeniz Sürüm v${res.submission?.submissionVersion} olarak eğitmeninize başarıyla iletildi.`
-          : 'Ödeviniz başarıyla teslim edildi ve eğitmenin değerlendirme kuyruğuna alındı.',
-      });
-      setSelectedAssignmentForSubmit(null);
-    } else {
-      setFeedback({ type: 'error', message: res.error || 'Ödev teslim edilemedi.' });
-    }
-  };
+    return [];
+  }, [conversations]);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* ------------------------------------------------------------------- */}
-      {/* BAŞLIK & PROGRAM ÖZETİ */}
-      {/* ------------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      {/* ===================================================================== */}
+      {/* 1. ÜST BAŞLIK VE HIZLI İŞLEM BUTONLARI (STANDART DÜZ BAŞLIK)         */}
+      {/* ===================================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <span className="text-xs text-slate-500 font-medium">Aktif Kursiyer Portali:</span>
-          <h2 className="text-xl font-bold text-brand-navy">
-            {assignedGroup
-              ? `${assignedGroup.programTitle} — ${assignedGroup.name}`
-              : 'Aktif Eğitim Programı Bulunamadı'}
-          </h2>
+          <div className="text-xs font-semibold text-slate-500 mb-1">
+            {formattedTodayDate}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Merhaba, <span className="text-blue-600">{currentUser.fullName || firstName}</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Eğitim sürecinizle ilgili güncel bilgilere buradan ulaşabilirsiniz.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {assignedGroup ? (
-            <>
-              <Link
-                to="/kursiyer/mesajlar"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-brand-blue" />
-                <span>Eğitmen Mesajları</span>
-              </Link>
-              <Link
-                to="/kursiyer/kanallar"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
-              >
-                <Hash className="w-3.5 h-3.5 text-brand-blue" />
-                <span>Grup Kanalları</span>
-              </Link>
-            </>
-          ) : (
-            <span className="text-amber-800 text-xs">
-              Henüz bir gruba atanmadınız veya kesin kaydınız tamamlanmadı.
-            </span>
-          )}
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Link
+            to="/kursiyer/dersler"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition shadow-2xs whitespace-nowrap"
+          >
+            <BookOpen className="w-4 h-4 shrink-0" />
+            <span>Derslerim</span>
+          </Link>
+          <Link
+            to="/kursiyer/takvim"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
+          >
+            <Calendar className="w-4 h-4 text-purple-600 shrink-0" />
+            <span>Eğitim Takvimi</span>
+          </Link>
+          <Link
+            to="/kursiyer/odevler"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
+          >
+            <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>Ödev Teslimi</span>
+          </Link>
         </div>
       </div>
 
-      {/* Feedback Toast */}
-      {feedback && (
-        <div
-          className={`p-4 rounded-lg flex items-start justify-between text-sm ${
-            feedback.type === 'success'
-              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {feedback.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
-            )}
-            <span>{feedback.message}</span>
+      {/* ===================================================================== */}
+      {/* 2. KAYITLI AKTİF EĞİTİM PROGRAMI VE ŞUBE BİLGİSİ (HERO BANNER)         */}
+      {/* ===================================================================== */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-5 md:p-6 shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div className="space-y-2 max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              Kayıtlı Aktif Program
+            </span>
+            <span className="text-xs text-slate-300 font-medium">
+              {assignedGroup?.cohortName || '2026 Güz Dönemi'} • {assignedGroup?.name || 'Grup A — Sabah Oturumu'}
+            </span>
           </div>
-          <button
-            onClick={() => setFeedback(null)}
-            className="text-slate-400 hover:text-slate-600 ml-4"
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            {assignedGroup?.programTitle || 'İslahiye Biberi & Tarımsal E-Ticaret'}
+          </h2>
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-1">
+            <div className="flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span>Eğitmen: <strong className="text-white">{assignedGroup?.instructorNames?.[0] || 'Murat Özkan'}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Derslik: <strong className="text-white">{assignedGroup?.location || 'İE Ana Derslik 1 (Zemin Kat)'}</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Zaman: <strong className="text-white">{assignedGroup?.scheduleSummary || 'Pazartesi & Çarşamba 09:30 - 12:30'}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full md:w-auto">
+          <Link
+            to="/kursiyer/dersler"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Müfredat Akışı</span>
+          </Link>
+          <Link
+            to="/kursiyer/mesajlar"
+            className="px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Eğitmene Yaz</span>
+          </Link>
         </div>
-      )}
+      </div>
 
-      {/* Gruptan Çıkarılma / Ayrılma Uyarısı */}
-      {activeAssignment?.status === 'removed' && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-xs text-red-900 space-y-1">
-          <div className="font-bold flex items-center gap-1.5">
-            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-            Eğitim Grubu Kaydınız Sonlandırılmıştır
-          </div>
-          <p>
-            Gerekçe: <strong>{activeAssignment.removalReason || 'İdari karar'}</strong>. Detaylı
-            bilgi için oda yönetimiyle iletişime geçiniz.
-          </p>
-        </div>
-      )}
+      {/* ===================================================================== */}
+      {/* 3. DÖRT TEMEL GÖSTERGE METRİK BANDI (COURSERA / STRIPE STANDARDI)     */}
+      {/* ===================================================================== */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Devam Durumum',
+            value: `%${attendanceRate}`,
+            icon: <BookOpen className="w-4 h-4" />,
+            subtext: `${attendedCount} / ${totalHeldSessions} Oturum Katılımı`,
+            to: '/kursiyer/devam',
+            badge: (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${attendanceRate >= 80 ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
+                {attendanceRate >= 80 ? 'Baraj Geçildi' : 'Min %80'}
+              </span>
+            ),
+          },
+          {
+            label: 'Tamamlanan Ödevler',
+            value: `${mandatoryApproved} / ${mandatoryTotal}`,
+            icon: <CheckSquare className="w-4 h-4" />,
+            subtext: mandatoryTotal === 0
+              ? 'Tanımlı ödev yok'
+              : assignmentPerf?.isMandatoryAllApproved
+                ? 'Tüm teslimler onaylandı'
+                : 'Zorunlu ödevler inceleniyor',
+            to: '/kursiyer/odevler',
+          },
+          {
+            label: 'Alınan Belgeler',
+            value: `${traineeCertificates.length} Belge`,
+            icon: <Award className="w-4 h-4" />,
+            subtext: traineeCertificates.length > 0
+              ? traineeCertificates.map((c) => c.certificateTypeLabel).join(', ')
+              : 'Dönem sonunda tescil edilir',
+            to: '/kursiyer/belgeler',
+          },
+          {
+            label: 'Yaklaşan Ders',
+            value: upcomingSession
+              ? `${upcomingSession.startTime} - ${upcomingSession.endTime}`
+              : 'Planlanmış ders yok',
+            icon: <Calendar className="w-4 h-4" />,
+            subtext: upcomingSession
+              ? (upcomingSession.topic || upcomingSession.title)
+              : 'Gelecek dersler takvime işlendiğinde görünür',
+            to: '/kursiyer/takvim',
+          },
+        ]}
+      />
 
-      {/* Grup Bilgisi Kartı */}
-      {assignedGroup && (
-        <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="space-y-0.5">
+      {/* ===================================================================== */}
+      {/* 3. ORTA SATIR: BU HAFTA DERSLERİM & EĞİTİM İLERLEMESİ (2 SÜTUN)       */}
+      {/* ===================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* SOL: Bu Hafta Derslerim (7 Sütun) */}
+        <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200/90 p-5 md:p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-sm">{assignedGroup.name}</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Aktif Kursiyerlik
-              </span>
+              <Calendar className="w-5 h-5 text-blue-600" />
+              <h2 className="text-base md:text-lg font-bold text-slate-900">
+                Bu Hafta Derslerim
+              </h2>
             </div>
-            <div className="text-slate-500">
-              Ders Programı: <strong className="text-slate-700">{assignedGroup.scheduleSummary}</strong> • Sınıf / Konum:{' '}
-              <strong className="text-slate-700">{assignedGroup.location}</strong>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
-            <span>Kayıt Tarihi: {activeAssignment?.assignedAt?.split('T')[0] || '12.10.2026'}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Kayıt Yok Uyarısı */}
-      {!assignedGroup ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center space-y-3">
-          <AlertCircle className="w-10 h-10 text-amber-600 mx-auto" />
-          <h3 className="text-base font-bold text-amber-900">
-            Aktif Bir Eğitim Grubuna Henüz Atanmadınız
-          </h3>
-          <p className="text-xs text-amber-800 max-w-md mx-auto leading-relaxed">
-            Başvurunuz kabul edilmiş olsa dahi kesin kayıt veya grup atama işleminiz henüz
-            tamamlanmamış olabilir. Lütfen Aday Masasından başvuru durumunuzu kontrol ediniz.
-          </p>
-          <Button
-            size="sm"
-            onClick={() => {
-              setRole('applicant');
-              navigate('/aday');
-            }}
-          >
-            Aday Masasına Git →
-          </Button>
-        </div>
-      ) : (
-        <>
-          {/* ----------------------------------------------------------------- */}
-          {/* 1. ÖNCELİK — EN YAKIN / SIRADAKİ DERS OTURUMU */}
-          {/* ----------------------------------------------------------------- */}
-          {nextSession ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-                      1. Öncelik — Sıradaki Ders Oturumu
-                    </span>
-                    <span className="text-xs text-slate-500 font-semibold">{nextSession.date}</span>
-                    {nextSession.status === 'attendance_open' && (
-                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded animate-pulse">
-                        Yoklama Alınıyor
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-base font-bold text-brand-textPrimary">
-                    Oturum {nextSession.sessionNumber}: {nextSession.title}
-                  </h3>
-                  <div className="text-xs text-brand-textSecondary flex flex-wrap items-center gap-4">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>
-                        Saat: <strong>{nextSession.startTime} - {nextSession.endTime}</strong>
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                      <span>
-                        Yer: <strong>{nextSession.location}</strong>
-                      </span>
-                    </span>
-                    {nextSession.topic && (
-                      <span className="text-slate-500 italic max-w-sm truncate">
-                        Konu: {nextSession.topic}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setSessionDetailModal(nextSession)}
-                  className="shrink-0"
-                >
-                  Oturum Notlarını Görüntüle
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-slate-50 rounded-lg border border-slate-200 p-6 text-center space-y-2">
-              <Calendar className="w-8 h-8 text-slate-400 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-800">
-                Bu grup için henüz ders oturumu tanımlanmamış.
-              </h3>
-            </div>
-          )}
-
-          {/* ----------------------------------------------------------------- */}
-          {/* 2. ÖNCELİK — DİNAMİK TESLİM BEKLEYEN ÖDEV KARTI */}
-          {/* ----------------------------------------------------------------- */}
-          {urgentAssignment ? (
-            <div
-              className={`rounded-xl border p-5 shadow-xs space-y-3 ${
-                urgentAssignment.isRevision
-                  ? 'bg-purple-50/80 border-purple-200'
-                  : 'bg-amber-50/70 border-amber-200'
-              }`}
+            <Link
+              to="/kursiyer/takvim"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 group"
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                        urgentAssignment.isRevision
-                          ? 'bg-purple-100 text-purple-900 border-purple-300'
-                          : 'bg-amber-100 text-amber-900 border-amber-300'
-                      }`}
-                    >
-                      {urgentAssignment.isRevision
-                        ? '2. Öncelik — Revizyon Bekleyen Ödev (Düzeltme İsteniyor)'
-                        : '2. Öncelik — Teslim Bekleyen Ödev'}
-                    </span>
-                    <span className="text-xs font-bold text-slate-700">
-                      Son Teslim: {urgentAssignment.assignment.dueDate || urgentAssignment.assignment.dueAt}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-bold text-brand-textPrimary">
-                    {urgentAssignment.assignment.title}
-                  </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
-                    {urgentAssignment.assignment.description}
-                  </p>
-
-                  {/* Revizyon Gerekçesi Vurgusu */}
-                  {urgentAssignment.isRevision && urgentAssignment.latestSub?.revisionHistory && (
-                    <div className="p-2.5 bg-white rounded border border-purple-200 text-xs text-purple-900 mt-2">
-                      <strong className="flex items-center gap-1 text-purple-800">
-                        <History className="w-3.5 h-3.5" /> Eğitmeninizin Revizyon Notu:
-                      </strong>
-                      <p className="italic mt-0.5">
-                        "{urgentAssignment.latestSub.revisionHistory[urgentAssignment.latestSub.revisionHistory.length - 1]?.revisionReason}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <Button
-                  size="sm"
-                  leftIcon={<Upload className="w-3.5 h-3.5" />}
-                  onClick={() => handleOpenSubmitModal(urgentAssignment.assignment)}
-                  className="shrink-0"
-                >
-                  {urgentAssignment.isRevision ? 'Revize Edip Yeniden Gönder' : 'Ödevi Teslim Et'}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-900">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Tebrikler! Şu an için teslim bekleyen aktif bir ödeviniz bulunmamaktadır.</span>
-              </div>
-              <span className="font-semibold text-emerald-800">Tüm Teslimler Tamam</span>
-            </div>
-          )}
-
-          {/* ----------------------------------------------------------------- */}
-          {/* 3. ÖNCELİK — DEVAM ORANI (%80 BARAJI) */}
-          {/* ----------------------------------------------------------------- */}
-          <Card>
-            <CardContent className="space-y-3 p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    3. Öncelik — Devam Durumu
-                  </span>
-                  <div className="text-sm font-bold text-brand-textPrimary mt-0.5">
-                    Katılım Oranı:{' '}
-                    {attendanceCalc?.attendanceRate !== null ? (
-                      <span
-                        className={`text-base font-extrabold tabular-nums ${
-                          attendanceCalc?.hasPassedThreshold ? 'text-brand-success' : 'text-brand-danger'
-                        }`}
-                      >
-                        %{attendanceCalc?.attendanceRate}
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 text-sm font-medium">
-                        Henüz Hesaplanamıyor
-                      </span>
-                    )}
-                    <span className="text-xs text-slate-500 font-normal ml-2">
-                      (Başarı Koşulu: En az %80)
-                    </span>
-                  </div>
-                </div>
-
-                {attendanceCalc?.attendanceRate !== null ? (
-                  <StatusBadge
-                    label={
-                      attendanceCalc?.hasPassedThreshold
-                        ? 'Başarı Barajı Üzerinde'
-                        : 'Devamsızlık Riski'
-                    }
-                    variant={attendanceCalc?.hasPassedThreshold ? 'success' : 'danger'}
-                  />
-                ) : (
-                  <span className="text-xs text-slate-500 font-medium">
-                    (Yeterli oturum tamamlanmadı)
-                  </span>
-                )}
-              </div>
-
-              {/* Progress bar */}
-              <div className="space-y-1">
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className={`h-2.5 rounded-full transition-all duration-300 ${
-                      attendanceCalc?.hasPassedThreshold ? 'bg-emerald-600' : 'bg-red-500'
-                    }`}
-                    style={{ width: `${attendanceCalc?.attendanceRate || 0}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[11px] text-slate-500">
-                  <span>
-                    Katılınan: <strong>{attendanceCalc?.attendedCount || 0} Oturum</strong>
-                  </span>
-                  <span>
-                    Mazeretli: <strong>{attendanceCalc?.excusedCount || 0} (Muaf)</strong>
-                  </span>
-                  <span>
-                    Devamsızlık: <strong>{attendanceCalc?.absentCount || 0} Oturum</strong>
-                  </span>
-                  <span>
-                    Hesaba Dahil: <strong>{attendanceCalc?.completedSessionsCount || 0} Oturum</strong>
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ----------------------------------------------------------------- */}
-          {/* YENİ: GRUP ÖDEVLERİM VE TESLİM DURUMLARI (Sprint E03-B) */}
-          {/* ----------------------------------------------------------------- */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  Eğitim Grubu Ödevlerim ({groupAssignments.length} Ödev)
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Başarı kriteri için zorunlu ödevlerin tamamının onaylanması ve genel ödev ortalamasının en az 70/100 olması gerekmektedir.
-                </p>
-              </div>
-
-              <div className="text-xs text-slate-600 flex items-center gap-3">
-                <span>
-                  Ortalama:{' '}
-                  <strong className="text-blue-700">
-                    {assignmentPerf?.averageScore !== null
-                      ? `${assignmentPerf?.averageScore} / 100`
-                      : 'Hesaplanamıyor'}
-                  </strong>
-                </span>
-                <span>•</span>
-                <span>
-                  Onaylanan Zorunlu:{' '}
-                  <strong className="text-emerald-700">
-                    {assignmentPerf?.mandatoryAssignmentsApproved || 0} /{' '}
-                    {assignmentPerf?.mandatoryAssignmentsTotal || 0}
-                  </strong>
-                </span>
-              </div>
-            </div>
-
-            {/* Assignments List */}
-            {groupAssignments.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-lg">
-                Bu grup için henüz yayınlanmış bir ödev bulunmamaktadır.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {groupAssignments.map((asgn) => {
-                  const latestSub = getLatestSubmission(asgn.id, currentUser.id);
-                  const evaluation = latestSub ? getEvaluationForSubmission(latestSub.id) : null;
-                  const isSubmitted = Boolean(latestSub);
-                  const isApproved = latestSub?.status === 'approved';
-                  const isRevision = latestSub?.status === 'revision_requested';
-                  const isUnderReview =
-                    latestSub?.status === 'submitted' || latestSub?.status === 'resubmitted';
-
-                  return (
-                    <div
-                      key={asgn.id}
-                      className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white transition-all space-y-2.5"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {asgn.isMandatory ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800 px-2 py-0.5 rounded">
-                                Zorunlu Ödev
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                                İsteğe Bağlı
-                              </span>
-                            )}
-
-                            {/* Teslim / Değerlendirme Durumu Rozeti */}
-                            {isApproved ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded">
-                                <Check className="w-3 h-3" /> Onaylandı ({evaluation?.score} Puan)
-                              </span>
-                            ) : isRevision ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded border border-amber-300">
-                                <AlertTriangle className="w-3 h-3 text-amber-600" /> Revizyon İstendi (v{latestSub?.submissionVersion})
-                              </span>
-                            ) : isUnderReview ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded animate-pulse">
-                                <Clock className="w-3 h-3 text-blue-600" /> Değerlendirme Bekliyor (v{latestSub?.submissionVersion})
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                                Henüz Teslim Edilmedi
-                              </span>
-                            )}
-
-                            <span className="text-xs text-slate-500">
-                              Son Teslim: <strong>{asgn.dueDate || asgn.dueAt}</strong>
-                            </span>
-                          </div>
-
-                          <h4 className="text-sm font-bold text-slate-900">{asgn.title}</h4>
-                          <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
-                            {asgn.description}
-                          </p>
-
-                          {/* Revizyon Gerekçesi Kutusu */}
-                          {isRevision && latestSub?.revisionHistory && latestSub.revisionHistory.length > 0 && (
-                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 mt-2 space-y-1">
-                              <span className="font-bold flex items-center gap-1">
-                                <AlertTriangle className="w-3.5 h-3.5 text-amber-700" /> Eğitmeninizin Revizyon Notu:
-                              </span>
-                              <p className="italic">
-                                "{latestSub.revisionHistory[latestSub.revisionHistory.length - 1]?.revisionReason}"
-                              </p>
-                              {evaluation && (
-                                <div className="text-[11px] text-amber-800 pt-1">
-                                  Geçici Puan: <strong>{evaluation.score} / 100</strong> (Revizyon teslimi sonrasında nihai puan güncellenecektir)
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Onaylanmış Ödev Geri Bildirimi */}
-                          {isApproved && evaluation?.feedback && (
-                            <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-emerald-900 mt-1">
-                              <strong>Eğitmen Değerlendirmesi:</strong> "{evaluation.feedback}"
-                            </div>
-                          )}
-                        </div>
-
-                        {/* İşlem Butonları */}
-                        <div className="shrink-0 flex items-center gap-2">
-                          {!isSubmitted ? (
-                            <Button
-                              size="sm"
-                              leftIcon={<Upload className="w-3.5 h-3.5" />}
-                              onClick={() => handleOpenSubmitModal(asgn)}
-                            >
-                              Teslim Et
-                            </Button>
-                          ) : isRevision ? (
-                            <Button
-                              size="sm"
-                              leftIcon={<Upload className="w-3.5 h-3.5" />}
-                              onClick={() => handleOpenSubmitModal(asgn)}
-                            >
-                              Yeniden Gönder (v{(latestSub?.submissionVersion || 1) + 1})
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSelectedSubmissionForView({ assignment: asgn, submission: latestSub! })}
-                            >
-                              Teslimi İncele
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              Tüm Takvimi Gör{' '}
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+            </Link>
           </div>
 
-          {/* ----------------------------------------------------------------- */}
-          {/* OTURUM GEÇMİŞİ TABLOSU */}
-          {/* ----------------------------------------------------------------- */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                Grup Oturumları ve Yoklama Kayıtlarım ({groupSessions.length} Oturum)
-              </h3>
-              <span className="text-xs text-slate-500">
-                Resmî Devam Barajı: <strong>%80</strong>
-              </span>
-            </div>
-
+          {/* Oturum Akışı Listesi (Timeline Format) */}
+          <div className="space-y-3 pt-1">
             {groupSessions.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-lg">
-                Henüz oturum tanımlanmamış.
+              <div className="py-8 px-4 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200">
+                <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-700">Bu Hafta İçin Planlanmış Ders Bulunmuyor</p>
+                <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                  Ders oturumları eğitmeniniz tarafından takvime işlendiğinde burada kronolojik olarak görüntülenecektir.
+                </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
-                    <tr>
-                      <th className="py-2.5 px-3">Oturum</th>
-                      <th className="py-2.5 px-3">Ders Başlığı & İçerik</th>
-                      <th className="py-2.5 px-3">Tarih & Saat</th>
-                      <th className="py-2.5 px-3">Yer</th>
-                      <th className="py-2.5 px-4 text-right">Yoklama Durumu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {groupSessions.map((sess) => {
-                      const userStatus = traineeAttendanceMap.get(sess.id);
-                      const isCompleted = sess.status === 'completed';
-                      const isOpen = sess.status === 'attendance_open' || sess.status === 'active';
-                      const isCancelled = sess.status === 'cancelled';
+              groupSessions.slice(0, 3).map((session, index) => {
+                const attStatus = traineeAttendanceMap.get(session.id);
+                const isFirst = index === 0;
+                const isCompleted = session.status === 'completed';
 
-                      return (
-                        <tr key={sess.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3 px-3 font-bold text-slate-900">
-                            Oturum {sess.sessionNumber}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="font-semibold text-slate-800">{sess.title}</div>
-                            {sess.topic && (
-                              <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-                                {sess.topic}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div>{sess.date}</div>
-                            <div className="text-[10px] text-slate-400">
-                              {sess.startTime} - {sess.endTime}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <div>{sess.location}</div>
-                            <div className="text-[10px] text-slate-400">{sess.instructorName}</div>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {isCancelled ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
-                                İptal Edildi (Muaf)
-                              </span>
-                            ) : isCompleted ? (
-                              userStatus === 'attended' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                  <CheckCircle2 className="w-3 h-3" /> Katıldı
-                                </span>
-                              ) : userStatus === 'excused' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                                  Mazeretli
-                                </span>
-                              ) : userStatus === 'absent' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">
-                                  Katılmadı
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500">
-                                  Kayıt Yok
-                                </span>
-                              )
-                            ) : isOpen ? (
-                              <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 animate-pulse">
-                                Yoklama Alınıyor
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500">
-                                Gelecek Oturum
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                // Tarih parçaları
+                const dateObj = new Date(session.date);
+                const dayNum = dateObj.getDate() || 22 + index * 2;
+                const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+                const days = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cts'];
+                const monthName = months[dateObj.getMonth()] || 'Eki';
+                const dayName = days[dateObj.getDay()] || 'Sal';
+
+                return (
+                  <div
+                    key={session.id}
+                    onClick={() => setSelectedSessionModal(session)}
+                    className="flex items-center gap-3.5 p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/70 transition cursor-pointer group"
+                  >
+                    {/* Sol Tarih Bloğu */}
+                    <div className="w-12 h-14 rounded-lg bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center shrink-0 text-center">
+                      <span className="text-sm font-extrabold text-slate-900 leading-none">
+                        {dayNum}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase mt-0.5 leading-none">
+                        {monthName} {dayName}
+                      </span>
+                    </div>
+
+                    {/* Zaman Çizgisi Noktası */}
+                    <div className="flex flex-col items-center shrink-0">
+                      <div
+                        className={`w-3 h-3 rounded-full border-2 border-white shadow-xs ${isFirst
+                          ? 'bg-blue-600'
+                          : isCompleted
+                            ? 'bg-emerald-600'
+                            : 'bg-slate-300'
+                          }`}
+                      />
+                    </div>
+
+                    {/* Oturum İçeriği */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition truncate">
+                        {session.topic || session.title}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                        <span>{session.startTime} - {session.endTime}</span>
+                        <span>•</span>
+                        <span className="truncate">{session.location || 'Seminer Salonu B'}</span>
+                      </div>
+                    </div>
+
+                    {/* Durum Rozeti */}
+                    <div className="shrink-0">
+                      {isFirst ? (
+                        <span className="text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 px-3 py-1 rounded-full">
+                          Yaklaşıyor
+                        </span>
+                      ) : isCompleted ? (
+                        <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-3 py-1 rounded-full">
+                          {attStatus === 'attended' ? 'Katıldı' : 'Tamamlandı'}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/60 px-3 py-1 rounded-full">
+                          Planlandı
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
+        </div>
 
-          {/* ----------------------------------------------------------------- */}
-          {/* 2-Column Grid: 4. Eğitmen Mesajı & 5. Başarı Kriterleri Durumu */}
-          {/* ----------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 4. ÖNCELİK — EĞİTMEN MESAJLARI */}
-            <Card>
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    4. Öncelik — Eğitmen Mesajları
-                  </span>
-                  <span className="text-xs text-blue-600 font-semibold flex items-center gap-1">
-                    <MessageSquare className="w-3.5 h-3.5" /> 1 Yeni
-                  </span>
-                </div>
+        {/* SAĞ: Eğitim İlerlemesi (5 Sütun Donut Chart) */}
+        <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200/90 p-5 md:p-6 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                <h2 className="text-base md:text-lg font-bold text-slate-900">
+                  Eğitim İlerlemesi
+                </h2>
+              </div>
+              <Link
+                to="/kursiyer/dersler"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 group"
+              >
+                Detaylı Gör{' '}
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+              </Link>
+            </div>
 
-                <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900">
-                      {assignedGroup?.instructorNames?.join(', ') || 'Murat Özkan'}
-                    </span>
-                    <span className="text-[10px] text-slate-400">Dün 16:30</span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    "Ödev teslimleriniz için yönergelere ve standartlara dikkat ediniz. Revizyon istenen çalışmalarınızı belirtilen geri bildirim doğrultusunda güncelleyerek yeniden yükleyebilirsiniz."
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Donut Chart ve Lejant Izgarası (Etkileşimli / Dilim Vurgulu) */}
+            <div className="flex flex-col sm:flex-row items-center justify-around gap-6 pt-4">
+              {/* SVG Donut Grafiği */}
+              {(() => {
+                const totalSessions = groupSessions.length || 1;
+                const circ = 289;
+                const completedStroke = (completedModules / totalSessions) * circ;
+                const inProgressStroke = (inProgressModules / totalSessions) * circ;
+                const notStartedStroke = (notStartedModules / totalSessions) * circ;
 
-            {/* 5. ÖNCELİK — BAŞARI DURUMUM & NİHAİ YÖNETİCİ ONAYI (Sprint E03-C) */}
-            <Card className="border-slate-300 shadow-sm">
-              <CardContent className="p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      5. Öncelik — Başarı Durumum
-                    </span>
-                    <h4 className="text-sm font-bold text-slate-900 mt-0.5">
-                      Dönem Sonu Başarı ve Belge Uygunluk Durumu
-                    </h4>
-                  </div>
-                  {finalEligibility && (
-                    <span
-                      className={`text-[11px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border ${
-                        finalEligibility.finalStatus === 'admin_approved'
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          : finalEligibility.finalStatus === 'awaiting_admin_decision'
-                          ? 'bg-blue-100 text-blue-800 border-blue-300'
-                          : finalEligibility.finalStatus === 'remediation'
-                          ? 'bg-purple-100 text-purple-900 border-purple-300'
-                          : finalEligibility.finalStatus === 'rejected'
-                          ? 'bg-red-100 text-red-800 border-red-300'
-                          : 'bg-amber-100 text-amber-900 border-amber-300'
-                      }`}
-                    >
-                      {finalEligibility.statusLabel}
-                    </span>
-                  )}
-                </div>
+                const getCenterDisplay = () => {
+                  switch (hoveredSegment) {
+                    case 'completed':
+                      return {
+                        value: `${completedModules}`,
+                        sub: 'Tamamlandı',
+                        rate: `%${Math.round((completedModules / totalSessions) * 100)}`,
+                        color: 'text-blue-700',
+                      };
+                    case 'in_progress':
+                      return {
+                        value: `${inProgressModules}`,
+                        sub: 'Devam Eden',
+                        rate: `%${Math.round((inProgressModules / totalSessions) * 100)}`,
+                        color: 'text-blue-500',
+                      };
+                    case 'not_started':
+                      return {
+                        value: `${notStartedModules}`,
+                        sub: 'Başlamayan',
+                        rate: `%${Math.round((notStartedModules / totalSessions) * 100)}`,
+                        color: 'text-slate-500',
+                      };
+                    case 'all':
+                    default:
+                      return {
+                        value: `%${overallProgressPercentage}`,
+                        sub: 'Genel İlerleme',
+                        rate: `${completedModules}/${totalSessions} Oturum`,
+                        color: 'text-slate-900',
+                      };
+                  }
+                };
 
-                {/* DÖRT ŞART KONTROL LİSTESİ */}
-                <div className="space-y-2.5 text-xs">
-                  {/* Koşul 1: %80 Devam */}
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      finalEligibility?.attendanceEligible
-                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                        : finalEligibility?.attendanceRate === null
-                        ? 'bg-slate-50 border-slate-200 text-slate-700'
-                        : 'bg-red-50/60 border-red-200 text-red-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {finalEligibility?.attendanceEligible ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <AlertTriangle
-                          className={`w-4 h-4 shrink-0 ${
-                            finalEligibility?.attendanceRate === null
-                              ? 'text-slate-400'
-                              : 'text-red-500'
-                          }`}
+                const centerInfo = getCenterDisplay();
+
+                return (
+                  <div className="relative w-40 h-40 flex items-center justify-center shrink-0">
+                    <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 120 120">
+                      {/* Arka plan halkası */}
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="46"
+                        className="stroke-slate-100"
+                        strokeWidth="12"
+                        fill="transparent"
+                      />
+                      {/* Tamamlanan Modüller Segmenti */}
+                      {completedModules > 0 && (
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r="46"
+                          stroke="#1D4ED8"
+                          strokeWidth={hoveredSegment === 'completed' ? 16 : 12}
+                          strokeDasharray={`${completedStroke} ${circ}`}
+                          strokeDashoffset="0"
+                          fill="transparent"
+                          className="cursor-pointer transition-all duration-300"
+                          style={{
+                            filter: hoveredSegment === 'completed' ? 'drop-shadow(0 2px 8px rgba(29, 78, 216, 0.45))' : 'none',
+                            opacity: hoveredSegment === 'all' || hoveredSegment === 'completed' ? 1 : 0.45,
+                          }}
+                          onMouseEnter={() => setHoveredSegment('completed')}
+                          onMouseLeave={() => setHoveredSegment('all')}
                         />
                       )}
-                      <div>
-                        <span className="font-semibold text-slate-900">1. Devam Koşulu (En az %80):</span>
-                        <div className="text-[11px] text-slate-500">
-                          {finalEligibility?.attendedCount || 0} katılım, {finalEligibility?.excusedCount || 0} mazeret / {finalEligibility?.completedSessionsCount || 0} oturum
-                        </div>
-                      </div>
-                    </div>
-                    <strong className="font-bold tabular-nums text-right">
-                      {finalEligibility?.attendanceRate !== null
-                        ? `%${finalEligibility?.attendanceRate} (${
-                            finalEligibility?.attendanceEligible ? 'Sağlandı' : 'Baraj Altında'
-                          })`
-                        : 'Henüz Hesaplanamıyor'}
-                    </strong>
-                  </div>
-
-                  {/* Koşul 2: 70/100 Ödev Ortalaması */}
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      finalEligibility?.gradeEligible
-                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                        : finalEligibility?.assignmentAverage === null
-                        ? 'bg-slate-50 border-slate-200 text-slate-700'
-                        : 'bg-red-50/60 border-red-200 text-red-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {finalEligibility?.gradeEligible ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <AlertTriangle
-                          className={`w-4 h-4 shrink-0 ${
-                            finalEligibility?.assignmentAverage === null
-                              ? 'text-slate-400'
-                              : 'text-red-500'
-                          }`}
+                      {/* Devam Eden Modüller Segmenti */}
+                      {inProgressModules > 0 && (
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r="46"
+                          stroke="#3B82F6"
+                          strokeWidth={hoveredSegment === 'in_progress' ? 16 : 12}
+                          strokeDasharray={`${inProgressStroke} ${circ}`}
+                          strokeDashoffset={`-${completedStroke}`}
+                          fill="transparent"
+                          className="cursor-pointer transition-all duration-300"
+                          style={{
+                            filter: hoveredSegment === 'in_progress' ? 'drop-shadow(0 2px 8px rgba(59, 130, 246, 0.45))' : 'none',
+                            opacity: hoveredSegment === 'all' || hoveredSegment === 'in_progress' ? 1 : 0.45,
+                          }}
+                          onMouseEnter={() => setHoveredSegment('in_progress')}
+                          onMouseLeave={() => setHoveredSegment('all')}
                         />
                       )}
-                      <div>
-                        <span className="font-semibold text-slate-900">2. Ödev Ortalaması (En az 70/100):</span>
-                        <div className="text-[11px] text-slate-500">
-                          Eğitmen tarafından geçerli son değerlendirme puanları
-                        </div>
-                      </div>
-                    </div>
-                    <strong className="font-bold tabular-nums text-right">
-                      {finalEligibility?.assignmentAverage !== null
-                        ? `${finalEligibility?.assignmentAverage} / 100 (${
-                            finalEligibility?.gradeEligible ? 'Sağlandı' : 'Baraj Altında'
-                          })`
-                        : 'Henüz Hesaplanamıyor'}
-                    </strong>
-                  </div>
-
-                  {/* Koşul 3: Zorunlu Ödevlerin Tamamı Onaylandı */}
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      finalEligibility?.mandatoryEligible
-                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                        : 'bg-amber-50/60 border-amber-200 text-amber-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {finalEligibility?.mandatoryEligible ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      {/* Başlamayan Modüller Segmenti */}
+                      {notStartedModules > 0 && (
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r="46"
+                          stroke="#CBD5E1"
+                          strokeWidth={hoveredSegment === 'not_started' ? 16 : 12}
+                          strokeDasharray={`${notStartedStroke} ${circ}`}
+                          strokeDashoffset={`-${completedStroke + inProgressStroke}`}
+                          fill="transparent"
+                          className="cursor-pointer transition-all duration-300"
+                          style={{
+                            filter: hoveredSegment === 'not_started' ? 'drop-shadow(0 2px 6px rgba(148, 163, 184, 0.45))' : 'none',
+                            opacity: hoveredSegment === 'all' || hoveredSegment === 'not_started' ? 1 : 0.45,
+                          }}
+                          onMouseEnter={() => setHoveredSegment('not_started')}
+                          onMouseLeave={() => setHoveredSegment('all')}
+                        />
                       )}
-                      <div>
-                        <span className="font-semibold text-slate-900">3. Zorunlu Ödev Onayları:</span>
-                        <div className="text-[11px] text-slate-500">
-                          Tüm zorunlu ödevlerin eğitmen onayından geçmesi şarttır
-                        </div>
-                      </div>
-                    </div>
-                    <strong className="font-bold tabular-nums text-right">
-                      {finalEligibility?.mandatoryAssignmentsApproved ?? 0} /{' '}
-                      {finalEligibility?.mandatoryAssignmentsTotal ?? 0} Onaylandı{' '}
-                      {finalEligibility?.mandatoryEligible
-                        ? '(Sağlandı)'
-                        : `(${
-                            (finalEligibility?.mandatoryAssignmentsTotal || 0) -
-                            (finalEligibility?.mandatoryAssignmentsApproved || 0)
-                          } Bekliyor)`}
-                    </strong>
-                  </div>
+                    </svg>
 
-                  {/* Koşul 4: Yetkili Yönetici Nihai Onayı */}
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      finalEligibility?.finalStatus === 'admin_approved'
-                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                        : finalEligibility?.finalStatus === 'remediation'
-                        ? 'bg-purple-50/60 border-purple-200 text-purple-900'
-                        : finalEligibility?.finalStatus === 'rejected'
-                        ? 'bg-red-50/60 border-red-200 text-red-900'
-                        : 'bg-blue-50/60 border-blue-200 text-blue-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {finalEligibility?.finalStatus === 'admin_approved' ? (
-                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <Clock className="w-4 h-4 text-blue-600 shrink-0" />
-                      )}
-                      <div>
-                        <span className="font-semibold text-slate-900">4. Yetkili Yönetici Nihai Kararı:</span>
-                        <div className="text-[11px] text-slate-500">
-                          Oda yönetimi tarafından gerekçelendirilmiş resmî karar
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold">
-                        {finalEligibility?.finalStatus === 'admin_approved'
-                          ? 'Nihai Onay Verildi'
-                          : finalEligibility?.finalStatus === 'remediation'
-                          ? 'Telafi Sürecinde'
-                          : finalEligibility?.finalStatus === 'rejected'
-                          ? 'Başarısız'
-                          : finalEligibility?.academicEligible
-                          ? 'Yönetici Onayı Bekleniyor'
-                          : 'Ön Koşullar Bekleniyor'}
+                    {/* Donut İçi Yazı — Dinamik Hover Etkileşimi */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2 pointer-events-none transition-all duration-200">
+                      <span className={`text-2xl font-black leading-none tracking-tight ${centerInfo.color}`}>
+                        {centerInfo.value}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mt-1 truncate max-w-[90px]">
+                        {centerInfo.sub}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-medium">
+                        {centerInfo.rate}
                       </span>
                     </div>
                   </div>
-                </div>
+                );
+              })()}
 
-                {/* DİNAMİK YÖNETİCİ & DURUM MESAJI BİLGİLENDİRMESİ */}
-                {finalEligibility?.finalStatus === 'admin_approved' ? (
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 text-xs text-emerald-900">
-                    <div className="font-bold flex items-center gap-1.5 text-emerald-800">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      Başarı değerlendirmeniz yönetici tarafından onaylandı. Belge işlemleri sonraki aşamada yürütülecektir.
-                    </div>
-                    <p className="text-slate-600 leading-relaxed">
-                      {successDecision?.traineeDecisionMessage ||
-                        'Dönem sonu değerlendirmeniz ve akademik başarı kanıtlarınız yetkili oda yönetimi tarafından incelenmiş ve başarı onayınız verilmiştir.'}
-                    </p>
-                    {successDecision && (
-                      <div className="text-[11px] text-emerald-800 pt-1 border-t border-emerald-200/60 flex items-center justify-between">
-                        <span>Onaylayan: <strong>{successDecision.decidedBy}</strong></span>
-                        <span>Karar Tarihi: <strong>{new Date(successDecision.decidedAt).toLocaleDateString('tr-TR')}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                ) : finalEligibility?.finalStatus === 'remediation' ? (
-                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-1.5 text-xs text-purple-900">
-                    <div className="font-bold flex items-center gap-1.5 text-purple-800">
-                      <AlertTriangle className="w-4 h-4 text-purple-600 shrink-0" />
-                      Telafi Sürecindesiniz
-                    </div>
-                    <p className="text-slate-700 leading-relaxed">
-                      {successDecision?.traineeDecisionMessage ||
-                        'Eksik kalan akademik koşullarınız için oda yönetimi tarafından kontrollü telafi süreci tanımlanmıştır.'}
-                    </p>
-                    {successDecision?.remediationDetails && (
-                      <div className="bg-white/80 p-2.5 rounded-lg border border-purple-200 text-[11px] space-y-1">
-                        <div>
-                          <strong>Gereken İşlem:</strong> {successDecision.remediationDetails.requiredActionNote}
-                        </div>
-                        {successDecision.remediationDetails.dueDate && (
-                          <div>
-                            <strong>Son Teslim Tarihi:</strong> {successDecision.remediationDetails.dueDate}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : finalEligibility?.academicEligible ? (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-1 text-xs text-blue-900">
-                    <div className="font-bold flex items-center gap-1.5 text-blue-800">
-                      <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                      Akademik koşulları sağladınız. Nihai yönetici onayı bekleniyor.
-                    </div>
-                    <p className="text-blue-800 leading-relaxed">
-                      Tüm devam ve ödev barajlarını başarıyla tamamladınız. Dönem sonu kesin başarı kaydınız oda yönetimi tarafından incelenerek onaylanacaktır.
-                    </p>
-                  </div>
-                ) : (
-                  finalEligibility?.incompleteRequirements &&
-                  finalEligibility.incompleteRequirements.length > 0 && (
-                    <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
-                      <div className="font-bold flex items-center gap-1.5 text-amber-800">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                        Tamamlanması Gereken Akademik Koşullar:
-                      </div>
-                      <ul className="list-disc list-inside text-amber-800 space-y-0.5 pl-1">
-                        {finalEligibility.incompleteRequirements.map((req, idx) => (
-                          <li key={idx}>{req}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )
-                )}
-
-                <div className="text-[11px] text-slate-500 pt-1 leading-relaxed border-t border-slate-100">
-                  * <strong>Önemli Bilgilendirme:</strong> İlk üç akademik koşulun sağlanması kursiyere otomatik sertifika veya belge üretmez. Nihai başarı kararı yetkili İslahiye Ticaret Odası yönetimi tarafından verilir. Karar onaylandığında belge aşağıda listelenir.
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* ----------------------------------------------------------------- */}
-          {/* 6. BELGELERİM & KAREKODLU DOĞRULAMA (Sprint E03-D) */}
-          {/* ----------------------------------------------------------------- */}
-          <div id="belgeler" className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-amber-600" />
-                  Belgelerim & Karekodlu Doğrulama Masası
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Eğitim programını başarıyla tamamlayıp yetkili yönetici onayı alan kursiyerler adına düzenlenen resmî başarı belgeleri.
-                </p>
-              </div>
-              <span className="text-[11px] font-mono text-slate-500">
-                Kayıtlı Belge: <strong>{traineeCertificates.length} Adet</strong>
-              </span>
-            </div>
-
-            {traineeCertificates.length === 0 ? (
-              <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 text-center space-y-2">
-                <Award className="w-8 h-8 text-slate-400 mx-auto" />
-                <h4 className="text-xs font-bold text-slate-800">
-                  {finalEligibility?.finalStatus === 'admin_approved'
-                    ? 'Yönetici Nihai Onayınız Verildi — Belge Düzenleme Sırasında'
-                    : finalEligibility?.academicEligible
-                    ? 'Akademik Başarı Sağlandı — Yönetici Onayı Bekleniyor'
-                    : 'Henüz Düzenlenmiş Bir Başarı Belgeniz Bulunmamaktadır'}
-                </h4>
-                <p className="text-[11px] text-slate-500 max-w-lg mx-auto leading-relaxed">
-                  {finalEligibility?.finalStatus === 'admin_approved'
-                    ? 'Tebrikler! Dönem sonu başarı kütüğünde onayınız tescil edilmiştir. İdari masadan belge numaranız ve karekodunuz üretildiğinde PDF çıktınızı buradan indirebilirsiniz.'
-                    : 'Başarı belgesine hak kazanabilmek için %80 devam, en az 70 ödev ortalaması, tüm zorunlu ödevlerin eğitmen onayı ve oda yönetiminin resmî nihai onayı şarttır.'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {traineeCertificates.map((cert) => {
-                  const disc = checkCertificateAcademicDiscrepancy(cert);
-                  const isCancelled = cert.status === 'cancelled';
-                  const isSuperseded = cert.status === 'superseded';
-                  const isUnderReview = cert.status === 'under_review' || disc.hasDiscrepancy;
-
-                  return (
-                    <div
-                      key={cert.id}
-                      className={`p-4 rounded-xl border transition-all space-y-3 ${
-                        isCancelled
-                          ? 'bg-red-50/50 border-red-200'
-                          : isUnderReview
-                          ? 'bg-amber-50/50 border-amber-200'
-                          : 'bg-slate-50/60 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                              {cert.certificateNumber}
-                            </span>
-                            <span className="text-[10px] font-semibold text-slate-600 bg-slate-200 px-2 py-0.5 rounded">
-                              {cert.certificateTypeLabel}
-                            </span>
-                            {isCancelled ? (
-                              <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
-                                İptal Edildi
-                              </span>
-                            ) : isSuperseded ? (
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded">
-                                Yerine Yeni Belge Düzenlendi
-                              </span>
-                            ) : isUnderReview ? (
-                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
-                                Yeniden İnceleme Gerekiyor
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
-                                Düzenlendi (Geçerli Demo)
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="text-xs font-bold text-slate-900">
-                            {cert.programTitle} — {cert.cohortName}
-                          </h4>
-                          <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-3">
-                            <span>Düzenleme: {new Date(cert.issuedAt).toLocaleDateString('tr-TR')}</span>
-                            <span>•</span>
-                            <span>Onaylayan: {cert.issuedBy}</span>
-                            <span>•</span>
-                            <span className="font-mono text-slate-700">Doğrulama Kodu: {cert.verificationCode}</span>
-                          </div>
-                        </div>
-
-                        {/* Butonlar */}
-                        <div className="flex flex-wrap items-center gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            leftIcon={<QrCode className="w-3.5 h-3.5 text-slate-600" />}
-                            onClick={() => navigate(`/belge-dogrula/${cert.verificationCode}`)}
-                          >
-                            Doğrula
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => setPreviewCert(cert)}
-                          >
-                            Önizle / Yazdır
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            leftIcon={<Download className="w-3.5 h-3.5" />}
-                            onClick={() => downloadCertificatePDF(cert)}
-                          >
-                            PDF İndir
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* İptal gerekçesi uyarısı */}
-                      {isCancelled && cert.cancellationReason && (
-                        <div className="p-2.5 rounded bg-white border border-red-200 text-xs text-red-800">
-                          <strong>İptal Gerekçesi:</strong> {cert.cancellationReason}
-                        </div>
-                      )}
-
-                      {/* Akademik uyumsuzluk uyarısı */}
-                      {isUnderReview && (
-                        <div className="p-2.5 rounded bg-white border border-amber-200 text-xs text-amber-900">
-                          <strong>Uyarı:</strong> Not veya devam verilerinizde yapılan son güncelleme sebebiyle belgeniz idari yeniden incelemeye alınmıştır.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ------------------------------------------------------------------- */}
-      {/* 6. DİĞER PROGRAM BAŞVURULARI BÖLÜMÜ */}
-      {/* ------------------------------------------------------------------- */}
-      {otherApplications.length > 0 && (
-        <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-blue-600" />
-                Diğer Program Başvurularınız
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Bir eğitimde aktif kursiyer olmanız, diğer programlara aday olarak başvurmanızı engellemez.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setRole('applicant');
-                navigate('/aday');
-              }}
-              className="text-xs"
-            >
-              Aday Masasını Aç →
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {otherApplications.map((app) => (
-              <div
-                key={app.id}
-                className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <div className="font-bold text-slate-900">{app.programTitle}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Durum: <span className="font-semibold text-blue-700 capitalize">{app.status}</span> •{' '}
-                    {app.appliedAt}
-                  </div>
-                </div>
+              {/* Lejant Bilgileri — Etkileşimli Seçim Kartları */}
+              <div className="space-y-2 text-xs w-full sm:w-auto">
                 <button
-                  onClick={() => {
-                    setRole('applicant');
-                    navigate('/aday');
-                  }}
-                  className="text-blue-600 hover:text-blue-800 text-[11px] font-semibold"
+                  type="button"
+                  onMouseEnter={() => setHoveredSegment('completed')}
+                  onMouseLeave={() => setHoveredSegment('all')}
+                  className={`w-full flex items-center justify-between sm:justify-start gap-4 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    hoveredSegment === 'completed'
+                      ? 'bg-blue-50 border-blue-400 shadow-xs scale-[1.02]'
+                      : 'border-slate-100 hover:bg-slate-50'
+                  }`}
                 >
-                  İncele
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-700 shrink-0" />
+                    <span className="text-slate-700 font-semibold">Tamamlanan Modüller</span>
+                  </div>
+                  <strong className="font-extrabold text-blue-900 ml-auto">{completedModules}</strong>
+                </button>
+
+                <button
+                  type="button"
+                  onMouseEnter={() => setHoveredSegment('in_progress')}
+                  onMouseLeave={() => setHoveredSegment('all')}
+                  className={`w-full flex items-center justify-between sm:justify-start gap-4 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    hoveredSegment === 'in_progress'
+                      ? 'bg-blue-50 border-blue-400 shadow-xs scale-[1.02]'
+                      : 'border-slate-100 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                    <span className="text-slate-700 font-semibold">Devam Eden Modüller</span>
+                  </div>
+                  <strong className="font-extrabold text-blue-800 ml-auto">{inProgressModules}</strong>
+                </button>
+
+                <button
+                  type="button"
+                  onMouseEnter={() => setHoveredSegment('not_started')}
+                  onMouseLeave={() => setHoveredSegment('all')}
+                  className={`w-full flex items-center justify-between sm:justify-start gap-4 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    hoveredSegment === 'not_started'
+                      ? 'bg-slate-100 border-slate-300 shadow-xs scale-[1.02]'
+                      : 'border-slate-100 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0" />
+                    <span className="text-slate-700 font-semibold">Başlamayan Modüller</span>
+                  </div>
+                  <strong className="font-extrabold text-slate-800 ml-auto">{notStartedModules}</strong>
                 </button>
               </div>
-            ))}
+            </div>
+          </div>
+
+          {/* Alt Mavi Bilgilendirme Kutusu */}
+          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-blue-900 mt-5">
+            <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              Eğitim programının tüm modüllerini tamamlayarak başarı belgesi almaya hak kazanabilirsin.
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* ===================================================================== */}
-      {/* MODAL: Ödev Teslim Modalı (Sprint E03-B) */}
+      {/* 4. ALT SATIR: SON ÖDEVLERİM • DUYURULAR • SON MESAJLAR (3 EŞİT SÜTUN) */}
       {/* ===================================================================== */}
-      {selectedAssignmentForSubmit && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 bg-brand-navy text-white flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Ödev Teslim Masası</h3>
-                <p className="text-xs text-blue-200 mt-0.5">
-                  {selectedAssignmentForSubmit.title}
-                </p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* SÜTUN 1: Son Ödevlerim */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <h2 className="text-base font-bold text-slate-900">Son Ödevlerim</h2>
               </div>
-              <button
-                onClick={() => setSelectedAssignmentForSubmit(null)}
-                className="text-slate-400 hover:text-white transition-colors"
+              <Link
+                to="/kursiyer/odevler"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 group"
               >
-                <X className="w-5 h-5" />
-              </button>
+                Tüm Ödevleri Gör{' '}
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+              </Link>
             </div>
 
-            <form onSubmit={handleSubmitAssignment} className="p-6 space-y-4 text-xs">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 space-y-1">
-                <div className="flex justify-between font-semibold">
-                  <span>Son Teslim Tarihi:</span>
-                  <span className="text-blue-700">
-                    {selectedAssignmentForSubmit.dueDate || selectedAssignmentForSubmit.dueAt}
-                  </span>
+            <div className="space-y-3 pt-2">
+              {groupAssignments.length === 0 ? (
+                <div className="py-8 px-4 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-700">Aktif Ödev Bulunmuyor</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                    Eğitmeniniz tarafından yeni bir ödev veya proje atandığında burada listelenecektir.
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span>Zorunluluk Durumu:</span>
-                  <span className={selectedAssignmentForSubmit.isMandatory ? 'text-red-700 font-bold' : 'text-slate-600'}>
-                    {selectedAssignmentForSubmit.isMandatory ? 'Zorunlu Ödev' : 'İsteğe Bağlı'}
-                  </span>
-                </div>
-              </div>
+              ) : (
+                groupAssignments.slice(0, 3).map((asgn) => {
+                  const sub = getLatestSubmission(asgn.id, currentUser.id);
 
-              {/* Açıklama Metni Alanı */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Çalışma Açıklaması & Metin İçeriği
-                </label>
-                <textarea
-                  rows={4}
-                  value={submitText}
-                  onChange={(e) => setSubmitText(e.target.value)}
-                  placeholder="Hazırladığınız çalışmanın özetini, bulgularınızı ve uyguladığınız adımları yazınız..."
-                  className="w-full text-xs border border-slate-300 rounded-lg p-2.5"
-                />
-              </div>
+                  let badgeText = 'Değerlendiriliyor';
+                  let badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
 
-              {/* Bağlantı URL Alanı */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Harici Bağlantı / Repo / Drive Linki (Opsiyonel)
-                </label>
-                <input
-                  type="url"
-                  value={submitLink}
-                  onChange={(e) => setSubmitLink(e.target.value)}
-                  placeholder="https://drive.google.com/... veya https://github.com/..."
-                  className="w-full text-xs border border-slate-300 rounded-lg p-2.5"
-                />
-              </div>
+                  if (sub?.status === 'approved') {
+                    badgeText = 'Tamamlandı';
+                    badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  } else if (sub?.status === 'revision_requested') {
+                    badgeText = 'Revizyon';
+                    badgeClass = 'bg-red-50 text-red-700 border-red-200';
+                  } else if (!sub) {
+                    badgeText = 'Teslim Bekliyor';
+                    badgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
+                  }
 
-              {/* Dosya Eki (Frontend Demo Simülasyonu) */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Çalışma Dosyası Ekleme (Simülasyon)
-                </label>
-                <div className="border border-dashed border-slate-300 rounded-lg p-4 bg-slate-50 text-center space-y-2">
-                  <Upload className="w-5 h-5 text-slate-400 mx-auto" />
-                  <div className="flex items-center justify-center gap-2">
-                    <input
-                      type="text"
-                      value={submitFileName}
-                      onChange={(e) => setSubmitFileName(e.target.value)}
-                      placeholder="Örn: pazaryeri_urun_listesi_ayse.pdf"
-                      className="border border-slate-300 rounded px-2.5 py-1 text-xs w-64 bg-white"
-                    />
-                    <select
-                      value={submitFileSize}
-                      onChange={(e) => setSubmitFileSize(e.target.value)}
-                      className="border border-slate-300 rounded px-2 py-1 text-xs bg-white"
+                  return (
+                    <Link
+                      key={asgn.id}
+                      to="/kursiyer/odevler"
+                      className="flex items-center gap-3 p-2.5 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50/70 transition group"
                     >
-                      <option value="1.2 MB">1.2 MB</option>
-                      <option value="3.5 MB">3.5 MB</option>
-                      <option value="8.0 MB">8.0 MB</option>
-                    </select>
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    * Frontend simülasyonudur; dosya verisi yerel demo depolamada saklanır, harici sunucuya iletilmez.
-                  </div>
-                </div>
-              </div>
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSelectedAssignmentForSubmit(null)}
-                >
-                  Vazgeç
-                </Button>
-                <Button type="submit">Ödevi Eğitmene Teslim Et</Button>
-              </div>
-            </form>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition truncate">
+                          {asgn.title}
+                        </h4>
+                        <span className="text-[11px] text-slate-500 block truncate">
+                          Son Teslim: {asgn.dueDate || '28 Eki 2026'}
+                        </span>
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${badgeClass}`}
+                      >
+                        {badgeText}
+                      </span>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
-      )}
+
+        {/* SÜTUN 2: Duyurular */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-blue-600" />
+                <h2 className="text-base font-bold text-slate-900">Duyurular</h2>
+              </div>
+              <Link
+                to="/bildirimler"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 group"
+              >
+                Tüm Duyuruları Gör{' '}
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+              </Link>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              {announcements.length > 0 ? (
+                announcements.map((ann, i) => {
+                  const isUnread = i === 0;
+                  return (
+                    <div
+                      key={ann.id}
+                      onClick={() => setSelectedAnnouncementModal(ann)}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50/70 transition cursor-pointer group"
+                    >
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${isUnread ? 'bg-red-500 ring-2 ring-red-100' : 'bg-slate-300'
+                          }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition truncate">
+                          {ann.title}
+                        </h4>
+                        <span className="text-[11px] text-slate-500 block truncate">
+                          {new Date(ann.publishDate || ann.createdAt).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition shrink-0" />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-8 px-4 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200">
+                  <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-700">Yayınlanmış Duyuru Bulunmuyor</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                    Eğitim yönetimi tarafından yeni bir duyuru yapıldığında burada görüntülenecektir.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* SÜTUN 3: Son Mesajlar */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+                <h2 className="text-base font-bold text-slate-900">Son Mesajlar</h2>
+              </div>
+              <Link
+                to="/kursiyer/mesajlar"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 group"
+              >
+                Tüm Mesajları Gör{' '}
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+              </Link>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              {displayMessages.length === 0 ? (
+                <div className="py-8 px-4 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200">
+                  <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-700">Yeni Mesaj Bulunmuyor</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                    Eğitmeninizle başlattığınız birebir mesajlaşmalar burada listelenir.
+                  </p>
+                </div>
+              ) : (
+                displayMessages.map((msg) => (
+                  <Link
+                    key={msg.id}
+                    to="/kursiyer/mesajlar"
+                    className="flex items-center gap-3 p-2.5 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50/70 transition group"
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${msg.color}`}
+                    >
+                      {msg.initials}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition truncate">
+                          {msg.name}
+                        </h4>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {msg.time}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                        {msg.text}
+                      </p>
+                    </div>
+
+                    {msg.unread && (
+                      <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                    )}
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ===================================================================== */}
-      {/* MODAL: Teslim İnceleme Modalı */}
+      {/* 5. OTURUM DETAY MODALI                                                */}
       {/* ===================================================================== */}
-      {selectedSubmissionForView && (
+      {selectedSessionModal && (
         <Modal
-          isOpen={Boolean(selectedSubmissionForView)}
-          onClose={() => setSelectedSubmissionForView(null)}
-          title={`Teslim Detayı: ${selectedSubmissionForView.assignment.title}`}
-          description={`Sürüm: v${selectedSubmissionForView.submission.submissionVersion} • ${new Date(
-            selectedSubmissionForView.submission.submittedAt
-          ).toLocaleString('tr-TR')}`}
-          footer={
-            <Button size="sm" onClick={() => setSelectedSubmissionForView(null)}>
-              Kapat
-            </Button>
-          }
+          isOpen={true}
+          onClose={() => setSelectedSessionModal(null)}
+          title={`Oturum #${selectedSessionModal.sessionNumber}: ${selectedSessionModal.topic || selectedSessionModal.title}`}
+          maxWidth="lg"
         >
-          <div className="space-y-3 text-xs">
-            {selectedSubmissionForView.submission.content.text && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <strong className="block text-slate-700 mb-1">Açıklama Metni:</strong>
-                <p className="text-slate-800 whitespace-pre-wrap">
-                  {selectedSubmissionForView.submission.content.text}
-                </p>
+          <div className="space-y-4 text-xs">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Tarih:</span>
+                <span className="font-semibold text-slate-900">{selectedSessionModal.date}</span>
               </div>
-            )}
-
-            {selectedSubmissionForView.submission.content.linkUrl && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <strong className="block text-slate-700 mb-1">Bağlantı:</strong>
-                <a
-                  href={selectedSubmissionForView.submission.content.linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-700 font-semibold hover:underline inline-flex items-center gap-1"
-                >
-                  {selectedSubmissionForView.submission.content.linkUrl} <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            )}
-
-            {selectedSubmissionForView.submission.content.fileName && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <strong className="block text-slate-700 mb-1">Eklenen Dosya:</strong>
-                <span className="font-mono text-slate-700">
-                  {selectedSubmissionForView.submission.content.fileName} ({selectedSubmissionForView.submission.content.fileSize})
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Saat:</span>
+                <span className="font-semibold text-slate-900">
+                  {selectedSessionModal.startTime} - {selectedSessionModal.endTime}
                 </span>
               </div>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {/* ===================================================================== */}
-      {/* MODAL: Oturum Detay Modalı */}
-      {/* ===================================================================== */}
-      {sessionDetailModal && (
-        <Modal
-          isOpen={Boolean(sessionDetailModal)}
-          onClose={() => setSessionDetailModal(null)}
-          title={`Oturum ${sessionDetailModal.sessionNumber}: ${sessionDetailModal.title}`}
-          description={`${sessionDetailModal.date} • ${sessionDetailModal.startTime} - ${sessionDetailModal.endTime}`}
-          footer={
-            <Button size="sm" onClick={() => setSessionDetailModal(null)}>
-              Kapat
-            </Button>
-          }
-        >
-          <div className="space-y-3 text-xs text-slate-700">
-            <div className="p-3 bg-slate-50 rounded border border-slate-200">
-              <strong>Oturum Konumu:</strong> {sessionDetailModal.location}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Derslik / Lokasyon:</span>
+                <span className="font-semibold text-slate-900">
+                  {selectedSessionModal.location || 'Seminer Salonu B'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Eğitmen:</span>
+                <span className="font-bold text-blue-700">{selectedSessionModal.instructorName}</span>
+              </div>
             </div>
-            {sessionDetailModal.topic && (
-              <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                <strong>Ders İçeriği:</strong> {sessionDetailModal.topic}
+
+            {selectedSessionModal.notes && (
+              <div className="space-y-1">
+                <span className="font-bold text-slate-800 block">Ders & Müfredat Notları:</span>
+                <p className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 leading-relaxed">
+                  {selectedSessionModal.notes}
+                </p>
               </div>
             )}
-            {sessionDetailModal.notes && (
-              <div className="p-3 bg-blue-50 text-blue-900 rounded border border-blue-200">
-                <strong>Eğitmen Notu:</strong> {sessionDetailModal.notes}
-              </div>
-            )}
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200">
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  setSelectedSessionModal(null);
+                  navigate('/kursiyer/dersler');
+                }}
+              >
+                Müfredatta Gör
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setSelectedSessionModal(null)}
+              >
+                Tamam
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL: Başarı Belgesi Önizleme Modalı (Sprint E03-D) */}
+      {/* 6. DUYURU DETAY MODALI                                                */}
       {/* ===================================================================== */}
-      {previewCert && (
-        <CertificatePreviewModal
-          certificate={previewCert}
-          onClose={() => setPreviewCert(null)}
-        />
+      {selectedAnnouncementModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setSelectedAnnouncementModal(null)}
+          title={selectedAnnouncementModal.title}
+          maxWidth="md"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
+              <span className="text-slate-500">Yayın Tarihi:</span>
+              <span className="font-bold text-slate-900">
+                {new Date(selectedAnnouncementModal.publishDate || selectedAnnouncementModal.createdAt).toLocaleDateString('tr-TR')}
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <span className="font-bold text-slate-800 block">Duyuru Metni:</span>
+              <p className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 leading-relaxed">
+                {selectedAnnouncementModal.content}
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-200">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setSelectedAnnouncementModal(null)}
+              >
+                Kapat
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
 };
-
-export default TraineeDashboardPage;

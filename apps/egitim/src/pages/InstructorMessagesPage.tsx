@@ -4,16 +4,18 @@ import {
   Send,
   ArrowLeft,
   Info,
-  CheckCheck,
-  Check,
   AlertCircle,
   Filter,
   Hash,
-  ChevronRight,
   GraduationCap,
+  Search,
+  Users,
+  CornerUpLeft,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
+import { KpiStrip } from '../components/ui/KpiStrip';
 import {
   Conversation,
   DirectMessage,
@@ -23,10 +25,15 @@ import {
   getMessagesForConversation,
   sendDirectMessage,
   markConversationAsRead,
+  editDirectMessage,
+  deleteDirectMessage,
+  toggleDirectMessageReaction,
   MESSAGES_UPDATE_EVENT,
   CONVERSATIONS_UPDATE_EVENT,
 } from '../services/messageStorage';
 import { getStoredGroups } from '../services/enrollmentStorage';
+import { ChatMessageBubble } from '../components/common/ChatMessageBubble';
+import { playMessageSentSound } from '../services/soundFx';
 
 export const InstructorMessagesPage: React.FC = () => {
   const { currentUser } = useDemoRole();
@@ -39,7 +46,9 @@ export const InstructorMessagesPage: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<{ id: string; senderName: string; senderRole?: string; content: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -91,16 +100,29 @@ export const InstructorMessagesPage: React.FC = () => {
     }
   }, [selectedConversationId]);
 
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevMsgCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMsgCountRef.current = messages.length;
   }, [messages]);
 
   // Eğitmenin grupları
   const assignedGroups = getStoredGroups().filter((g) => g.instructorIds.includes(instructorId));
 
+  const totalUnreadCount = conversations.reduce((sum, c) => sum + (c.unreadCountInstructor || 0), 0);
+
   const filteredConversations = conversations.filter((c) => {
-    if (selectedGroupFilter === 'all') return true;
-    return c.groupId === selectedGroupFilter;
+    if (selectedGroupFilter !== 'all' && c.groupId !== selectedGroupFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchesName = c.traineeName.toLowerCase().includes(q);
+      const matchesGroup = c.groupName ? c.groupName.toLowerCase().includes(q) : false;
+      const matchesLast = c.lastMessagePreview ? c.lastMessagePreview.toLowerCase().includes(q) : false;
+      if (!matchesName && !matchesGroup && !matchesLast) return false;
+    }
+    return true;
   });
 
   const activeConv = conversations.find((c) => c.id === selectedConversationId);
@@ -120,12 +142,15 @@ export const InstructorMessagesPage: React.FC = () => {
       senderRole: 'instructor',
       senderName: instructorName,
       body: inputText,
+      replyTo: replyTarget || undefined,
     });
 
     if (!res.success) {
       setErrorMsg(res.error || 'Mesaj iletilemedi.');
     } else {
+      playMessageSentSound();
       setInputText('');
+      setReplyTarget(null);
       setErrorMsg(null);
       loadMessages(selectedConversationId);
       loadConversations();
@@ -133,39 +158,64 @@ export const InstructorMessagesPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Üst Başlık & Ekmek Kırıntısı */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      {/* Üst Başlık & Hızlı Butonlar */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link to="/egitmen" className="hover:text-brand-blue transition-colors">
-              Eğitmen Masası
-            </Link>
-            <ChevronRight className="w-3.5 h-3.5" />
-            <span className="text-slate-800 font-semibold">Kursiyer Mesajları</span>
-          </div>
-          <h1 className="text-2xl font-bold text-brand-navy">Kursiyer Danışma & Mesaj Masası</h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Kursiyer Danışma & Mesaj Masası
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Yalnızca size atanmış eğitim gruplarındaki kursiyerlerin resmi soru ve danışma mesajları.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Link
             to="/egitmen/kanallar"
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-md border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-sm"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
           >
-            <Hash className="w-4 h-4 text-brand-blue" />
+            <Hash className="w-4 h-4 text-blue-600 shrink-0" />
             <span>Sınıf Kanalları</span>
           </Link>
         </div>
       </div>
 
-      {/* Dürüst Demo Bilgilendirme Kartı */}
-      <div className="bg-slate-100 border border-slate-200 rounded-lg p-3.5 flex items-start gap-3">
-        <Info className="w-5 h-5 text-slate-600 shrink-0 mt-0.5" />
+      {/* 3 KPI Metrik Bandı (Stripe / Canvas LMS Standart Metrik Bandı) */}
+      <KpiStrip
+        columns={3}
+        items={[
+          {
+            label: 'Aktif Diyaloglar',
+            value: `${conversations.length} Konuşma`,
+            icon: <MessageSquare className="w-4 h-4" />,
+            subtext: 'Atanmış şubelerdeki kursiyerler',
+          },
+          {
+            label: 'Okunmamış Mesajlar',
+            value: `${totalUnreadCount} Bekleyen`,
+            icon: <AlertCircle className="w-4 h-4" />,
+            subtext: 'Yanıt bekleyen soru',
+            badge: totalUnreadCount > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                Cevap Bekliyor
+              </span>
+            ) : undefined,
+          },
+          {
+            label: 'Sorumlu Olduğunuz Şube',
+            value: `${assignedGroups.length} Grup`,
+            icon: <Users className="w-4 h-4" />,
+            subtext: 'Yetkili iletişim havuzu',
+          },
+        ]}
+      />
+
+      {/* Eğitmen İletişim İlkesi */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-start gap-3">
+        <Info className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
         <div className="text-xs text-slate-700 leading-relaxed">
-          <span className="font-semibold">Eğitmen İletişim İlkesi (Sprint E04-A):</span> Kursiyer mesajlaşması, yalnızca atandığınız grupların kapsamıyla sınırlıdır. Kursiyerin diğer programlardaki kayıtlarına veya kişisel evraklarına erişim yetkisi verilmez. Yanıtlarınız yerel demo veritabanına işlenir.
+          <span className="font-semibold text-slate-900">Eğitmen İletişim İlkesi:</span> Kursiyer mesajlaşması, yalnızca atandığınız grupların kapsamıyla sınırlıdır. Kursiyerin diğer programlardaki kayıtlarına veya kişisel evraklarına erişim yetkisi verilmez.
         </div>
       </div>
 
@@ -177,25 +227,38 @@ export const InstructorMessagesPage: React.FC = () => {
             mobileShowDetail ? 'hidden md:flex' : 'flex'
           }`}
         >
-          {/* Grup Filtresi */}
-          <div className="p-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between gap-2">
-            <span className="text-xs font-bold text-brand-navy uppercase tracking-wider flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <span>Grup Filtresi:</span>
-            </span>
+          {/* Grup Filtresi & Arama */}
+          <div className="p-3 border-b border-slate-200 bg-slate-50/60 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-brand-navy uppercase tracking-wider flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <span>Grup:</span>
+              </span>
 
-            <select
-              value={selectedGroupFilter}
-              onChange={(e) => setSelectedGroupFilter(e.target.value)}
-              className="text-xs rounded border border-slate-300 bg-white px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-blue"
-            >
-              <option value="all">Tüm Gruplarım ({conversations.length})</option>
-              {assignedGroups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
+              <select
+                value={selectedGroupFilter}
+                onChange={(e) => setSelectedGroupFilter(e.target.value)}
+                className="text-xs rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-blue flex-1 max-w-[190px]"
+              >
+                <option value="all">Tüm Gruplarım ({conversations.length})</option>
+                {assignedGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Kursiyer veya mesaj ara..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           {/* Konuşmalar */}
@@ -320,10 +383,10 @@ export const InstructorMessagesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Mesaj Listesi */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3.5 max-h-[440px]">
-                <div className="text-center my-2">
-                  <span className="inline-block px-3 py-1 bg-slate-100 text-slate-500 text-[10px] rounded-full border border-slate-200">
+              {/* Mesaj Listesi (WhatsApp / Telegram Balon Görünümü) */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-2.5 max-h-[440px] bg-slate-100/60">
+                <div className="text-center my-1.5">
+                  <span className="inline-block px-3 py-1 bg-white text-slate-500 text-[10px] rounded-full border border-slate-200 shadow-2xs">
                     Kursiyer danışma akışı • {activeConv.groupName}
                   </span>
                 </div>
@@ -334,50 +397,56 @@ export const InstructorMessagesPage: React.FC = () => {
                   </div>
                 ) : (
                   messages.map((msg) => {
-                    const isMe = msg.senderRole === 'instructor';
-                    const timeStr = new Date(msg.createdAt).toLocaleTimeString('tr-TR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+                    const currentUserName = (currentUser?.fullName || currentUser?.name || '').trim().toLowerCase();
+                    const currentUserId = (currentUser?.id || '').trim();
 
+                    const msgSenderName = (msg.senderName || '').trim().toLowerCase();
+                    const msgSenderId = (msg.senderId || '').trim();
+
+                    const nameDiffers = Boolean(currentUserName && msgSenderName && currentUserName !== msgSenderName);
+                    const isMe = !nameDiffers && Boolean(
+                      (currentUserName && msgSenderName && currentUserName === msgSenderName) ||
+                      (currentUserId && msgSenderId && currentUserId === msgSenderId && !msgSenderId.startsWith('user-instructor-01'))
+                    );
                     return (
-                      <div
+                      <ChatMessageBubble
                         key={msg.id}
-                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                      >
-                        <div className="text-[10px] text-slate-400 mb-0.5 px-1">
-                          {isMe ? 'Siz (Eğitmen)' : msg.senderName} • {timeStr}
-                        </div>
-
-                        <div
-                          className={`max-w-[82%] sm:max-w-[70%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
-                            isMe
-                              ? 'bg-brand-navy text-white rounded-br-xs'
-                              : 'bg-white text-slate-800 border border-slate-200 rounded-bl-xs'
-                          }`}
-                        >
-                          <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-
-                          <div
-                            className={`mt-1.5 pt-1 border-t flex items-center justify-end gap-1 text-[9px] ${
-                              isMe ? 'border-blue-900/40 text-blue-200' : 'border-slate-100 text-slate-400'
-                            }`}
-                          >
-                            <span>Yerel Demoya Kaydedildi</span>
-                            {isMe ? (
-                              msg.readAt ? (
-                                <span title="Okundu (Demo Görüntüleme)">
-                                  <CheckCheck className="w-3 h-3 text-cyan-300" />
-                                </span>
-                              ) : (
-                                <span title="Kaydedildi">
-                                  <Check className="w-3 h-3 text-blue-300" />
-                                </span>
-                              )
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
+                        id={msg.id}
+                        senderId={msg.senderId}
+                        senderName={msg.senderName}
+                        senderRole={msg.senderRole}
+                        content={msg.body}
+                        createdAt={msg.createdAt}
+                        isEdited={msg.isEdited}
+                        editedAt={msg.editedAt}
+                        isDeleted={msg.isDeleted}
+                        deletedAt={msg.deletedAt}
+                        replyTo={msg.replyTo}
+                        reactions={msg.reactions}
+                        currentUserId={instructorId}
+                        isMe={isMe}
+                        canEdit={isMe && !msg.isDeleted}
+                        canDelete={isMe && !msg.isDeleted}
+                        onReply={(id, name, text) => setReplyTarget({ id, senderName: name, content: text })}
+                        onReact={(messageId, emoji) => {
+                          toggleDirectMessageReaction(messageId, emoji, instructorId);
+                          if (selectedConversationId) {
+                            loadMessages(selectedConversationId);
+                          }
+                        }}
+                        onEdit={(messageId, newContent) => {
+                          const editRes = editDirectMessage(messageId, newContent, instructorId);
+                          if (editRes.success && selectedConversationId) {
+                            loadMessages(selectedConversationId);
+                          }
+                        }}
+                        onDelete={(messageId) => {
+                          const delRes = deleteDirectMessage(messageId, instructorId);
+                          if (delRes.success && selectedConversationId) {
+                            loadMessages(selectedConversationId);
+                          }
+                        }}
+                      />
                     );
                   })
                 )}
@@ -393,7 +462,25 @@ export const InstructorMessagesPage: React.FC = () => {
               )}
 
               {/* Mesaj Gönderme Formu */}
-              <form onSubmit={handleSendMessage} className="p-3.5 bg-white border-t border-slate-200">
+              <form onSubmit={handleSendMessage} className="p-3.5 bg-white border-t border-slate-200 space-y-2">
+                {/* Yanıtlanan Mesaj Başlığı (Varsa) */}
+                {replyTarget && (
+                  <div className="flex items-center justify-between p-2 px-3 bg-blue-50/90 border border-blue-200 rounded-xl text-xs text-blue-900 animate-in fade-in">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CornerUpLeft className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="font-bold truncate">{replyTarget.senderName} yanıtlanıyor:</span>
+                      <span className="italic text-slate-500 truncate text-[11px]">"{replyTarget.content}"</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyTarget(null)}
+                      className="p-1 text-slate-400 hover:text-slate-700 ml-2 cursor-pointer"
+                      title="Yanıtı İptal Et"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-end gap-2">
                   <div className="flex-1 relative">
                     <textarea

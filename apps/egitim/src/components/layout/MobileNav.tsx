@@ -18,24 +18,31 @@ export const MobileNav: React.FC = () => {
     switch (currentRole) {
       case 'applicant':
         return [
-          { to: '/aday', label: 'Başvurularım', icon: LayoutDashboard },
-          { to: '/egitimler', label: 'Katalog', icon: BookOpen },
-          { to: '/basvuru-rehberi', label: 'Rehber', icon: ClipboardList },
-          { to: '/egitim-takvimi', label: 'Takvim', icon: Award },
+          { to: '/aday', label: 'Genel Bakış', icon: LayoutDashboard },
+          { to: '/aday/katalog', label: 'Katalog', icon: BookOpen },
+          { to: '/aday/rehber', label: 'Rehber', icon: ClipboardList },
+          { to: '/aday/takvim', label: 'Takvim', icon: Award },
         ];
       case 'trainee':
         return [
-          { to: '/kursiyer', label: 'Panel', icon: LayoutDashboard },
+          { to: '/kursiyer', label: 'Genel Bakış', icon: LayoutDashboard },
           { to: '/kursiyer/mesajlar', label: 'Mesajlar', icon: MessageSquare },
           { to: '#dersler', label: 'Derslerim', icon: BookOpen },
           { to: '#odevler', label: 'Ödevler', icon: CheckSquare },
         ];
       case 'instructor':
         return [
-          { to: '/egitmen', label: 'Yoklama', icon: ClipboardList },
+          { to: '/egitmen', label: 'Genel Bakış', icon: LayoutDashboard },
           { to: '/egitmen/mesajlar', label: 'Mesajlar', icon: MessageSquare },
           { to: '#odevler', label: 'Ödevler', icon: CheckSquare },
           { to: '#gruplar', label: 'Gruplar', icon: Users },
+        ];
+      case 'superadmin':
+        return [
+          { to: '/yonetim/super-admin', label: 'Genel Bakış', icon: LayoutDashboard },
+          { to: '/yonetim/kullanicilar', label: 'Kullanıcılar', icon: Users },
+          { to: '/yonetim/roller', label: 'Yetkiler', icon: CheckSquare },
+          { to: '/yonetim/denetim', label: 'Denetim', icon: Award },
         ];
       case 'admin':
         return [

@@ -1,43 +1,23 @@
 import React from 'react';
 
 interface DiscoveryRibbonProps {
-  onNavigateToDishes: () => void;
-  onNavigateToWorkshop: () => void;
   onNavigateToMap: () => void;
+  onNavigateToDishes: () => void;
+  onNavigateToDistrict: () => void;
   onNavigateToHeritage: () => void;
 }
 
 export const DiscoveryRibbon: React.FC<DiscoveryRibbonProps> = ({
-  onNavigateToDishes,
-  onNavigateToWorkshop,
   onNavigateToMap,
+  onNavigateToDishes,
+  onNavigateToDistrict,
   onNavigateToHeritage,
 }) => {
   const items = [
     {
-      id: 'lezzetler',
-      title: 'Yöresel Lezzetler',
-      subtitle: "İslahiye'nin özgün tatları",
-      iconSrc: '/motifs/icon_casserole.png',
-      iconAlt: 'Toprak Güveç Çanağı Gravürü',
-      iconClass: 'w-16 h-12',
-      onClick: onNavigateToDishes,
-      href: '#lezzetler',
-    },
-    {
-      id: 'tarif-atolyesi',
-      title: 'Tarif Atölyesi',
-      subtitle: 'Adım adım pişirme rehberi',
-      iconSrc: '/motifs/icon_pitcher.png',
-      iconAlt: 'Bakır Güğüm Gravürü',
-      iconClass: 'w-11 h-12',
-      onClick: onNavigateToWorkshop,
-      href: '#tarif-atolyesi',
-    },
-    {
       id: 'lezzet-haritasi',
       title: 'Lezzet Haritası',
-      subtitle: 'Gastronomi seyahatnamesi',
+      subtitle: 'Coğrafi & kültürel lezzet atlası',
       iconSrc: '/motifs/icon_mountains.png',
       iconAlt: 'Amanos Dağları Gravürü',
       iconClass: 'w-16 h-12',
@@ -45,14 +25,34 @@ export const DiscoveryRibbon: React.FC<DiscoveryRibbonProps> = ({
       href: '#lezzet-haritasi',
     },
     {
+      id: 'lezzetler',
+      title: 'Yöresel Tarifler',
+      subtitle: 'Özgün reçeteler ve lezzet kataloğu',
+      iconSrc: '/motifs/icon_casserole.png',
+      iconAlt: 'Toprak Güveç Çanağı Gravürü',
+      iconClass: 'w-16 h-12',
+      onClick: onNavigateToDishes,
+      href: '#lezzetler',
+    },
+    {
+      id: 'islahiyeyi-kesfet',
+      title: 'İslahiye’yi Keşfet',
+      subtitle: 'Yesemek ve kadim doğa rotaları',
+      iconSrc: '/motifs/icon_pitcher.png',
+      iconAlt: 'Kadim Zanaat & Güğüm Gravürü',
+      iconClass: 'w-11 h-12',
+      onClick: onNavigateToDistrict,
+      href: '#islahiyeyi-kesfet',
+    },
+    {
       id: 'mutfak-mirasi',
       title: 'Mutfak Mirası',
-      subtitle: 'Kültürel anlatılar ve yazılar',
+      subtitle: 'Sözlü tarih ve kültürel bellek',
       iconSrc: '/motifs/icon_oven_arch.png',
       iconAlt: 'Taş Fırın Kemer Kapı Gravürü',
       iconClass: 'w-14 h-12',
       onClick: onNavigateToHeritage,
-      href: '#kultur-mirasi',
+      href: '/mutfak-mirasi',
     },
   ];
 
@@ -98,28 +98,28 @@ export const DiscoveryRibbon: React.FC<DiscoveryRibbonProps> = ({
                   <img 
                     src={item.iconSrc} 
                     alt={item.iconAlt} 
-                    className="w-full h-full object-contain filter drop-shadow-xs" 
+                    className="max-h-full max-w-full object-contain filter contrast-[1.08]" 
                     loading="lazy"
                   />
                 </div>
 
-                {/* Editorial Typography */}
-                <div className="min-w-0">
-                  <h3 className="font-display font-medium text-[#203B31] text-base sm:text-[17px] leading-tight group-hover:text-[#BA855E] transition-colors duration-200 truncate">
+                <div className="min-w-0 flex-1">
+                  <span className="block font-display font-medium text-sm sm:text-base text-[#203B31] group-hover:text-[#BA855E] transition-colors truncate">
                     {item.title}
-                  </h3>
-                  <p className="font-sans text-[12px] sm:text-[13px] text-[#242724]/75 leading-tight mt-0.5 truncate">
+                  </span>
+                  <span className="block text-[11px] sm:text-xs text-[#242724]/70 font-sans truncate">
                     {item.subtitle}
-                  </p>
+                  </span>
                 </div>
               </div>
 
-              {/* Minimalist circular copper arrow cue */}
-              <div className="shrink-0 ml-2">
-                <span className="w-6 h-6 rounded-full border border-[#BA855E]/60 flex items-center justify-center text-[#BA855E] text-xs font-semibold group-hover:border-[#BA855E] group-hover:bg-[#BA855E] group-hover:text-white group-hover:translate-x-0.5 transition-all duration-200 shadow-xs">
-                  →
-                </span>
-              </div>
+              {/* Minimal chevron pointer */}
+              <span 
+                className="text-xs text-[#BA855E]/60 group-hover:text-[#BA855E] group-hover:translate-x-0.5 transition-all shrink-0 pr-1 select-none font-bold" 
+                aria-hidden="true"
+              >
+                ›
+              </span>
             </a>
           ))}
         </div>

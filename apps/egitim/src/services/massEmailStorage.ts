@@ -22,7 +22,7 @@ import {
   getStoredAssignments,
   getStoredGroups,
 } from './enrollmentStorage';
-import { DEMO_USERS } from '../data/educationData';
+import { getStoredUsers } from './authorizationDemoService';
 
 const EMAIL_TEMPLATES_STORAGE_KEY = 'islahiye_education_email_templates_v1';
 const EMAIL_QUEUE_STORAGE_KEY = 'islahiye_education_email_queue_v1';
@@ -38,16 +38,16 @@ export const INITIAL_EMAIL_TEMPLATES: MassEmailTemplate[] = [
   {
     id: 'tmpl-start-notice',
     name: 'Eğitim Başlangıç Bilgilendirmesi',
-    subject: '{{programName}} — {{termName}} Eğitimleri Başlıyor',
-    body: `Sayın {{recipientName}},
+    subject: '[Program Adı] — [Dönem Adı] Eğitimleri Başlıyor',
+    body: `Sayın [Alıcı Adı],
 
-{{institutionName}} bünyesinde düzenlenen "{{programName}}" eğitimi {{termName}} kapsamında kesin kaydınız tamamlanmıştır.
+[Kurum Adı] bünyesinde düzenlenen "[Program Adı]" eğitimi [Dönem Adı] kapsamında kesin kaydınız tamamlanmıştır.
 
-Dersleriniz {{groupName}} grubu bünyesinde planlanan takvime uygun olarak başlayacaktır. Ders programınızı ve oturum salon detaylarını öğrenci panelinizden inceleyebilirsiniz.
+Dersleriniz [Grup Adı] grubu bünyesinde planlanan takvime uygun olarak başlayacaktır. Ders programınızı ve oturum salon detaylarını öğrenci panelinizden inceleyebilirsiniz.
 
 İlk ders gününde kimlik belgenizle birlikte derslikte hazır bulunmanızı rica eder, başarılı bir eğitim dönemi dileriz.
 
-İletişim & Destek: {{contactInfo}}`,
+İletişim & Destek: [İletişim Bilgisi]`,
     availableVariables: [
       'programName',
       'termName',
@@ -62,15 +62,15 @@ Dersleriniz {{groupName}} grubu bünyesinde planlanan takvime uygun olarak başl
   {
     id: 'tmpl-session-change',
     name: 'Ders Tarihi ve Saat Değişikliği',
-    subject: 'Önemli Bilgilendirme: {{groupName}} Ders Saati Güncellemesi',
-    body: `Sayın {{recipientName}},
+    subject: 'Önemli Bilgilendirme: [Grup Adı] Ders Saati Güncellemesi',
+    body: `Sayın [Alıcı Adı],
 
-"{{programName}}" programı {{groupName}} grubunun yaklaşan ders oturumunun tarihi ve saati eğitmen ve derslik planlaması doğrultusunda güncellenmiştir.
+"[Program Adı]" programı [Grup Adı] grubunun yaklaşan ders oturumunun tarihi ve saati eğitmen ve derslik planlaması doğrultusunda güncellenmiştir.
 
 Güncel oturum saatleri ve derslik bilgisi portal üzerindeki takviminize işlenmiştir. Katılım durumunuzu buna göre planlamanızı önemle rica ederiz.
 
 Bilgilerinize sunarız.
-{{institutionName}}`,
+[Kurum Adı]`,
     availableVariables: [
       'programName',
       'termName',
@@ -84,15 +84,15 @@ Bilgilerinize sunarız.
   {
     id: 'tmpl-group-announcement',
     name: 'Genel Grup Duyurusu & Saha Bilgilendirmesi',
-    subject: '{{groupName}} — Önemli Bilgilendirme ve Duyuru',
-    body: `Sayın {{recipientName}},
+    subject: '[Grup Adı] — Önemli Bilgilendirme ve Duyuru',
+    body: `Sayın [Alıcı Adı],
 
-{{termName}} dönemi "{{programName}}" eğitimi {{groupName}} sınıfı için önemli bir duyuru bulunmaktadır.
+[Dönem Adı] dönemi "[Program Adı]" eğitimi [Grup Adı] sınıfı için önemli bir duyuru bulunmaktadır.
 
 Eğitim sürecine ilişkin güncel materyaller, ödev açıklamaları ve duyurular sınıf kanalınızda paylaşılmıştır. İlgili detayları incelemek için lütfen portalınıza giriş yapınız.
 
 Saygılarımızla,
-{{institutionName}}`,
+[Kurum Adı]`,
     availableVariables: [
       'programName',
       'termName',
@@ -106,15 +106,15 @@ Saygılarımızla,
   {
     id: 'tmpl-assignment-deadline',
     name: 'Ödev Son Teslim Tarihi Hatırlatması',
-    subject: 'Hatırlatma: {{programName}} Ödev Teslim Tarihi Yaklaşıyor',
-    body: `Sayın {{recipientName}},
+    subject: 'Hatırlatma: [Program Adı] Ödev Teslim Tarihi Yaklaşıyor',
+    body: `Sayın [Alıcı Adı],
 
-"{{programName}}" eğitimi kapsamında eğitmeniniz tarafından tanımlanan zorunlu ödev çalışmasının son teslim süresi yaklaşmaktadır.
+"[Program Adı]" eğitimi kapsamında eğitmeniniz tarafından tanımlanan zorunlu ödev çalışmasının son teslim süresi yaklaşmaktadır.
 
 Dönem sonu başarı belgesi ve sertifika değerlendirmesinde en az 70/100 ödev ortalaması ve zorunlu ödevlerin tamamlanması şartı aranmaktadır. Ödevinizi zamanında sisteme yüklemenizi hatırlatırız.
 
 İyi çalışmalar dileriz.
-{{institutionName}}`,
+[Kurum Adı]`,
     availableVariables: [
       'programName',
       'groupName',
@@ -127,16 +127,16 @@ Dönem sonu başarı belgesi ve sertifika değerlendirmesinde en az 70/100 ödev
   {
     id: 'tmpl-term-end',
     name: 'Dönem Sonu Bilgilendirmesi & Başarı Belgeleri',
-    subject: 'Tebrikler: {{programName}} — {{termName}} Tamamlandı',
-    body: `Sayın {{recipientName}},
+    subject: 'Tebrikler: [Program Adı] — [Dönem Adı] Tamamlandı',
+    body: `Sayın [Alıcı Adı],
 
-{{institutionName}} tarafından yürütülen "{{programName}}" eğitimi {{termName}} dönemi ders oturumları ve değerlendirme süreçleri başarıyla tamamlanmıştır.
+[Kurum Adı] tarafından yürütülen "[Program Adı]" eğitimi [Dönem Adı] dönemi ders oturumları ve değerlendirme süreçleri başarıyla tamamlanmıştır.
 
 Devam şartını (%80) ve ödev başarı kriterlerini (70/100) sağlayan kursiyerlerimizin resmi başarı belgeleri ve QR kodlu dijital sertifikaları portal üzerinden erişime açılmıştır.
 
 Bölgemiz ekonomisine ve dijital dönüşümüne katkılarınız için teşekkür eder, başarılarınızın devamını dileriz.
 
-{{institutionName}} Yönetimi`,
+[Kurum Adı] Yönetimi`,
     availableVariables: [
       'programName',
       'termName',
@@ -189,6 +189,22 @@ export const INITIAL_EMAIL_QUEUE: MassEmailQueueItem[] = [
 // 3. STORAGE ACCESSORS
 // -----------------------------------------------------------------------------
 
+export const sanitizeCodeVariables = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\{\{\s*programName\s*\}\}/gi, '[Program Adı]')
+    .replace(/\{\{\s*termName\s*\}\}/gi, '[Dönem Adı]')
+    .replace(/\{\{\s*groupName\s*\}\}/gi, '[Grup Adı]')
+    .replace(/\{\{\s*recipientName\s*\}\}/gi, '[Alıcı Adı]')
+    .replace(/\{\{\s*institutionName\s*\}\}/gi, '[Kurum Adı]')
+    .replace(/\{\{\s*contactInfo\s*\}\}/gi, '[İletişim Bilgisi]')
+    .replace(/\{\{\s*date\s*\}\}/gi, '[Tarih]')
+    .replace(/\{\{\s*sessionTime\s*\}\}/gi, '[Ders Saati]')
+    .replace(/\{\{\s*location\s*\}\}/gi, '[Derslik]')
+    .replace(/\{\{\s*instructorName\s*\}\}/gi, '[Eğitmen Adı]')
+    .replace(/\{\{([^{}]+)\}\}/g, '[$1]');
+};
+
 export const getStoredEmailTemplates = (): MassEmailTemplate[] => {
   try {
     const raw = localStorage.getItem(EMAIL_TEMPLATES_STORAGE_KEY);
@@ -197,7 +213,12 @@ export const getStoredEmailTemplates = (): MassEmailTemplate[] => {
       return INITIAL_EMAIL_TEMPLATES;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_EMAIL_TEMPLATES;
+    const list: MassEmailTemplate[] = Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_EMAIL_TEMPLATES;
+    return list.map((t) => ({
+      ...t,
+      subject: sanitizeCodeVariables(t.subject),
+      body: sanitizeCodeVariables(t.body),
+    }));
   } catch (err) {
     console.error('Email templates read error:', err);
     return INITIAL_EMAIL_TEMPLATES;
@@ -335,8 +356,9 @@ export const deriveEligibleRecipients = (params: {
 
       group.instructorIds.forEach((instId, idx) => {
         const instName = group.instructorNames[idx] || 'Eğitmen';
-        const demoUser = Object.values(DEMO_USERS).find((u) => u.id === instId);
-        const email = demoUser?.email || `${instName.toLowerCase().replace(/\s+/g, '.')}@islahiye-dijital.org`;
+        const allUsers = getStoredUsers();
+        const matchedUser = allUsers.find((u) => u.id === instId || u.name === instName || u.fullName === instName);
+        const email = matchedUser?.email || `${instName.toLowerCase().replace(/\s+/g, '.')}@islahiye.bel.tr`;
 
         if (!resultMap.has(instId)) {
           resultMap.set(instId, {
@@ -367,8 +389,64 @@ export interface ResolvedTemplateResult {
   unresolvedVariables: string[];
 }
 
+const normalizeTag = (str: string): string => {
+  return str
+    .toLowerCase()
+    .replace(/ı/g, 'i')
+    .replace(/i̇/g, 'i')
+    .replace(/İ/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/&/g, 've')
+    .replace(/[\s_-]+/g, ' ')
+    .trim();
+};
+
+const TAG_KEY_MAP: Record<string, string> = {
+  programname: 'programName',
+  'program adi': 'programName',
+  'program adı': 'programName',
+  programadi: 'programName',
+  program: 'programName',
+  termname: 'termName',
+  'donem adi': 'termName',
+  'dönem adı': 'termName',
+  donemadi: 'termName',
+  donem: 'termName',
+  dönem: 'termName',
+  groupname: 'groupName',
+  'grup adi': 'groupName',
+  'grup adı': 'groupName',
+  grupadi: 'groupName',
+  grup: 'groupName',
+  recipientname: 'recipientName',
+  'alici adi': 'recipientName',
+  'alıcı adı': 'recipientName',
+  aliciadi: 'recipientName',
+  alici: 'recipientName',
+  alıcı: 'recipientName',
+  kursiyer: 'recipientName',
+  institutionname: 'institutionName',
+  'kurum adi': 'institutionName',
+  'kurum adı': 'institutionName',
+  kurumadi: 'institutionName',
+  kurum: 'institutionName',
+  contactinfo: 'contactInfo',
+  'iletisim bilgisi': 'contactInfo',
+  'iletişim bilgisi': 'contactInfo',
+  'iletisim ve destek': 'contactInfo',
+  'iletişim ve destek': 'contactInfo',
+  iletisimbilgisi: 'contactInfo',
+  iletisim: 'contactInfo',
+  iletişim: 'contactInfo',
+  destek: 'contactInfo',
+};
+
 /**
- * Şablon metnindeki {{variableName}} kalıplarını çözümler.
+ * Şablon metnindeki [Değişken Adı] ve {{variableName}} kalıplarını çözümler.
  * Çözümlenemeyen eksik değişkenleri raporlar.
  */
 export const resolveTemplateVariables = (
@@ -376,16 +454,21 @@ export const resolveTemplateVariables = (
   variables: Record<string, string>
 ): { resolved: string; missing: string[] } => {
   const missing: string[] = [];
-  const regex = /\{\{([a-zA-Z0-9_]+)\}\}/g;
+  // Hem [Program Adı] hem {{programName}} hem de {varName} kalıplarını yakalar
+  const regex = /\{\{([^{}]+)\}\}|\[([^[\]]+)\]|\{([^{}]+)\}/g;
 
-  const resolved = text.replace(regex, (match, varName) => {
-    if (varName in variables && variables[varName] !== undefined && variables[varName] !== '') {
-      return variables[varName];
+  const resolved = text.replace(regex, (match, v1, v2, v3) => {
+    const rawTag = (v1 || v2 || v3 || '').trim();
+    const normalizedKey = normalizeTag(rawTag);
+    const varKey = TAG_KEY_MAP[normalizedKey] || rawTag;
+
+    if (varKey in variables && variables[varKey] !== undefined && variables[varKey] !== '') {
+      return variables[varKey];
     }
-    if (!missing.includes(varName)) {
-      missing.push(varName);
+    if (!missing.includes(rawTag)) {
+      missing.push(rawTag);
     }
-    return match; // Eksik değişken olduğu gibi bırakılır
+    return match;
   });
 
   return { resolved, missing };
@@ -402,11 +485,15 @@ export const previewEmailWithSample = (
     contactInfo?: string;
   }
 ): ResolvedTemplateResult => {
+  const cleanRecipientName = (context.recipientName || 'Ahmet Kaya')
+    .replace(/^Sayın\s+/i, '')
+    .trim();
+
   const vars: Record<string, string> = {
-    programName: context.programName || '',
-    termName: context.termName || '',
-    groupName: context.groupName || '',
-    recipientName: context.recipientName || 'Örnek Kursiyer (Sayın Ayşe Demir)',
+    programName: context.programName || 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termName: context.termName || '2026 Güz Dönemi',
+    groupName: context.groupName || 'Grup A (Hafta İçi Sabah)',
+    recipientName: cleanRecipientName || 'Ahmet Kaya',
     institutionName: context.institutionName || 'İslahiye Ticaret Odası',
     contactInfo: context.contactInfo || 'egitim@islahiye-tso.org.tr | 0342 862 ** **',
   };
@@ -414,11 +501,22 @@ export const previewEmailWithSample = (
   const subjRes = resolveTemplateVariables(template.subject, vars);
   const bodyRes = resolveTemplateVariables(template.body, vars);
 
+  // Raw placeholder temizleme: Önizlemede hiçbir zaman ham {{...}}, {...} veya {} kalıntıları görünmemeli
+  let cleanSubject = subjRes.resolved
+    .replace(/\bSayın\s+Sayın\b/gi, 'Sayın')
+    .replace(/\{\{[^}]*\}\}|\(\([^)]*\)\)|\{[^}]*\}/g, '')
+    .trim();
+
+  let cleanBody = bodyRes.resolved
+    .replace(/\bSayın\s+Sayın\b/gi, 'Sayın')
+    .replace(/\{\{[^}]*\}\}|\(\([^)]*\)\)|\{[^}]*\}/g, '')
+    .trim();
+
   const missingSet = new Set([...subjRes.missing, ...bodyRes.missing]);
 
   return {
-    subject: subjRes.resolved,
-    body: bodyRes.resolved,
+    subject: cleanSubject,
+    body: cleanBody,
     unresolvedVariables: Array.from(missingSet),
   };
 };

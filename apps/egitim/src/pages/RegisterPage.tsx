@@ -355,7 +355,7 @@ export const RegisterPage: React.FC = () => {
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="font-bold text-slate-900">Demo Aday ile Hemen Başla</div>
+                  <div className="font-bold text-slate-900">Hızlı Aday Profiliyle Başla</div>
                   <div className="text-[11px] text-slate-500">Fatma Şahin profiliyle formu doldurmadan doğrudan aday alanını aç</div>
                 </div>
               </div>

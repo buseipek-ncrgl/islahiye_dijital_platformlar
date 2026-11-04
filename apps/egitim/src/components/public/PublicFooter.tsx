@@ -8,7 +8,7 @@ export const PublicFooter: React.FC = () => {
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const location = useLocation();
 
-  const isAuthPage = location.pathname === '/giris' || location.pathname === '/hesap-olustur';
+  const isAuthPage = location.pathname === '/giris' || location.pathname === '/hesap-olustur' || location.pathname === '/';
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -138,7 +138,7 @@ export const PublicFooter: React.FC = () => {
               </p>
               <div className="pt-1">
                 <span className="inline-block px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300 text-[11px] font-medium">
-                  Ön tanıtım demosu • Resmî işlem değildir
+                  İslahiye Ticaret Odası Kurumsal Hizmeti
                 </span>
               </div>
             </div>

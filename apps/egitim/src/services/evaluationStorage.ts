@@ -6,12 +6,60 @@ import {
 } from '../types';
 import { INITIAL_DEMO_CRITERIA_SETS } from './criteriaRepository';
 import { evaluateApplication, validateCriteriaWeights } from './criteriaEngine';
+import { educationApi } from './apiClient';
 
 const CRITERIA_STORAGE_KEY = 'islahiye_education_criteria_v1';
 const EVALUATION_STORAGE_KEY = 'islahiye_education_evaluations_v1';
 
 const CRITERIA_UPDATE_EVENT = 'islahiye_criteria_updated';
 const EVALUATION_UPDATE_EVENT = 'islahiye_evaluations_updated';
+
+export const syncCriteriaWithApi = async (): Promise<CriteriaSet[]> => {
+  try {
+    const list = await educationApi.criteria();
+    if (list && list.length > 0) {
+      const mapped: CriteriaSet[] = list.map((item) => ({
+        id: item.id,
+        programId: item.programId,
+        programTitle: item.programName || 'Genel Program',
+        title: `${item.programName || 'Program'} — Kriter Seti v${item.version}.0`,
+        description: 'Sistem tarafından yönetilen resmî kriter ve puanlama seti.',
+        version: `v${item.version}.0`,
+        status: item.isActive ? 'active' : 'archived',
+        createdAt: item.createdAt || new Date().toISOString(),
+        publishedAt: item.createdAt,
+        thresholds: {
+          strong: 80,
+          suitable: 65,
+          reviewNeeded: 50,
+        },
+        allowCandidateScoreView: false,
+        criteria: (item.criteria || []).map((c: any) => ({
+          id: c.id,
+          code: c.code,
+          title: c.title,
+          description: c.description || '',
+          programId: item.programId,
+          type: 'scale_100',
+          weight: c.weight,
+          maxScore: c.maxScore || 100,
+          isMandatory: !!c.isPrerequisite,
+          requiresVerification: false,
+          isPrerequisite: !!c.isPrerequisite,
+        })),
+      }));
+      saveCriteriaSetsToStorage(mapped);
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Criteria API sync notice:', err);
+  }
+  return getStoredCriteriaSets();
+};
+
+if (typeof window !== 'undefined') {
+  syncCriteriaWithApi().catch(() => {});
+}
 
 // -----------------------------------------------------------------------------
 // KRİTER SETİ DEPOLAMA VE SÜRÜM YÖNETİMİ
@@ -162,6 +210,20 @@ export const publishNewCriteriaVersion = (
 
   all.unshift(newSet);
   saveCriteriaSetsToStorage(all);
+
+  educationApi.createCriteriaVersion({
+    programId,
+    isActive: true,
+    criteria: updatedCriteria.map((c) => ({
+      code: c.code,
+      title: c.title,
+      description: c.description || '',
+      category: (c as any).category || 'Genel',
+      weight: c.weight,
+      maxScore: c.maxScore || 100,
+      isPrerequisite: !!c.isPrerequisite,
+    })),
+  }).catch((err) => console.warn('Criteria API publish notice:', err));
 
   return { success: true, newSet };
 };

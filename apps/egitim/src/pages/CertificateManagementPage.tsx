@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Award,
   CheckCircle2,
@@ -10,7 +11,10 @@ import {
   Plus,
   RefreshCw,
   X,
-  FileCheck,
+  LayoutGrid,
+  List,
+  QrCode,
+  ExternalLink,
 } from 'lucide-react';
 import {
   CertificateRecord,
@@ -19,10 +23,11 @@ import {
   Program,
 } from '../types';
 import { Card, CardContent } from '../components/ui/Card';
+import { KpiStrip } from '../components/ui/KpiStrip';
 import { Button } from '../components/ui/Button';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
 import { getStoredGroups } from '../services/enrollmentStorage';
-import { DEMO_PROGRAMS } from '../data/educationData';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
 import { calculateBatchEligibility } from '../services/successEngine';
 import {
   getStoredCertificates,
@@ -41,7 +46,7 @@ export const CertificateManagementPage: React.FC = () => {
   const { currentUser } = useDemoRole();
 
   // Filters & Search
-  const [programs, setPrograms] = useState<Program[]>([]);
+  const [programs, setPrograms] = useState<Program[]>(() => getInitialPrograms());
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('all');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -71,12 +76,20 @@ export const CertificateManagementPage: React.FC = () => {
   // Audit History Modal
   const [historyModalCert, setHistoryModalCert] = useState<CertificateRecord | null>(null);
 
+  // View Mode & Bulk Selection
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
+  const [bulkIssueModalOpen, setBulkIssueModalOpen] = useState(false);
+  const [bulkIssueNotes, setBulkIssueNotes] = useState('');
+
   // Feedback Notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Load Data
   const loadData = () => {
-    setPrograms(DEMO_PROGRAMS);
+    fetchLivePrograms().then((progs) => {
+      if (progs && progs.length > 0) setPrograms(progs);
+    });
     setGroups(getStoredGroups());
     setCertificates(getStoredCertificates());
 
@@ -244,36 +257,76 @@ export const CertificateManagementPage: React.FC = () => {
     }
   };
 
+  // Bulk Actions
+  const toggleSelectAll = () => {
+    if (selectedEnrollmentIds.length === combinedRows.length) {
+      setSelectedEnrollmentIds([]);
+    } else {
+      setSelectedEnrollmentIds(combinedRows.map((r) => r.eligibility.enrollmentId));
+    }
+  };
+
+  const toggleSelectOne = (enrollmentId: string) => {
+    setSelectedEnrollmentIds((prev) =>
+      prev.includes(enrollmentId) ? prev.filter((id) => id !== enrollmentId) : [...prev, enrollmentId]
+    );
+  };
+
+  const handleExecuteBulkIssue = () => {
+    let successCount = 0;
+    let failCount = 0;
+
+    selectedEnrollmentIds.forEach((enrId) => {
+      const res = issueCertificate({
+        enrollmentId: enrId,
+        issuedBy: `${currentUser.fullName} (Yetkili Yönetici)`,
+        certificateType: 'achievement',
+        notes: bulkIssueNotes.trim() || 'Toplu işlemle başarı belgesi üretildi.',
+      });
+      if (res.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    });
+
+    setFeedback({
+      type: 'success',
+      message: `${successCount} kursiyer için başarı belgeleri ve QR kodları başarıyla üretildi.${
+        failCount > 0 ? ` (${failCount} kayıtta zaten belge bulunduğu veya onay eksik olduğu için atlandı)` : ''
+      }`,
+    });
+    setBulkIssueModalOpen(false);
+    setSelectedEnrollmentIds([]);
+    setBulkIssueNotes('');
+    loadData();
+  };
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Sayfa Başlığı ve Durum */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <span className="text-xs text-slate-500 font-medium">Yönetim Masası (/yonetim/belgeler):</span>
-          <h2 className="text-xl font-bold text-brand-navy flex items-center gap-2">
-            <Award className="w-5 h-5 text-blue-600" />
-            Başarı Belgesi PDF Üretimi, QR Doğrulama ve Belge Kütüğü
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Başarı Belgesi Üretimi, QR Doğrulama & Belge Kütüğü
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Yetkili oda yönetimi onayı almış kursiyerlerin belge kayıtları, PDF üretimi ve iptal/yeniden düzenleme yönetimi.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
             onClick={() => {
               resetCertificateDemoData();
               loadData();
-              setFeedback({ type: 'success', message: 'Demo belge verileri başlangıç durumuna sıfırlandı.' });
+              setFeedback({ type: 'success', message: 'Belge kütük verileri başlangıç durumuna yenilendi.' });
             }}
-            className="text-xs text-slate-600"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
           >
-            Demo Verilerini Sıfırla
-          </Button>
+            <RefreshCw className="w-4 h-4 shrink-0" />
+            <span>Belge Kütüğünü Yenile</span>
+          </button>
         </div>
       </div>
 
@@ -300,141 +353,162 @@ export const CertificateManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* 4 TOP KPI CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-slate-500">Belgeye Hak Kazanan</span>
-            <div className="text-2xl font-bold text-slate-900 tabular-nums">{totalApprovedCandidates}</div>
-            <div className="text-[11px] text-slate-400">Yönetimce Onaylı Kursiyer</div>
-          </CardContent>
-        </Card>
+      {/* 4 TOP KPI STRIP (Stripe / Canvas LMS Metrik Bandı) */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Belgeye Hak Kazanan',
+            value: totalApprovedCandidates,
+            icon: <Award className="w-4 h-4" />,
+            subtext: 'Yönetimce onaylı kursiyer',
+          },
+          {
+            label: 'Düzenlenmiş Belgeler',
+            value: totalIssuedCerts,
+            icon: <CheckCircle2 className="w-4 h-4" />,
+            subtext: 'Aktif & doğrulanabilir PDF',
+          },
+          {
+            label: 'Belge Bekleyenler',
+            value: pendingIssuanceCount,
+            icon: <Award className="w-4 h-4" />,
+            subtext: 'Onaylı, düzenleme bekliyor',
+            badge: pendingIssuanceCount > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                Sırada
+              </span>
+            ) : undefined,
+          },
+          {
+            label: 'İptal / İnceleme',
+            value: underReviewOrCancelledCount,
+            icon: <AlertTriangle className="w-4 h-4" />,
+            subtext: 'Geçersiz / veri uyumsuzluğu',
+            badge: underReviewOrCancelledCount > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200">
+                Kritik
+              </span>
+            ) : undefined,
+          },
+        ]}
+      />
 
-        <Card className="border-emerald-200 bg-emerald-50/20">
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-emerald-900">Düzenlenmiş Belgeler</span>
-            <div className="text-2xl font-bold text-emerald-700 tabular-nums">{totalIssuedCerts}</div>
-            <div className="text-[11px] text-emerald-800">Aktif & Doğrulanabilir PDF</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200 bg-blue-50/20">
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-blue-900">Belge Bekleyenler</span>
-            <div className="text-2xl font-bold text-blue-700 tabular-nums">{pendingIssuanceCount}</div>
-            <div className="text-[11px] text-blue-800">Onaylı, Düzenleme Bekliyor</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-200 bg-amber-50/20">
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-amber-900">İptal / İnceleme</span>
-            <div className="text-2xl font-bold text-amber-700 tabular-nums">{underReviewOrCancelledCount}</div>
-            <div className="text-[11px] text-amber-800">Geçersiz / Veri Uyumsuzluğu</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* FILTER & SEARCH TOOLBAR */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">Program:</span>
-            <select
-              value={selectedProgramId}
-              onChange={(e) => setSelectedProgramId(e.target.value)}
-              className="border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs font-medium text-slate-800"
-            >
-              <option value="all">Tüm Programlar</option>
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">Grup:</span>
-            <select
-              value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
-              className="border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs font-medium text-slate-800"
-            >
-              <option value="all">Tüm Gruplar</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="relative flex items-center">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+      {/* FILTER & SEARCH TOOLBAR (Standart Tek Satır Hizalama) */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+          {/* 1. Arama */}
+          <div className="relative flex items-center min-w-[220px] max-w-xs w-full sm:w-auto">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
             <input
               type="text"
               placeholder="Kursiyer veya belge no ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white w-48 text-slate-800"
+              className="h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white w-full text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
+
+          {/* 2. Program Seçimi */}
+          <select
+            value={selectedProgramId}
+            onChange={(e) => setSelectedProgramId(e.target.value)}
+            className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Tüm Programlar</option>
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+
+          {/* 3. Grup Seçimi */}
+          <select
+            value={selectedGroupId}
+            onChange={(e) => setSelectedGroupId(e.target.value)}
+            className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Tüm Gruplar</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+
+          {/* 4. Durum Filtresi */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Tüm Durumlar</option>
+            <option value="issued">Düzenlenenler ({totalIssuedCerts})</option>
+            <option value="pending">Belge Bekleyen ({pendingIssuanceCount})</option>
+            <option value="under_review">İnceleme Gerekli ({underReviewOrCancelledCount})</option>
+            <option value="cancelled">İptal Edilenler</option>
+          </select>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-slate-600 mr-1">Filtre:</span>
-          {[
-            { key: 'all', label: 'Tümü' },
-            { key: 'issued', label: 'Düzenlenenler' },
-            { key: 'pending', label: 'Belge Bekleyen' },
-            { key: 'under_review', label: 'İnceleme Gerekli' },
-            { key: 'cancelled', label: 'İptal Edilenler' },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                statusFilter === f.key
-                  ? 'bg-brand-navy text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        {/* Sağ: Görünüm Modu Switcher */}
+        <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-slate-100 shrink-0 h-9">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+              viewMode === 'list'
+                ? 'bg-white shadow-2xs text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Liste Görünümü"
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Liste</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+              viewMode === 'grid'
+                ? 'bg-white shadow-2xs text-blue-600'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Kart Görünümü"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Kartlar</span>
+          </button>
         </div>
       </div>
 
-      {/* TABLE: CERTIFICATE & CANDIDATE RECORDS */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-              <FileCheck className="w-4 h-4 text-blue-600" />
-              Kursiyer Belge Kayıtları ve Hak Ediş Kütüğü ({combinedRows.length} Kayıt)
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Yalnızca 4 başarı şartı sağlanmış ve yetkili oda yönetimince onaylanmış kayıtlara belge üretilebilir.
-            </p>
-          </div>
+      {/* CERTIFICATE & CANDIDATE RECORDS VIEW */}
+      {combinedRows.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
+          Seçili filtrelere uygun kursiyer veya belge kaydı bulunamadı.
         </div>
-
-        {combinedRows.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            Seçili filtrelere uygun kursiyer veya belge kaydı bulunamadı.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+      ) : viewMode === 'list' ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto max-h-[580px] overflow-y-auto relative">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
                 <tr>
-                  <th className="py-3 px-3">Kursiyer</th>
-                  <th className="py-3 px-3">Program & Grup</th>
-                  <th className="py-3 px-3 text-center">Nihai Karar Durumu</th>
-                  <th className="py-3 px-3 text-center">Belge No & Kod</th>
-                  <th className="py-3 px-3 text-center">Belge Durumu</th>
-                  <th className="py-3 px-3 text-right">İşlemler</th>
+                  <th className="py-3 px-3 w-10 text-center bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={
+                        combinedRows.length > 0 &&
+                        selectedEnrollmentIds.length === combinedRows.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="py-3 px-3 bg-slate-50">Kursiyer</th>
+                  <th className="py-3 px-3 bg-slate-50">Program & Grup</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Nihai Karar Durumu</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Belge No & Kod</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Belge Durumu</th>
+                  <th className="py-3 px-3 text-right bg-slate-50">İşlemler</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -444,9 +518,25 @@ export const CertificateManagementPage: React.FC = () => {
                   const isCancelled = certificate?.status === 'cancelled';
                   const isUnderReview = certificate?.status === 'under_review' || hasDiscrepancy;
                   const isPending = eligibility.finalStatus === 'admin_approved' && (!certificate || isCancelled);
+                  const isSelected = selectedEnrollmentIds.includes(eligibility.enrollmentId);
 
                   return (
-                    <tr key={eligibility.enrollmentId} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={eligibility.enrollmentId}
+                      className={`transition-colors ${
+                        isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/70'
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <td className="py-3.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectOne(eligibility.enrollmentId)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+
                       {/* Kursiyer */}
                       <td className="py-3.5 px-3">
                         <div className="font-bold text-slate-900">{eligibility.traineeName}</div>
@@ -490,8 +580,15 @@ export const CertificateManagementPage: React.FC = () => {
                             <div className="font-mono font-bold text-slate-900 text-[11px]">
                               {certificate.certificateNumber}
                             </div>
-                            <div className="text-[10px] text-blue-700 font-mono mt-0.5">
-                              {certificate.verificationCode}
+                            <div className="flex items-center justify-center gap-1 mt-0.5">
+                              <Link
+                                to={`/yonetim/belge-dogrulama/${certificate.verificationCode}`}
+                                className="text-[10px] text-blue-700 hover:text-blue-900 font-mono underline inline-flex items-center gap-0.5"
+                                title="Belge Doğrulama Sayfasını Aç"
+                              >
+                                <span>{certificate.verificationCode}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </Link>
                             </div>
                           </div>
                         ) : (
@@ -529,7 +626,6 @@ export const CertificateManagementPage: React.FC = () => {
                       {/* İşlemler */}
                       <td className="py-3.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* 1. Belge Düzenle Butonu (Yalnızca hak kazanmış ve aktif belgesi olmayanlar için) */}
                           {isPending && (
                             <Button
                               size="sm"
@@ -542,7 +638,6 @@ export const CertificateManagementPage: React.FC = () => {
                             </Button>
                           )}
 
-                          {/* 2. Önizle / PDF İndir (Belgesi olanlar için) */}
                           {certificate && (
                             <>
                               <Button
@@ -566,7 +661,6 @@ export const CertificateManagementPage: React.FC = () => {
                             </>
                           )}
 
-                          {/* 3. İptal Et Butonu (Aktif belgesi olanlar için) */}
                           {isIssued && (
                             <Button
                               size="sm"
@@ -581,7 +675,6 @@ export const CertificateManagementPage: React.FC = () => {
                             </Button>
                           )}
 
-                          {/* 4. Yeniden Düzenle Butonu (İptal veya inceleme gerektirenler için) */}
                           {(isCancelled || isUnderReview) && certificate && (
                             <Button
                               size="sm"
@@ -597,16 +690,16 @@ export const CertificateManagementPage: React.FC = () => {
                             </Button>
                           )}
 
-                          {/* 5. Denetim Geçmişi */}
-                          {certificate && certificate.auditHistory && certificate.auditHistory.length > 0 && (
+                          {certificate && (
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
+                              leftIcon={<History className="w-3 h-3" />}
                               onClick={() => setHistoryModalCert(certificate)}
-                              className="text-[11px] py-1 px-1.5 text-slate-500"
-                              title="Belge Denetim Geçmişi"
+                              className="text-[11px] py-1 px-2 text-slate-600 hover:bg-slate-100"
+                              title="Tarihçe ve Denetim İzi"
                             >
-                              <History className="w-3.5 h-3.5" />
+                              Kütük
                             </Button>
                           )}
                         </div>
@@ -617,8 +710,230 @@ export const CertificateManagementPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* GRID VIEW */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {combinedRows.map((row) => {
+            const { eligibility, certificate, hasDiscrepancy } = row;
+            const isIssued = certificate?.status === 'issued';
+            const isCancelled = certificate?.status === 'cancelled';
+            const isUnderReview = certificate?.status === 'under_review' || hasDiscrepancy;
+            const isPending = eligibility.finalStatus === 'admin_approved' && (!certificate || isCancelled);
+            const isSelected = selectedEnrollmentIds.includes(eligibility.enrollmentId);
+
+            return (
+              <Card
+                key={eligibility.enrollmentId}
+                className={`transition-all border ${
+                  isSelected
+                    ? 'border-blue-500 ring-2 ring-blue-100 shadow-md bg-blue-50/20'
+                    : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                }`}
+              >
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectOne(eligibility.enrollmentId)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5"
+                      />
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">{eligibility.traineeName}</h4>
+                        <p className="text-[11px] text-slate-500">{eligibility.groupName}</p>
+                      </div>
+                    </div>
+
+                    {isIssued && !hasDiscrepancy ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Düzenlendi
+                      </span>
+                    ) : isUnderReview ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        İnceleme Gerekli
+                      </span>
+                    ) : isPending ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-300">
+                        Bekliyor
+                      </span>
+                    ) : isCancelled ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">
+                        İptal
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                        Onaysız
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 font-medium">Program:</span>
+                      <span className="font-semibold text-slate-800 truncate max-w-[180px]">
+                        {eligibility.programTitle}
+                      </span>
+                    </div>
+
+                    {certificate ? (
+                      <>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Belge No:</span>
+                          <span className="font-mono font-bold text-slate-900">
+                            {certificate.certificateNumber}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Karekod / Doğrulama:</span>
+                          <Link
+                            to={`/yonetim/belge-dogrulama/${certificate.verificationCode}`}
+                            className="text-blue-700 font-mono font-bold text-[10px] underline flex items-center gap-1"
+                          >
+                            <QrCode className="w-3 h-3" />
+                            <span>{certificate.verificationCode}</span>
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 italic">
+                        Henüz resmi belge numarası atanmadı
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100 text-xs">
+                    {isPending && (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="w-full justify-center text-xs"
+                        leftIcon={<Plus className="w-3 h-3" />}
+                        onClick={() => handleOpenIssueModal(eligibility.enrollmentId)}
+                      >
+                        Belge Düzenle
+                      </Button>
+                    )}
+
+                    {certificate && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 justify-center text-xs"
+                          leftIcon={<Eye className="w-3 h-3" />}
+                          onClick={() => setPreviewCert(certificate)}
+                        >
+                          Önizle
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="flex-1 justify-center text-xs"
+                          leftIcon={<Download className="w-3 h-3" />}
+                          onClick={() => downloadCertificatePDF(certificate)}
+                        >
+                          PDF
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Floating Bulk Action Ribbon */}
+      {selectedEnrollmentIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-xs animate-slideUp">
+          <div className="flex items-center gap-2 font-semibold">
+            <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[11px] font-bold">
+              {selectedEnrollmentIds.length}
+            </span>
+            <span>kayıt seçildi</span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700" />
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBulkIssueModalOpen(true)}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition"
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>Toplu Belge Üret</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedEnrollmentIds([])}
+              className="px-2.5 py-1.5 text-slate-400 hover:text-white transition"
+            >
+              Seçimi Kaldır
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BULK ISSUE MODAL */}
+      {bulkIssueModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Toplu Belge Üretimi</h3>
+                <p className="text-xs text-slate-500">
+                  {selectedEnrollmentIds.length} kursiyer için karekodlu resmi sertifika üretilecek.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600">
+              Yalnızca nihai oda onayı verilmiş kursiyerler için benzersiz belge numarası (İE-2026-BB-xxx) ve doğrulama kodu üretilecek, kütüğe kaydedilecektir.
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Kütük Tescil Açıklaması (Opsiyonel):
+              </label>
+              <textarea
+                rows={2}
+                value={bulkIssueNotes}
+                onChange={(e) => setBulkIssueNotes(e.target.value)}
+                placeholder="Örn: 2026 Güz dönemi mezuniyet komisyonu onayıyla toplu düzenlendi..."
+                className="w-full text-xs border border-slate-300 rounded-lg p-2.5"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkIssueModalOpen(false)}
+              >
+                Vazgeç
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-brand-navy hover:bg-slate-800 text-white"
+                onClick={handleExecuteBulkIssue}
+              >
+                Belgeleri Üret ve Kütüğe İşle
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===================================================================== */}
       {/* MODAL 1: BELGE DÜZENLEME ONAY MODALI (8 ŞART KONTROLÜ) */}

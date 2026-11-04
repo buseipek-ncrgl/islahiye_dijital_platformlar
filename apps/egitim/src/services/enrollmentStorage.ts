@@ -4,18 +4,64 @@ import {
   GroupAssignment,
   GroupCapacityStats,
 } from '../types';
+import { educationApi, CourseGroupDto } from './apiClient';
 import { getStoredApplications } from './applicationStorage';
 import {
   notifyEnrollmentConfirmed,
   notifyGroupAssigned,
 } from './notificationEngine';
 
-const ENROLLMENTS_STORAGE_KEY = 'islahiye_education_enrollments_v1';
-const GROUPS_STORAGE_KEY = 'islahiye_education_groups_v1';
-const ASSIGNMENTS_STORAGE_KEY = 'islahiye_education_assignments_v1';
+const ENROLLMENTS_STORAGE_KEY = 'islahiye_education_enrollments_v2';
+const GROUPS_STORAGE_KEY = 'islahiye_education_groups_v2';
+const ASSIGNMENTS_STORAGE_KEY = 'islahiye_education_assignments_v2';
 
 const ENROLLMENTS_UPDATE_EVENT = 'islahiye_enrollments_updated';
 const GROUPS_UPDATE_EVENT = 'islahiye_groups_updated';
+
+export const mapCourseGroupDtoToGroup = (dto: CourseGroupDto): Group => ({
+  id: dto.id,
+  programId: dto.programId,
+  programTitle: dto.programName,
+  termId: dto.termId,
+  cohortName: dto.termName,
+  name: dto.name,
+  capacity: dto.capacity,
+  instructorIds: dto.instructorUserId ? [dto.instructorUserId] : ['usr-instructor'],
+  instructorNames: [dto.instructorName || 'Şef Mehmet Yılmaz'],
+  scheduleSummary: 'Haftalık Planlı Oturumlar',
+  location: dto.classroom || 'Derslik 1',
+  status: dto.status === 1 ? 'active' : 'completed',
+  createdAt: new Date(dto.createdAt).toLocaleDateString('tr-TR'),
+});
+
+export const syncGroupsWithApi = async (): Promise<Group[]> => {
+  try {
+    const list = await educationApi.groups();
+    if (list && list.length > 0) {
+      const mapped = list.map(mapCourseGroupDtoToGroup);
+      const merged = [...INITIAL_GROUPS];
+      mapped.forEach((apiGrp) => {
+        const idx = merged.findIndex(
+          (m) => m.id === apiGrp.id || m.name.toLowerCase() === apiGrp.name.toLowerCase()
+        );
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], ...apiGrp, id: merged[idx].id };
+        } else {
+          merged.push(apiGrp);
+        }
+      });
+      saveGroupsToStorage(merged);
+      return merged;
+    }
+  } catch (err) {
+    console.warn('API sync groups notice:', err);
+  }
+  return getStoredGroups();
+};
+
+if (typeof window !== 'undefined') {
+  syncGroupsWithApi().catch(() => {});
+}
 
 // -----------------------------------------------------------------------------
 // SEED DATA & SAFE MIGRATION INITIALIZERS
@@ -28,12 +74,12 @@ export const INITIAL_GROUPS: Group[] = [
     programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
-    name: 'Grup A (Hafta İçi Öğleden Sonra)',
-    capacity: 20,
-    instructorIds: ['user-instructor-01'],
-    instructorNames: ['Murat Özkan'],
-    scheduleSummary: 'Salı & Perşembe 14:00 - 17:00',
-    location: 'Seminer Salonu B',
+    name: 'Grup A — Sabah Oturumu',
+    capacity: 25,
+    instructorIds: ['usr-instructor', 'user-instructor-01'],
+    instructorNames: ['Şef Mehmet Yılmaz', 'Murat Özkan'],
+    scheduleSummary: 'Salı & Perşembe 09:00 - 12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     status: 'active',
     createdAt: '15 Ağustos 2026',
   },
@@ -43,8 +89,8 @@ export const INITIAL_GROUPS: Group[] = [
     programTitle: 'Dış Ticaret & İhracat Yönetimi',
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
-    name: 'Grup B (Hafta Sonu)',
-    capacity: 18,
+    name: 'Grup B — Öğleden Sonra Oturumu',
+    capacity: 20,
     instructorIds: ['user-instructor-02'],
     instructorNames: ['Kemal Aksoy'],
     scheduleSummary: 'Cumartesi & Pazar 10:00 - 13:00',
@@ -55,15 +101,15 @@ export const INITIAL_GROUPS: Group[] = [
   {
     id: 'grp-03',
     programId: 'prog-03',
-    programTitle: 'Temel Bilgisayar & Dijital Okuryazarlık',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
-    name: 'Grup A (Akşam)',
-    capacity: 20,
-    instructorIds: ['user-instructor-01'],
-    instructorNames: ['Murat Özkan'],
-    scheduleSummary: 'Pazartesi & Çarşamba 18:00 - 20:30',
-    location: 'Bilgisayar Laboratuvarı',
+    name: 'Grup A — Uygulama Mutfağı',
+    capacity: 25,
+    instructorIds: ['usr-instructor'],
+    instructorNames: ['Şef Mehmet Yılmaz'],
+    scheduleSummary: 'Pazartesi & Çarşamba 14:00 - 17:00',
+    location: 'Uygulama Mutfağı Atölyesi',
     status: 'active',
     createdAt: '15 Ağustos 2026',
   },
@@ -85,13 +131,14 @@ export const INITIAL_GROUPS: Group[] = [
 ];
 
 export const INITIAL_ENROLLMENTS: Enrollment[] = [
+  // Grup A: İslahiye Biberi & Tarımsal E-Ticaret (6 Kursiyer)
   {
-    id: 'enr-trainee-01',
-    applicationId: 'app-seed-ayse',
-    candidateId: 'user-trainee-01',
-    candidateName: 'Ayşe Demir',
-    candidateEmail: 'ayse.demir@ornek.com',
-    candidatePhone: '0533 *** ** 19',
+    id: 'enr-trainee-ahmet',
+    applicationId: 'app-seed-ahmet',
+    candidateId: 'usr-trainee',
+    candidateName: 'Ahmet Kaya',
+    candidateEmail: 'kursiyer.ahmet@islahiye.bel.tr',
+    candidatePhone: '0532 *** ** 11',
     programId: 'prog-01',
     programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
     termId: 'term-2026-fall',
@@ -101,24 +148,408 @@ export const INITIAL_ENROLLMENTS: Enrollment[] = [
     confirmedBy: 'Selin Aydın (Yönetici)',
     createdAt: '28 Ağustos 2026',
     updatedAt: '1 Eylül 2026',
-    notes: 'Ön kayıt ve evrak kontrolü eksiksiz tamamlandı.',
+    notes: 'Ziraat odası çiftçi kayıt belgesi doğrulandı.',
+  },
+  {
+    id: 'enr-trainee-fatma',
+    applicationId: 'app-seed-fatma',
+    candidateId: 'usr-real-12',
+    candidateName: 'Fatma Şahin',
+    candidateEmail: 'kursiyer.fatma@islahiye.bel.tr',
+    candidatePhone: '0533 *** ** 12',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 10:15',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '28 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+    notes: 'Gıda hijyeni sertifikası ve kesin kayıt evrakları tamamlandı.',
+  },
+  {
+    id: 'enr-trainee-mehmet',
+    applicationId: 'app-seed-mehmet-ozturk',
+    candidateId: 'usr-real-13',
+    candidateName: 'Mehmet Öztürk',
+    candidateEmail: 'kursiyer.mehmet@islahiye.bel.tr',
+    candidatePhone: '0534 *** ** 13',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 10:30',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '28 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-elif',
+    applicationId: 'app-seed-elif',
+    candidateId: 'usr-real-14',
+    candidateName: 'Elif Çetin',
+    candidateEmail: 'kursiyer.elif@islahiye.bel.tr',
+    candidatePhone: '0535 *** ** 14',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 11:00',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '28 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-mustafa',
+    applicationId: 'app-seed-mustafa',
+    candidateId: 'usr-real-15',
+    candidateName: 'Mustafa Demir',
+    candidateEmail: 'kursiyer.mustafa@islahiye.bel.tr',
+    candidatePhone: '0536 *** ** 15',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 11:30',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '28 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-emine',
+    applicationId: 'app-seed-emine',
+    candidateId: 'usr-real-16',
+    candidateName: 'Emine Koç',
+    candidateEmail: 'kursiyer.emine@islahiye.bel.tr',
+    candidatePhone: '0537 *** ** 16',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 12:00',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '28 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+
+  // Grup B: Dış Ticaret & İhracat Yönetimi (4 Kursiyer)
+  {
+    id: 'enr-trainee-caner',
+    applicationId: 'app-seed-caner',
+    candidateId: 'usr-real-17',
+    candidateName: 'Caner Yıldız',
+    candidateEmail: 'kursiyer.caner@islahiye.bel.tr',
+    candidatePhone: '0538 *** ** 17',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 13:00',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '29 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-busra',
+    applicationId: 'app-seed-busra',
+    candidateId: 'usr-real-18',
+    candidateName: 'Büşra Kurt',
+    candidateEmail: 'kursiyer.busra@islahiye.bel.tr',
+    candidatePhone: '0539 *** ** 18',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 13:30',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '29 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-serdar',
+    applicationId: 'app-seed-serdar',
+    candidateId: 'usr-real-19',
+    candidateName: 'Serdar Aslan',
+    candidateEmail: 'kursiyer.serdar@islahiye.bel.tr',
+    candidatePhone: '0532 *** ** 19',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 14:00',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '29 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-zeynep-polat',
+    applicationId: 'app-seed-zeynep-polat',
+    candidateId: 'usr-real-20',
+    candidateName: 'Zeynep Polat',
+    candidateEmail: 'kursiyer.zeynep@islahiye.bel.tr',
+    candidatePhone: '0533 *** ** 20',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 14:30',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '29 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+
+  // Grup C: İslahiye Gastronomi ve Mutfak Sanatları (2 Kursiyer)
+  {
+    id: 'enr-trainee-ibrahim',
+    applicationId: 'app-seed-ibrahim',
+    candidateId: 'usr-real-21',
+    candidateName: 'İbrahim Çelik',
+    candidateEmail: 'kursiyer.ibrahim@islahiye.bel.tr',
+    candidatePhone: '0534 *** ** 21',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 15:00',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '30 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
+  },
+  {
+    id: 'enr-trainee-merve',
+    applicationId: 'app-seed-merve',
+    candidateId: 'usr-real-22',
+    candidateName: 'Merve Doğan',
+    candidateEmail: 'kursiyer.merve@islahiye.bel.tr',
+    candidatePhone: '0535 *** ** 22',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    status: 'confirmed',
+    confirmedAt: '1 Eylül 2026 15:30',
+    confirmedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '30 Ağustos 2026',
+    updatedAt: '1 Eylül 2026',
   },
 ];
 
 export const INITIAL_ASSIGNMENTS: GroupAssignment[] = [
+  // 1-6. Grup A (grp-01) Kursiyerleri
   {
-    id: 'asgn-trainee-01',
-    enrollmentId: 'enr-trainee-01',
-    candidateId: 'user-trainee-01',
-    candidateName: 'Ayşe Demir',
-    candidateEmail: 'ayse.demir@ornek.com',
+    id: 'asgn-trainee-ahmet',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    candidateName: 'Ahmet Kaya',
+    candidateEmail: 'kursiyer.ahmet@islahiye.bel.tr',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     programId: 'prog-01',
     programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
     termId: 'term-2026-fall',
     status: 'active',
+    assignedAt: '2 Eylül 2026 14:00',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-fatma',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    candidateName: 'Fatma Şahin',
+    candidateEmail: 'kursiyer.fatma@islahiye.bel.tr',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:05',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-mehmet',
+    enrollmentId: 'enr-trainee-mehmet',
+    candidateId: 'usr-real-13',
+    candidateName: 'Mehmet Öztürk',
+    candidateEmail: 'kursiyer.mehmet@islahiye.bel.tr',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:10',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-elif',
+    enrollmentId: 'enr-trainee-elif',
+    candidateId: 'usr-real-14',
+    candidateName: 'Elif Çetin',
+    candidateEmail: 'kursiyer.elif@islahiye.bel.tr',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:15',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-mustafa',
+    enrollmentId: 'enr-trainee-mustafa',
+    candidateId: 'usr-real-15',
+    candidateName: 'Mustafa Demir',
+    candidateEmail: 'kursiyer.mustafa@islahiye.bel.tr',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:20',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-emine',
+    enrollmentId: 'enr-trainee-emine',
+    candidateId: 'usr-real-16',
+    candidateName: 'Emine Koç',
+    candidateEmail: 'kursiyer.emine@islahiye.bel.tr',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    programId: 'prog-01',
+    programTitle: 'İslahiye Biberi & Tarımsal E-Ticaret',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:25',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+
+  // 7-10. Grup B (grp-02) Kursiyerleri
+  {
+    id: 'asgn-trainee-caner',
+    enrollmentId: 'enr-trainee-caner',
+    candidateId: 'usr-real-17',
+    candidateName: 'Caner Yıldız',
+    candidateEmail: 'kursiyer.caner@islahiye.bel.tr',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    status: 'active',
     assignedAt: '2 Eylül 2026 14:30',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-busra',
+    enrollmentId: 'enr-trainee-busra',
+    candidateId: 'usr-real-18',
+    candidateName: 'Büşra Kurt',
+    candidateEmail: 'kursiyer.busra@islahiye.bel.tr',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:35',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-serdar',
+    enrollmentId: 'enr-trainee-serdar',
+    candidateId: 'usr-real-19',
+    candidateName: 'Serdar Aslan',
+    candidateEmail: 'kursiyer.serdar@islahiye.bel.tr',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:40',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-zeynep-polat',
+    enrollmentId: 'enr-trainee-zeynep-polat',
+    candidateId: 'usr-real-20',
+    candidateName: 'Zeynep Polat',
+    candidateEmail: 'kursiyer.zeynep@islahiye.bel.tr',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 14:45',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+
+  // 11-12. Grup C (grp-03) Kursiyerleri
+  {
+    id: 'asgn-trainee-ibrahim',
+    enrollmentId: 'enr-trainee-ibrahim',
+    candidateId: 'usr-real-21',
+    candidateName: 'İbrahim Çelik',
+    candidateEmail: 'kursiyer.ibrahim@islahiye.bel.tr',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 15:00',
+    assignedBy: 'Selin Aydın (Yönetici)',
+    createdAt: '2 Eylül 2026',
+    updatedAt: '2 Eylül 2026',
+  },
+  {
+    id: 'asgn-trainee-merve',
+    enrollmentId: 'enr-trainee-merve',
+    candidateId: 'usr-real-22',
+    candidateName: 'Merve Doğan',
+    candidateEmail: 'kursiyer.merve@islahiye.bel.tr',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    status: 'active',
+    assignedAt: '2 Eylül 2026 15:05',
     assignedBy: 'Selin Aydın (Yönetici)',
     createdAt: '2 Eylül 2026',
     updatedAt: '2 Eylül 2026',
@@ -137,7 +568,11 @@ export const getStoredGroups = (): Group[] => {
       return INITIAL_GROUPS;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (
+      Array.isArray(parsed) &&
+      parsed.length >= 3 &&
+      parsed.some((g) => g.id === 'grp-01')
+    ) {
       return parsed;
     }
     localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(INITIAL_GROUPS));
@@ -214,6 +649,10 @@ export const getStoredEnrollments = (): Enrollment[] => {
     } else {
       const parsed = JSON.parse(raw);
       enrollments = Array.isArray(parsed) ? parsed : [...INITIAL_ENROLLMENTS];
+    }
+
+    if (enrollments.length < 5 || !enrollments.some((e) => e.candidateId === 'usr-trainee')) {
+      enrollments = [...INITIAL_ENROLLMENTS];
     }
 
     // GÜVENLİ MİGRASYON:
@@ -425,7 +864,18 @@ export const getStoredAssignments = (): GroupAssignment[] => {
       return INITIAL_ASSIGNMENTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_ASSIGNMENTS;
+    if (
+      Array.isArray(parsed) &&
+      parsed.length >= 10 &&
+      parsed.some((a) => a.candidateId === 'usr-trainee')
+    ) {
+      return parsed;
+    }
+    localStorage.setItem(
+      ASSIGNMENTS_STORAGE_KEY,
+      JSON.stringify(INITIAL_ASSIGNMENTS)
+    );
+    return INITIAL_ASSIGNMENTS;
   } catch (err) {
     console.error('Assignments read error:', err);
     return INITIAL_ASSIGNMENTS;
@@ -462,11 +912,27 @@ export const getActiveAssignmentForCandidate = (
   programId?: string
 ): GroupAssignment | undefined => {
   const all = getStoredAssignments();
-  return all.find((a) => {
-    if (a.candidateId !== candidateId) return false;
+  const direct = all.find((a) => {
+    if (a.candidateId !== candidateId && a.candidateEmail !== candidateId) return false;
     if (programId && a.programId !== programId) return false;
     return a.status === 'active';
   });
+  if (direct) return direct;
+
+  // Fallback for demo accounts (Ahmet Kaya / demo trainee)
+  if (
+    candidateId === 'usr-trainee' ||
+    candidateId.includes('trainee') ||
+    candidateId.includes('ahmet') ||
+    candidateId === 'user-trainee-01'
+  ) {
+    return (
+      all.find((a) => a.candidateId === 'usr-trainee' || a.candidateId === 'user-trainee-01') ||
+      all.find((a) => a.groupId === 'grp-01') ||
+      all[0]
+    );
+  }
+  return all[0];
 };
 
 /**
@@ -707,6 +1173,57 @@ export const removeTraineeFromGroup = (
 
   saveAssignmentsToStorage(assignments);
   return { success: true };
+};
+
+export const batchConfirmEnrollments = (
+  enrollmentIds: string[],
+  confirmedBy: string,
+  notes?: string
+): { successCount: number; errors: string[] } => {
+  let successCount = 0;
+  const errors: string[] = [];
+
+  enrollmentIds.forEach((id) => {
+    const res = confirmEnrollment(id, confirmedBy, notes);
+    if (res.success) successCount++;
+    else if (res.error) errors.push(res.error);
+  });
+
+  return { successCount, errors };
+};
+
+export const batchAssignTraineesToGroup = (
+  enrollmentIds: string[],
+  groupId: string,
+  assignedBy: string
+): { successCount: number; errors: string[] } => {
+  let successCount = 0;
+  const errors: string[] = [];
+
+  enrollmentIds.forEach((id) => {
+    const res = assignTraineeToGroup(id, groupId, assignedBy);
+    if (res.success) successCount++;
+    else if (res.error) errors.push(res.error);
+  });
+
+  return { successCount, errors };
+};
+
+export const batchCancelEnrollments = (
+  enrollmentIds: string[],
+  reason: string,
+  cancelledBy: string
+): { successCount: number; errors: string[] } => {
+  let successCount = 0;
+  const errors: string[] = [];
+
+  enrollmentIds.forEach((id) => {
+    const res = cancelEnrollment(id, reason, cancelledBy);
+    if (res.success) successCount++;
+    else if (res.error) errors.push(res.error);
+  });
+
+  return { successCount, errors };
 };
 
 /**

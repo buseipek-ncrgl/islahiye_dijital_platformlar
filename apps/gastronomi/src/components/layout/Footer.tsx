@@ -51,34 +51,43 @@ export const Footer: React.FC = () => {
                   className="hover:text-copper-light transition-colors flex items-center gap-1.5"
                 >
                   <Compass className="w-3.5 h-3.5 text-copper" />
-                  <span>Keşfet & Giriş</span>
+                  <span>01 Karşılama</span>
                 </a>
               </li>
               <li>
                 <a
-                  href="#lezzetler"
+                  href="#lezzet-haritasi"
                   className="hover:text-copper-light transition-colors flex items-center gap-1.5"
                 >
                   <Compass className="w-3.5 h-3.5 text-copper" />
-                  <span>Yöresel Lezzetler</span>
+                  <span>02 Lezzet Haritası</span>
                 </a>
               </li>
               <li>
                 <a
-                  href="#kultur-mirasi"
+                  href="/yemekler"
                   className="hover:text-copper-light transition-colors flex items-center gap-1.5"
                 >
                   <Compass className="w-3.5 h-3.5 text-copper" />
-                  <span>Kültürel Miras</span>
+                  <span>03 Yöresel Tarifler</span>
                 </a>
               </li>
               <li>
                 <a
-                  href="#harita-onizleme"
+                  href="#islahiyeyi-kesfet"
                   className="hover:text-copper-light transition-colors flex items-center gap-1.5"
                 >
                   <Compass className="w-3.5 h-3.5 text-copper" />
-                  <span>Lezzet Haritası & Rotalar</span>
+                  <span>04 İslahiye’yi Keşfet</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#islahiyeden-kareler"
+                  className="hover:text-copper-light transition-colors flex items-center gap-1.5"
+                >
+                  <Compass className="w-3.5 h-3.5 text-copper" />
+                  <span>05 İslahiye’den Kareler</span>
                 </a>
               </li>
             </ul>

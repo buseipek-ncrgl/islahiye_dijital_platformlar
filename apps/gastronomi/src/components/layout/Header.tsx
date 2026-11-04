@@ -42,10 +42,9 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
   }, [mobileMenuOpen]);
 
   const navItems = [
-    { label: 'Keşfet', href: '#kesfet', isRoute: false },
-    { label: 'Yöresel Lezzetler', href: '#lezzetler', isRoute: false },
-    { label: 'Tarif Atölyesi', href: '#tarif-atolyesi', isRoute: false },
-    { label: 'Lezzet Haritası', href: '/lezzet-haritasi', isRoute: true },
+    { label: 'Lezzet Haritası', href: '#lezzet-haritasi', isRoute: false },
+    { label: 'Yöresel Tarifler', href: '/yemekler', isRoute: true },
+    { label: 'İslahiye’yi Keşfet', href: '#islahiyeyi-kesfet', isRoute: false },
     { label: 'Mutfak Mirası', href: '/mutfak-mirasi', isRoute: true },
     { label: 'Haberler & Yazılar', href: '/haberler', isRoute: true },
     { label: 'Etkinlikler', href: '/etkinlikler', isRoute: true },

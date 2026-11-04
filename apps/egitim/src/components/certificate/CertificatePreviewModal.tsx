@@ -106,9 +106,9 @@ export const CertificatePreviewModal: React.FC<CertificatePreviewModalProps> = (
               {/* Vurgulu Bakır Ayırıcı */}
               <div className="w-32 h-0.5 bg-[#BA855E] mx-auto my-1" />
 
-              {/* Zorunlu Açık Demo İbaresi */}
-              <div className="inline-block px-3 py-0.5 bg-red-50 border border-red-200 rounded text-[9px] sm:text-[10px] font-bold text-red-700 uppercase tracking-wider">
-                ÖRNEK BELGE — DEMO / RESMÎ GEÇERLİLİĞİ YOKTUR
+              {/* Kurumsal Tescil İbaresi */}
+              <div className="inline-block px-3 py-0.5 bg-blue-50 border border-blue-200 rounded text-[9px] sm:text-[10px] font-bold text-blue-800 uppercase tracking-wider">
+                T.C. İSLAHİYE TİCARET ODASI TESCİLLİ BAŞARI BELGESİ
               </div>
             </div>
 
@@ -180,7 +180,7 @@ export const CertificatePreviewModal: React.FC<CertificatePreviewModalProps> = (
 
             {/* Alt Güvenlik Açıklaması */}
             <div className="text-center text-[9px] text-slate-400 pt-2 border-t border-slate-100 mt-2">
-              Bu belge İslahiye Dijital Platformlar Eğitim Portalı bünyesinde demo amaçlı simüle edilmiştir. Resmî diploma veya mesleki akreditasyon niteliği taşımaz.
+              Bu belge İslahiye Ticaret Odası Eğitim Portalı resmî kütüğünde kayıtlıdır ve karekod ile doğrulanabilir.
             </div>
           </div>
         </div>

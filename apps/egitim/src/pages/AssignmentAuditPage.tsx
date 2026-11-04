@@ -5,6 +5,13 @@ import {
   X,
   Layers,
   ChevronRight,
+  LayoutGrid,
+  List,
+  Search,
+  Download,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { Group, Assignment, AssignmentSubmission, AssignmentEvaluation } from '../types';
 import { getStoredGroups, getGroupAssignmentsByGroup } from '../services/enrollmentStorage';
@@ -22,6 +29,7 @@ import {
 import { calculateTraineeAttendance } from '../services/attendanceEngine';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { KpiStrip } from '../components/ui/KpiStrip';
 
 export const AssignmentAuditPage: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -32,6 +40,11 @@ export const AssignmentAuditPage: React.FC = () => {
 
   // Kursiyer Detay Modalı
   const [detailTraineeId, setDetailTraineeId] = useState<string | null>(null);
+
+  // View Mode & Filtering
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [riskFilter, setRiskFilter] = useState<'all' | 'risk' | 'normal'>('all');
 
   const loadData = () => {
     const grps = getStoredGroups();
@@ -87,6 +100,41 @@ export const AssignmentAuditPage: React.FC = () => {
       };
     });
   }, [selectedGroup, allAssignments, allSubmissions, allEvaluations]);
+
+  // Filtrelenmiş Kursiyer Listesi
+  const filteredTrainees = useMemo(() => {
+    return traineesAnalysis.filter((t) => {
+      if (searchQuery.trim() && !t.traineeName.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      if (riskFilter === 'risk' && !t.isAtRisk) return false;
+      if (riskFilter === 'normal' && t.isAtRisk) return false;
+      return true;
+    });
+  }, [traineesAnalysis, searchQuery, riskFilter]);
+
+  // CSV Dışa Aktarma
+  const handleExportCSV = () => {
+    if (!selectedGroup) return;
+    const headers = ['Kursiyer Adı', 'Devam Oranı (%)', 'Ödev Ortalaması', 'Zorunlu Ödev Onayı', 'Durum', 'Risk'];
+    const rows = filteredTrainees.map((t) => [
+      `"${t.traineeName}"`,
+      t.attendanceRate ?? 'N/A',
+      t.perf.averageScore ?? 'N/A',
+      `"${t.perf.mandatoryAssignmentsApproved}/${t.perf.mandatoryAssignmentsTotal}"`,
+      `"${t.preCheck.statusLabel}"`,
+      t.isAtRisk ? 'Risk Altında' : 'Normal',
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Odev_Denetim_${selectedGroup.name.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Tüm değerlendirme ve revizyon geçmişi (Audit Log)
   const auditLogs = useMemo(() => {
@@ -170,16 +218,15 @@ export const AssignmentAuditPage: React.FC = () => {
   }, [detailTraineeId, traineesAnalysis]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <span className="text-xs text-slate-500 font-medium">Yönetici Denetim Masası:</span>
-          <h2 className="text-xl font-bold text-brand-navy">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Ödev Yönetimi, Değerlendirme & Başarı Ön Denetimi
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Grup bazlı ödev teslimleri, 70/100 başarı barajı, zorunlu ödev onayları ve gerekçeli revizyon geçmişi
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Grup bazlı ödev teslimleri, 70/100 başarı barajı, zorunlu ödev onayları ve gerekçeli revizyon geçmişi.
           </p>
         </div>
       </div>
@@ -208,61 +255,53 @@ export const AssignmentAuditPage: React.FC = () => {
         })}
       </div>
 
-      {/* Üst Metrik Kartları */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-slate-500">Yayınlanan Ödev</span>
-            <div className="text-2xl font-bold text-slate-900">
-              {selectedGroupSummary?.publishedAssignments || 0}
-            </div>
-            <div className="text-[11px] text-slate-400">
-              {selectedGroupSummary?.draftAssignments || 0} Taslak Ödev
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-slate-500">Değerlendirme Bekleyen</span>
-            <div className="text-2xl font-bold text-amber-700">
-              {selectedGroupSummary?.pendingEvaluations || 0}
-            </div>
-            <div className="text-[11px] text-amber-800">
-              {selectedGroupSummary?.revisionRequests || 0} Revizyon Sürecinde
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-slate-500">Grup Not Ortalaması</span>
-            <div className="text-2xl font-bold text-blue-700">
-              {selectedGroupSummary?.groupAverageScore !== null
-                ? `${selectedGroupSummary?.groupAverageScore} / 100`
-                : 'Hesaplanamıyor'}
-            </div>
-            <div className="text-[11px] text-slate-400">Başarı Barajı: 70/100</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 space-y-1">
-            <span className="text-xs font-semibold text-slate-500">Risk Altındaki Kursiyer</span>
-            <div className="text-2xl font-bold text-red-600">
-              {selectedGroupSummary?.atRiskTraineesCount || 0} Kursiyer
-            </div>
-            <div className="text-[11px] text-red-700">
-              Toplam: {selectedGroupSummary?.traineesCount || 0} Kursiyer
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Üst Metrik Bandı (Stripe / Canvas LMS Standart Metrik Bandı) */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Yayınlanan Ödev',
+            value: selectedGroupSummary?.publishedAssignments || 0,
+            icon: <Layers className="w-4 h-4" />,
+            subtext: `${selectedGroupSummary?.draftAssignments || 0} Taslak Ödev`,
+          },
+          {
+            label: 'Değerlendirme Bekleyen',
+            value: selectedGroupSummary?.pendingEvaluations || 0,
+            icon: <Clock className="w-4 h-4" />,
+            subtext: `${selectedGroupSummary?.revisionRequests || 0} Revizyon Sürecinde`,
+            badge: (selectedGroupSummary?.pendingEvaluations || 0) > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                Bekliyor
+              </span>
+            ) : undefined,
+          },
+          {
+            label: 'Grup Not Ortalaması',
+            value:
+              selectedGroupSummary?.groupAverageScore !== null && selectedGroupSummary?.groupAverageScore !== undefined
+                ? `${selectedGroupSummary.groupAverageScore} / 100`
+                : 'Henüz Not Yok',
+            icon: <CheckCircle2 className="w-4 h-4" />,
+            subtext: 'Başarı Barajı: 70/100',
+          },
+          {
+            label: 'Risk Altındaki Kursiyer',
+            value: `${selectedGroupSummary?.atRiskTraineesCount || 0} Kursiyer`,
+            icon: <AlertTriangle className="w-4 h-4" />,
+            subtext: `Toplam: ${selectedGroupSummary?.traineesCount || 0} Kursiyer`,
+            badge: (selectedGroupSummary?.atRiskTraineesCount || 0) > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-800 border border-rose-200 animate-pulse">
+                Risk
+              </span>
+            ) : undefined,
+          },
+        ]}
+      />
 
       {/* KURSİYER BAZLI BAŞARI ÖN KONTROL TABLOSU */}
       <Card>
         <CardContent className="p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-blue-600" />
@@ -272,29 +311,105 @@ export const AssignmentAuditPage: React.FC = () => {
                 Devam (%80), Ödev Ortalaması (70/100) ve Zorunlu Ödev Onaylarının entegre denetimi
               </p>
             </div>
-            <div className="text-xs text-slate-500">
-              Toplam Kursiyer: <strong>{traineesAnalysis.length}</strong>
+
+            {/* Toolbar: Search, Risk Filter, View Switcher, CSV Export */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {/* Search */}
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Kursiyer ara..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white w-36 text-slate-800"
+                />
+              </div>
+
+              {/* Risk Filter Chips */}
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setRiskFilter('all')}
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                    riskFilter === 'all' ? 'bg-white shadow-2xs text-slate-900' : 'text-slate-600'
+                  }`}
+                >
+                  Tümü ({traineesAnalysis.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRiskFilter('risk')}
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                    riskFilter === 'risk' ? 'bg-red-50 text-red-700 shadow-2xs font-bold' : 'text-slate-600'
+                  }`}
+                >
+                  Riskli ({traineesAnalysis.filter((t) => t.isAtRisk).length})
+                </button>
+              </div>
+
+              {/* View Switcher */}
+              <div className="flex items-center border border-slate-300 rounded-lg p-0.5 bg-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded text-xs flex items-center gap-1 transition ${
+                    viewMode === 'list'
+                      ? 'bg-white shadow-2xs text-brand-navy font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Liste Görünümü"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded text-xs flex items-center gap-1 transition ${
+                    viewMode === 'grid'
+                      ? 'bg-white shadow-2xs text-brand-navy font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Kart Görünümü"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* CSV Export Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+                className="text-[11px] py-1 px-2.5 flex items-center gap-1"
+                title="Raporu CSV olarak indir"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>CSV</span>
+              </Button>
             </div>
           </div>
 
-          {traineesAnalysis.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">Bu grupta kayıtlı kursiyer bulunmuyor.</div>
-          ) : (
-            <div className="overflow-x-auto">
+          {filteredTrainees.length === 0 ? (
+            <div className="p-8 text-center text-slate-400">
+              Filtreye uygun kursiyer kaydı bulunamadı.
+            </div>
+          ) : viewMode === 'list' ? (
+            <div className="overflow-x-auto max-h-[580px] overflow-y-auto relative">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-4">Kursiyer Adı</th>
-                    <th className="py-3 px-3 text-center">Devam Oranı (%80)</th>
-                    <th className="py-3 px-3 text-center">Ödev Ortalaması (70)</th>
-                    <th className="py-3 px-3 text-center">Zorunlu Onay</th>
-                    <th className="py-3 px-3 text-center">Ön Kontrol Durumu</th>
-                    <th className="py-3 px-3 text-center">Risk Durumu</th>
-                    <th className="py-3 px-4 text-right">İşlem</th>
+                    <th className="py-3 px-4 bg-slate-50">Kursiyer Adı</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Devam Oranı (%80)</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Ödev Ortalaması (70)</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Zorunlu Onay</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Ön Kontrol Durumu</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Risk Durumu</th>
+                    <th className="py-3 px-4 text-right bg-slate-50">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {traineesAnalysis.map((t) => (
+                  {filteredTrainees.map((t) => (
                     <tr key={t.traineeId} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 px-4 font-bold text-slate-900">{t.traineeName}</td>
 
@@ -359,11 +474,13 @@ export const AssignmentAuditPage: React.FC = () => {
                       {/* Risk Durumu */}
                       <td className="py-3 px-3 text-center">
                         {t.isAtRisk ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">
+                            <AlertTriangle className="w-3 h-3 text-red-600" />
                             Risk Altında
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             Normal
                           </span>
                         )}
@@ -381,6 +498,110 @@ export const AssignmentAuditPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          ) : (
+            /* GRID VIEW */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTrainees.map((t) => (
+                <Card
+                  key={t.traineeId}
+                  className={`border transition-all hover:shadow-xs ${
+                    t.isAtRisk ? 'border-red-200 bg-red-50/10' : 'border-slate-200'
+                  }`}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">{t.traineeName}</h4>
+                        <p className="text-[11px] text-slate-500">{selectedGroup?.name}</p>
+                      </div>
+                      {t.isAtRisk ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-red-600" />
+                          Riskli
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+                          Normal
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      {/* Attendance Bar */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1 text-[11px]">
+                          <span className="text-slate-500">Devam Durumu:</span>
+                          <span
+                            className={`font-bold tabular-nums ${
+                              t.attendanceRate !== null && t.attendanceRate >= 80
+                                ? 'text-emerald-700'
+                                : 'text-red-700'
+                            }`}
+                          >
+                            %{t.attendanceRate ?? 'N/A'}
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              t.attendanceRate !== null && t.attendanceRate >= 80
+                                ? 'bg-emerald-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(100, t.attendanceRate || 0)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Assignment Average */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1 text-[11px]">
+                          <span className="text-slate-500">Ödev Ortalaması:</span>
+                          <span
+                            className={`font-bold tabular-nums ${
+                              t.perf.hasPassedThreshold ? 'text-emerald-700' : 'text-red-700'
+                            }`}
+                          >
+                            {t.perf.averageScore ?? 'N/A'} / 100
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              t.perf.hasPassedThreshold ? 'bg-emerald-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(100, t.perf.averageScore || 0)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Mandatory count */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">Zorunlu Ödevler:</span>
+                        <span
+                          className={`font-bold ${
+                            t.perf.isMandatoryAllApproved ? 'text-emerald-700' : 'text-amber-700'
+                          }`}
+                        >
+                          {t.perf.mandatoryAssignmentsApproved} / {t.perf.mandatoryAssignmentsTotal} Onaylı
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full justify-center text-xs"
+                        onClick={() => setDetailTraineeId(t.traineeId)}
+                      >
+                        Ödev Dosyasını İncele
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
@@ -406,17 +627,17 @@ export const AssignmentAuditPage: React.FC = () => {
               Bu grupta henüz kaydedilmiş değerlendirme veya revizyon hareketi bulunmuyor.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[460px] overflow-y-auto relative">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-3">Zaman</th>
-                    <th className="py-3 px-4">Kursiyer</th>
-                    <th className="py-3 px-4">Ödev & Sürüm</th>
-                    <th className="py-3 px-3">Eğitmen</th>
-                    <th className="py-3 px-3 text-center">Karar</th>
-                    <th className="py-3 px-3 text-center">Puan</th>
-                    <th className="py-3 px-4">Eğitmen Gerekçesi / Geri Bildirim</th>
+                    <th className="py-3 px-3 bg-slate-50">Zaman</th>
+                    <th className="py-3 px-4 bg-slate-50">Kursiyer</th>
+                    <th className="py-3 px-4 bg-slate-50">Ödev & Sürüm</th>
+                    <th className="py-3 px-3 bg-slate-50">Eğitmen</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Karar</th>
+                    <th className="py-3 px-3 text-center bg-slate-50">Puan</th>
+                    <th className="py-3 px-4 bg-slate-50">Eğitmen Gerekçesi / Geri Bildirim</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -518,7 +739,7 @@ export const AssignmentAuditPage: React.FC = () => {
               </div>
 
               <div className="text-[11px] text-slate-500 italic">
-                * Bu ekran ön kontrol raporudur. Nihai resmi onay Sprint E03-C kapsamında yönetici tarafından verilecektir.
+                * Bu ekran akademik ön kontrol raporudur. Nihai resmi sertifika onayı Dönem Sonu Başarı Onay Masası üzerinden yetkili idare tarafından verilecektir.
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-end">

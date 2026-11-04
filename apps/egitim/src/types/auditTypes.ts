@@ -26,7 +26,9 @@ export type AuditResourceType =
   | 'permission_matrix'
   | 'system_settings'
   | 'mass_email'
-  | 'security';
+  | 'security'
+  | 'user'
+  | 'user_batch';
 
 export type AuditAction =
   // Başvuru ve Kriter
@@ -58,7 +60,14 @@ export type AuditAction =
   | 'certificate.generated'
   | 'certificate.cancelled'
   | 'certificate.downloaded'
-  // Yönetişim
+  // Yönetişim & Kullanıcı
+  | 'user.created'
+  | 'user.updated'
+  | 'user.deleted'
+  | 'user.status_updated'
+  | 'user.bulk_status_updated'
+  | 'user.bulk_role_assigned'
+  | 'user.bulk_deleted'
   | 'user.role_assigned'
   | 'user.role_revoked'
   | 'permission.matrix_updated'

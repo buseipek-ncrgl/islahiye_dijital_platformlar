@@ -11,6 +11,8 @@ import {
   Clock,
   FileText,
   Check,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import {
   Group,
@@ -21,9 +23,10 @@ import {
 } from '../types';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { KpiStrip } from '../components/ui/KpiStrip';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
 import { getStoredGroups } from '../services/enrollmentStorage';
-import { DEMO_PROGRAMS } from '../data/educationData';
+import { fetchLivePrograms, getInitialPrograms } from '../services/programAdapter';
 import {
   calculateBatchEligibility,
   calculateFinalEligibility,
@@ -43,7 +46,7 @@ export const SuccessDecisionPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'decision_desk' | 'term_registry'>('decision_desk');
 
   // Filters
-  const [programs, setPrograms] = useState<Program[]>([]);
+  const [programs, setPrograms] = useState<Program[]>(() => getInitialPrograms());
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('all');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -72,14 +75,22 @@ export const SuccessDecisionPage: React.FC = () => {
   const [isCloseTermModalOpen, setIsCloseTermModalOpen] = useState(false);
   const [closureNotes, setClosureNotes] = useState('');
 
+  // View Mode & Bulk Selection
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
+  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [bulkRemediationModalOpen, setBulkRemediationModalOpen] = useState(false);
+  const [bulkNote, setBulkNote] = useState('');
+
   // Feedback Toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Load Data
   const loadData = () => {
-    const progs = DEMO_PROGRAMS;
+    fetchLivePrograms().then((progs) => {
+      if (progs && progs.length > 0) setPrograms(progs);
+    });
     const grps = getStoredGroups();
-    setPrograms(progs);
     setGroups(grps);
 
     const batch = calculateBatchEligibility(
@@ -154,8 +165,8 @@ export const SuccessDecisionPage: React.FC = () => {
           !item.attendanceEligible
             ? 'attendance'
             : !item.gradeEligible
-            ? 'assignment_grade'
-            : 'mandatory_assignment'
+              ? 'assignment_grade'
+              : 'mandatory_assignment'
         );
         setRemediationDueDate('2026-11-15');
         setRemediationActionNote('Belirtilen eksiklik için telafi çalışması tamamlanmalıdır.');
@@ -182,19 +193,19 @@ export const SuccessDecisionPage: React.FC = () => {
       remediationDetails:
         modalDecision === 'remediation'
           ? {
-              reason: remediationReason.trim(),
-              targetRequirement: remediationTarget,
-              targetRequirementLabel:
-                remediationTarget === 'attendance'
-                  ? 'Devam Telafisi'
-                  : remediationTarget === 'assignment_grade'
+            reason: remediationReason.trim(),
+            targetRequirement: remediationTarget,
+            targetRequirementLabel:
+              remediationTarget === 'attendance'
+                ? 'Devam Telafisi'
+                : remediationTarget === 'assignment_grade'
                   ? 'Ödev Notu Yükseltme'
                   : 'Zorunlu Ödev Telafisi',
-              dueDate: remediationDueDate,
-              requiredActionNote: remediationActionNote.trim(),
-              assignedAt: new Date().toISOString(),
-              outcome: 'pending',
-            }
+            dueDate: remediationDueDate,
+            requiredActionNote: remediationActionNote.trim(),
+            assignedAt: new Date().toISOString(),
+            outcome: 'pending',
+          }
           : undefined,
       decidedBy: `${currentUser.fullName} (Yetkili Yönetici)`,
       academicEligible: selectedDossier.academicEligible,
@@ -203,15 +214,14 @@ export const SuccessDecisionPage: React.FC = () => {
     if (res.success) {
       setFeedback({
         type: 'success',
-        message: `${selectedDossier.traineeName} için nihai karar "${
-          modalDecision === 'approved'
-            ? 'Nihai Onay Verildi (Belgeye Hak Kazandı)'
-            : modalDecision === 'remediation'
+        message: `${selectedDossier.traineeName} için nihai karar "${modalDecision === 'approved'
+          ? 'Nihai Onay Verildi (Belgeye Hak Kazandı)'
+          : modalDecision === 'remediation'
             ? 'Telafi Sürecine Yönlendirildi'
             : modalDecision === 'additional_review'
-            ? 'Ek İnceleme İstendi'
-            : 'Başarısız Olarak Sonuçlandırıldı'
-        }" olarak kaydedildi ve denetim kütüğüne işlendi.`,
+              ? 'Ek İnceleme İstendi'
+              : 'Başarısız Olarak Sonuçlandırıldı'
+          }" olarak kaydedildi ve denetim kütüğüne işlendi.`,
       });
       setSelectedEnrollmentId(null);
       loadData();
@@ -242,6 +252,100 @@ export const SuccessDecisionPage: React.FC = () => {
     } else {
       setFeedback({ type: 'error', message: res.error || 'Kütük kapatılamadı.' });
     }
+  };
+
+  // Bulk Actions
+  const toggleSelectAll = () => {
+    if (selectedEnrollmentIds.length === filteredList.length) {
+      setSelectedEnrollmentIds([]);
+    } else {
+      setSelectedEnrollmentIds(filteredList.map((f) => f.enrollmentId));
+    }
+  };
+
+  const toggleSelectOne = (enrollmentId: string) => {
+    setSelectedEnrollmentIds((prev) =>
+      prev.includes(enrollmentId) ? prev.filter((id) => id !== enrollmentId) : [...prev, enrollmentId]
+    );
+  };
+
+  const handleExecuteBulkApprove = () => {
+    let successCount = 0;
+    selectedEnrollmentIds.forEach((enrId) => {
+      const item = eligibilityList.find((e) => e.enrollmentId === enrId);
+      if (!item) return;
+      const res = recordAdminSuccessDecision({
+        enrollmentId: item.enrollmentId,
+        traineeId: item.traineeId,
+        traineeName: item.traineeName,
+        programId: item.programId,
+        termId: item.termId,
+        groupId: item.groupId,
+        decision: 'approved',
+        eligibilitySnapshot: item.sourceSnapshot,
+        internalNote: bulkNote.trim() || 'Toplu işlemle yetkili yönetici onayı verildi.',
+        traineeDecisionMessage:
+          'Tebrik ederiz! Dönem sonu başarı değerlendirmeniz onaylanmış ve başarı belgesi hakkınız tescil edilmiştir.',
+        decidedBy: `${currentUser.fullName} (Yetkili Yönetici)`,
+        academicEligible: item.academicEligible,
+      });
+      if (res.success) successCount++;
+    });
+
+    setFeedback({
+      type: 'success',
+      message: `${successCount} kursiyer için toplu nihai onay verildi ve kütüğe işlendi.`,
+    });
+    setBulkApproveModalOpen(false);
+    setSelectedEnrollmentIds([]);
+    setBulkNote('');
+    loadData();
+  };
+
+  const handleExecuteBulkRemediation = () => {
+    let count = 0;
+    selectedEnrollmentIds.forEach((enrId) => {
+      const item = eligibilityList.find((e) => e.enrollmentId === enrId);
+      if (!item) return;
+      const res = recordAdminSuccessDecision({
+        enrollmentId: item.enrollmentId,
+        traineeId: item.traineeId,
+        traineeName: item.traineeName,
+        programId: item.programId,
+        termId: item.termId,
+        groupId: item.groupId,
+        decision: 'remediation',
+        eligibilitySnapshot: item.sourceSnapshot,
+        internalNote: bulkNote.trim() || 'Toplu kararla telafi sürecine sevk edildi.',
+        traineeDecisionMessage:
+          'Eksik başarı koşullarınız için telafi imkânı tanınmıştır. Detaylar için eğitmeninizle iletişime geçiniz.',
+        remediationDetails: {
+          reason: 'Toplu telafi sevki',
+          targetRequirement: !item.attendanceEligible
+            ? 'attendance'
+            : !item.gradeEligible
+              ? 'assignment_grade'
+              : 'mandatory_assignment',
+          targetRequirementLabel: 'Akademik Telafi Çalışması',
+          dueDate: '2026-11-20',
+          requiredActionNote: 'Belirtilen süre zarfında eksik çalışma tamamlanmalıdır.',
+          assignedAt: new Date().toISOString(),
+          outcome: 'pending',
+        },
+        decidedBy: `${currentUser.fullName} (Yetkili Yönetici)`,
+        academicEligible: item.academicEligible,
+      });
+      if (res.success) count++;
+    });
+
+    setFeedback({
+      type: 'success',
+      message: `${count} kursiyer için telafi süreci başlatıldı.`,
+    });
+    setBulkRemediationModalOpen(false);
+    setSelectedEnrollmentIds([]);
+    setBulkNote('');
+    loadData();
   };
 
   // Filtered List
@@ -286,20 +390,19 @@ export const SuccessDecisionPage: React.FC = () => {
   const remediationCount = eligibilityList.filter((e) => e.finalStatus === 'remediation').length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <span className="text-xs text-slate-500 font-medium">Yetkili Yönetici Masası:</span>
-          <h2 className="text-xl font-bold text-brand-navy">
-            Dönem Sonu Nihai Başarı Onay Masası ve Resmî Kütük
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Dönem Sonu Nihai Başarı Onay Masası
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Dört Şart Kontrolü: %80 Devam + 70/100 Ödev Ortalaması + Zorunlu Ödev Onayları + Yetkili Yönetici Kararı
           </p>
         </div>
-        <div className="text-xs text-slate-600 flex items-center gap-2">
-          <span>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
             Aktif Yönetici: <strong>{currentUser.fullName}</strong>
           </span>
         </div>
@@ -309,11 +412,10 @@ export const SuccessDecisionPage: React.FC = () => {
       <div className="flex items-center gap-4 border-b border-slate-200">
         <button
           onClick={() => setActiveTab('decision_desk')}
-          className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === 'decision_desk'
-              ? 'border-blue-600 text-brand-navy'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'decision_desk'
+            ? 'border-blue-600 text-brand-navy'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Award className="w-4 h-4 text-blue-600" />
           <span>1. Başarı Onay & Karar Masası ({totalCount})</span>
@@ -326,11 +428,10 @@ export const SuccessDecisionPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('term_registry')}
-          className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === 'term_registry'
-              ? 'border-blue-600 text-brand-navy'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'term_registry'
+            ? 'border-blue-600 text-brand-navy'
+            : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Lock className="w-4 h-4 text-blue-600" />
           <span>2. Dönem Sonu Resmî Kütüğü & Kapanış</span>
@@ -340,11 +441,10 @@ export const SuccessDecisionPage: React.FC = () => {
       {/* Feedback Toast */}
       {feedback && (
         <div
-          className={`p-4 rounded-lg flex items-start justify-between text-sm ${
-            feedback.type === 'success'
-              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}
+          className={`p-4 rounded-lg flex items-start justify-between text-sm ${feedback.type === 'success'
+            ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
+            }`}
         >
           <div className="flex items-center gap-2">
             {feedback.type === 'success' ? (
@@ -368,60 +468,62 @@ export const SuccessDecisionPage: React.FC = () => {
       {/* ===================================================================== */}
       {activeTab === 'decision_desk' && (
         <div className="space-y-6">
-          {/* 4 KPI Kartı */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4 space-y-1">
-                <span className="text-xs font-semibold text-slate-500">Kesin Kayıtlı Kursiyer</span>
-                <div className="text-2xl font-bold text-slate-900 tabular-nums">{totalCount}</div>
-                <div className="text-[11px] text-slate-400">Aktif Eğitim Dönemi</div>
-              </CardContent>
-            </Card>
+          {/* 4 KPI Metrik Bandı (Stripe / Canvas LMS Standart Metrik Bandı) */}
+          <KpiStrip
+            items={[
+              {
+                label: 'Kesin Kayıtlı Kursiyer',
+                value: totalCount,
+                icon: <Users className="w-4 h-4" />,
+                subtext: 'Aktif eğitim dönemi',
+              },
+              {
+                label: 'Akademik Şartları Sağlayan',
+                value: academicPassedCount,
+                icon: <CheckCircle2 className="w-4 h-4" />,
+                subtext: `${awaitingAdminCount} Kişi onay bekliyor`,
+                badge: awaitingAdminCount > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                    Onay Bekliyor
+                  </span>
+                ) : undefined,
+              },
+              {
+                label: 'Nihai Onay Verilenler',
+                value: approvedCount,
+                icon: <Award className="w-4 h-4" />,
+                subtext: 'Belgeye hak kazananlar',
+              },
+              {
+                label: 'Telafi Sürecindekiler',
+                value: remediationCount,
+                icon: <Clock className="w-4 h-4" />,
+                subtext: 'Ek süre / telafi kararı',
+              },
+            ]}
+          />
 
-            <Card className="border-blue-100 bg-blue-50/20">
-              <CardContent className="p-4 space-y-1">
-                <span className="text-xs font-semibold text-blue-900">Akademik Şartları Sağlayan</span>
-                <div className="text-2xl font-bold text-blue-700 tabular-nums">
-                  {academicPassedCount}
-                </div>
-                <div className="text-[11px] text-blue-600 font-medium">
-                  {awaitingAdminCount} Kişi Yönetici Onayı Bekliyor
-                </div>
-              </CardContent>
-            </Card>
+          {/* Filtre ve Arama Barı (Standart Tek Satır Hizalama) */}
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
+              {/* 1. Arama */}
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Kursiyer veya program ara..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white w-full text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
 
-            <Card className="border-emerald-100 bg-emerald-50/20">
-              <CardContent className="p-4 space-y-1">
-                <span className="text-xs font-semibold text-emerald-900">Nihai Onay Verilenler</span>
-                <div className="text-2xl font-bold text-emerald-700 tabular-nums">
-                  {approvedCount}
-                </div>
-                <div className="text-[11px] text-emerald-700 font-medium">
-                  Belgeye Hak Kazananlar
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-100 bg-amber-50/20">
-              <CardContent className="p-4 space-y-1">
-                <span className="text-xs font-semibold text-amber-900">Telafi Sürecindekiler</span>
-                <div className="text-2xl font-bold text-amber-700 tabular-nums">
-                  {remediationCount}
-                </div>
-                <div className="text-[11px] text-amber-800">Ek Süre / Telafi Kararı</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filtre ve Arama Barı */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-slate-600">Program:</span>
+              {/* 2, 3, 4. Filtre Dropdownları */}
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                 <select
                   value={selectedProgramId}
                   onChange={(e) => setSelectedProgramId(e.target.value)}
-                  className="border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs font-medium text-slate-800"
+                  className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="all">Tüm Programlar</option>
                   {programs.map((p) => (
@@ -430,14 +532,11 @@ export const SuccessDecisionPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
-              </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-slate-600">Grup:</span>
                 <select
                   value={selectedGroupId}
                   onChange={(e) => setSelectedGroupId(e.target.value)}
-                  className="border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs font-medium text-slate-800"
+                  className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="all">Tüm Gruplar</option>
                   {groups.map((g) => (
@@ -446,175 +545,385 @@ export const SuccessDecisionPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
-              </div>
 
-              <div className="relative flex items-center">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Kursiyer veya program ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white w-48 text-slate-800"
-                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="h-9 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="all">Tüm Durumlar ({totalCount})</option>
+                  <option value="awaiting_admin">Onay Bekleyenler ({awaitingAdminCount})</option>
+                  <option value="approved">Nihai Onaylananlar ({approvedCount})</option>
+                  <option value="remediation">Telafi Sürecindekiler ({remediationCount})</option>
+                  <option value="missing">Eksik Koşul ({totalCount - academicPassedCount})</option>
+                </select>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-slate-600 mr-1">Durum:</span>
-              {[
-                { key: 'all', label: 'Tümü' },
-                { key: 'awaiting_admin', label: 'Onay Bekleyen' },
-                { key: 'approved', label: 'Onaylanan' },
-                { key: 'remediation', label: 'Telafi' },
-                { key: 'missing', label: 'Eksik Koşul' },
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setStatusFilter(f.key)}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                    statusFilter === f.key
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            {/* Sağ: Görünüm Değiştirici */}
+            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-slate-100 shrink-0 h-9 self-end lg:self-auto">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                  viewMode === 'list'
+                    ? 'bg-white shadow-2xs text-blue-600'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Liste Görünümü"
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Liste</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                  viewMode === 'grid'
+                    ? 'bg-white shadow-2xs text-blue-600'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Kart Görünümü"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Kartlar</span>
+              </button>
             </div>
           </div>
 
-          {/* Ana Kursiyer Başarı Karar Tablosu */}
-          <Card>
-            <CardContent className="p-0 overflow-hidden">
-              {filteredList.length === 0 ? (
-                <div className="p-10 text-center text-slate-500 space-y-2">
-                  <Users className="w-8 h-8 text-slate-400 mx-auto" />
-                  <p className="font-bold">Filtreye uygun kursiyer kaydı bulunamadı.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
+          {/* Ana Kursiyer Başarı Karar Görünümü */}
+          {filteredList.length === 0 ? (
+            <Card>
+              <CardContent className="p-10 text-center text-slate-500 space-y-2">
+                <Users className="w-8 h-8 text-slate-400 mx-auto" />
+                <p className="font-bold">Filtreye uygun kursiyer kaydı bulunamadı.</p>
+              </CardContent>
+            </Card>
+          ) : viewMode === 'list' ? (
+            <Card>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto max-h-[580px] overflow-y-auto relative">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+                    <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
                       <tr>
-                        <th className="py-3.5 px-4">Kursiyer Adı</th>
-                        <th className="py-3.5 px-4">Program & Grup</th>
-                        <th className="py-3.5 px-3 text-center">Devam (%80)</th>
-                        <th className="py-3.5 px-3 text-center">Ödev Notu (70)</th>
-                        <th className="py-3.5 px-3 text-center">Zorunlu Onay</th>
-                        <th className="py-3.5 px-3 text-center">Akademik Durum</th>
-                        <th className="py-3.5 px-3 text-center">Yönetici Kararı</th>
-                        <th className="py-3.5 px-4 text-right">İşlem</th>
+                        <th className="py-3.5 px-3 w-10 text-center bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredList.length > 0 &&
+                              selectedEnrollmentIds.length === filteredList.length
+                            }
+                            onChange={toggleSelectAll}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </th>
+                        <th className="py-3.5 px-4 bg-slate-50">Kursiyer Adı</th>
+                        <th className="py-3.5 px-4 bg-slate-50">Program & Grup</th>
+                        <th className="py-3.5 px-3 text-center bg-slate-50">Devam (%80)</th>
+                        <th className="py-3.5 px-3 text-center bg-slate-50">Ödev Notu (70)</th>
+                        <th className="py-3.5 px-3 text-center bg-slate-50">Zorunlu Onay</th>
+                        <th className="py-3.5 px-3 text-center bg-slate-50">Akademik Durum</th>
+                        <th className="py-3.5 px-3 text-center bg-slate-50">Yönetici Kararı</th>
+                        <th className="py-3.5 px-4 text-right bg-slate-50">İşlem</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredList.map((item) => (
-                        <tr key={item.enrollmentId} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3.5 px-4 font-bold text-slate-900">
-                            {item.traineeName}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-800 line-clamp-1">
-                              {item.programTitle}
-                            </div>
-                            <div className="text-[11px] text-slate-500">{item.groupName}</div>
-                          </td>
-                          {/* Devam */}
-                          <td className="py-3.5 px-3 text-center tabular-nums">
-                            {item.attendanceRate !== null ? (
+                      {filteredList.map((item) => {
+                        const isSelected = selectedEnrollmentIds.includes(item.enrollmentId);
+                        return (
+                          <tr
+                            key={item.enrollmentId}
+                            className={`transition-colors ${isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/80'
+                              }`}
+                          >
+                            <td className="py-3.5 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectOne(item.enrollmentId)}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900">
+                              {item.traineeName}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold text-slate-800 line-clamp-1">
+                                {item.programTitle}
+                              </div>
+                              <div className="text-[11px] text-slate-500">{item.groupName}</div>
+                            </td>
+                            {/* Devam */}
+                            <td className="py-3.5 px-3 text-center tabular-nums">
+                              {item.attendanceRate !== null ? (
+                                <span
+                                  className={`font-bold ${item.attendanceEligible ? 'text-emerald-700' : 'text-red-700'
+                                    }`}
+                                >
+                                  %{item.attendanceRate}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[10px]">Hesaplanamıyor</span>
+                              )}
+                            </td>
+                            {/* Ödev Ortalaması */}
+                            <td className="py-3.5 px-3 text-center tabular-nums">
+                              {item.assignmentAverage !== null ? (
+                                <span
+                                  className={`font-bold ${item.gradeEligible ? 'text-emerald-700' : 'text-red-700'
+                                    }`}
+                                >
+                                  {item.assignmentAverage} / 100
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[10px]">Hesaplanamıyor</span>
+                              )}
+                            </td>
+                            {/* Zorunlu Onay */}
+                            <td className="py-3.5 px-3 text-center font-bold tabular-nums">
                               <span
-                                className={`font-bold ${
-                                  item.attendanceEligible ? 'text-emerald-700' : 'text-red-700'
-                                }`}
+                                className={
+                                  item.mandatoryEligible ? 'text-emerald-700' : 'text-amber-700'
+                                }
                               >
-                                %{item.attendanceRate}
+                                {item.mandatoryAssignmentsApproved} / {item.mandatoryAssignmentsTotal}
                               </span>
-                            ) : (
-                              <span className="text-slate-400 italic text-[10px]">Hesaplanamıyor</span>
-                            )}
-                          </td>
-                          {/* Ödev Ortalaması */}
-                          <td className="py-3.5 px-3 text-center tabular-nums">
-                            {item.assignmentAverage !== null ? (
-                              <span
-                                className={`font-bold ${
-                                  item.gradeEligible ? 'text-emerald-700' : 'text-red-700'
-                                }`}
+                            </td>
+                            {/* Akademik Durum Rozeti */}
+                            <td className="py-3.5 px-3 text-center">
+                              {item.academicEligible ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                  <Check className="w-3 h-3" /> Koşullar Sağlandı
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
+                                  Eksik Koşul
+                                </span>
+                              )}
+                            </td>
+                            {/* Yönetici Kararı */}
+                            <td className="py-3.5 px-3 text-center">
+                              {item.finalStatus === 'admin_approved' ? (
+                                <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  Nihai Onay Verildi
+                                </span>
+                              ) : item.finalStatus === 'awaiting_admin_decision' ? (
+                                <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-blue-100 text-blue-800 animate-pulse border border-blue-300">
+                                  Onay Bekliyor
+                                </span>
+                              ) : item.finalStatus === 'remediation' ? (
+                                <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                  Telafi Sürecinde
+                                </span>
+                              ) : item.finalStatus === 'under_review' ? (
+                                <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-purple-100 text-purple-900">
+                                  Ek İnceleme
+                                </span>
+                              ) : item.finalStatus === 'rejected' ? (
+                                <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-red-100 text-red-800">
+                                  Başarısız
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                                  İnceleme Sürüyor
+                                </span>
+                              )}
+                            </td>
+                            {/* Eylem */}
+                            <td className="py-3.5 px-4 text-right">
+                              <Button
+                                size="sm"
+                                variant={item.finalStatus === 'awaiting_admin_decision' ? 'primary' : 'outline'}
+                                onClick={() => handleOpenDossier(item.enrollmentId)}
                               >
-                                {item.assignmentAverage} / 100
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 italic text-[10px]">Hesaplanamıyor</span>
-                            )}
-                          </td>
-                          {/* Zorunlu Onay */}
-                          <td className="py-3.5 px-3 text-center font-bold tabular-nums">
-                            <span
-                              className={
-                                item.mandatoryEligible ? 'text-emerald-700' : 'text-amber-700'
-                              }
-                            >
-                              {item.mandatoryAssignmentsApproved} / {item.mandatoryAssignmentsTotal}
-                            </span>
-                          </td>
-                          {/* Akademik Durum Rozeti */}
-                          <td className="py-3.5 px-3 text-center">
-                            {item.academicEligible ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                <Check className="w-3 h-3" /> Koşullar Sağlandı
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
-                                Eksik Koşul
-                              </span>
-                            )}
-                          </td>
-                          {/* Yönetici Kararı */}
-                          <td className="py-3.5 px-3 text-center">
-                            {item.finalStatus === 'admin_approved' ? (
-                              <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                Nihai Onay Verildi
-                              </span>
-                            ) : item.finalStatus === 'awaiting_admin_decision' ? (
-                              <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-blue-100 text-blue-800 animate-pulse border border-blue-300">
-                                Onay Bekliyor
-                              </span>
-                            ) : item.finalStatus === 'remediation' ? (
-                              <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                                Telafi Sürecinde
-                              </span>
-                            ) : item.finalStatus === 'under_review' ? (
-                              <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-purple-100 text-purple-900">
-                                Ek İnceleme
-                              </span>
-                            ) : item.finalStatus === 'rejected' ? (
-                              <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-red-100 text-red-800">
-                                Başarısız
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                                İnceleme Sürüyor
-                              </span>
-                            )}
-                          </td>
-                          {/* Eylem */}
-                          <td className="py-3.5 px-4 text-right">
-                            <Button
-                              size="sm"
-                              variant={item.finalStatus === 'awaiting_admin_decision' ? 'primary' : 'outline'}
-                              onClick={() => handleOpenDossier(item.enrollmentId)}
-                            >
-                              Dosyayı İncele
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                                Dosyayı İncele
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Grid View */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredList.map((item) => {
+                const isSelected = selectedEnrollmentIds.includes(item.enrollmentId);
+                return (
+                  <Card
+                    key={item.enrollmentId}
+                    className={`transition-all border ${isSelected
+                      ? 'border-blue-500 ring-2 ring-blue-100 shadow-md bg-blue-50/20'
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                      }`}
+                  >
+                    <CardContent className="p-4 space-y-4">
+                      {/* Card Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectOne(item.enrollmentId)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-0.5"
+                          />
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">{item.traineeName}</h4>
+                            <p className="text-[11px] text-slate-500 font-medium">{item.groupName}</p>
+                          </div>
+                        </div>
+
+                        {item.finalStatus === 'admin_approved' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Onaylandı
+                          </span>
+                        ) : item.finalStatus === 'awaiting_admin_decision' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 animate-pulse border border-blue-300">
+                            Onay Bekliyor
+                          </span>
+                        ) : item.finalStatus === 'remediation' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                            Telafi
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                            {item.finalStatus}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Dual Progress Bars */}
+                      <div className="space-y-2.5 text-xs">
+                        {/* Attendance Bar */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] text-slate-600 font-medium">
+                              Devam Durumu (%80 Barajı):
+                            </span>
+                            <span
+                              className={`font-bold tabular-nums ${item.attendanceEligible ? 'text-emerald-700' : 'text-red-700'
+                                }`}
+                            >
+                              %{item.attendanceRate || 0}
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden relative">
+                            <div
+                              className={`h-full transition-all rounded-full ${item.attendanceEligible ? 'bg-emerald-500' : 'bg-red-500'
+                                }`}
+                              style={{ width: `${Math.min(100, item.attendanceRate || 0)}%` }}
+                            />
+                            {/* 80% mark indicator */}
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-slate-400"
+                              style={{ left: '80%' }}
+                              title="%80 Eşik"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Assignment Bar */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] text-slate-600 font-medium">
+                              Ödev Ortalaması (70 Eşiği):
+                            </span>
+                            <span
+                              className={`font-bold tabular-nums ${item.gradeEligible ? 'text-emerald-700' : 'text-red-700'
+                                }`}
+                            >
+                              {item.assignmentAverage || 0} / 100
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden relative">
+                            <div
+                              className={`h-full transition-all rounded-full ${item.gradeEligible ? 'bg-emerald-500' : 'bg-red-500'
+                                }`}
+                              style={{ width: `${Math.min(100, item.assignmentAverage || 0)}%` }}
+                            />
+                            {/* 70% mark indicator */}
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-slate-400"
+                              style={{ left: '70%' }}
+                              title="70 Puan Eşik"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Mandatory Assignments & Program Details */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500">Zorunlu Ödevler:</span>
+                          <span
+                            className={`font-bold ${item.mandatoryEligible ? 'text-emerald-700' : 'text-amber-700'
+                              }`}
+                          >
+                            {item.mandatoryAssignmentsApproved} / {item.mandatoryAssignmentsTotal} Onaylı
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card Action */}
+                      <div className="pt-2 border-t border-slate-100 flex justify-end">
+                        <Button
+                          size="sm"
+                          className="w-full justify-center text-xs"
+                          variant={item.finalStatus === 'awaiting_admin_decision' ? 'primary' : 'outline'}
+                          onClick={() => handleOpenDossier(item.enrollmentId)}
+                        >
+                          Dosyayı İncele & Karar Ver
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Floating Bulk Action Ribbon */}
+          {selectedEnrollmentIds.length > 0 && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-xs animate-slideUp">
+              <div className="flex items-center gap-2 font-semibold">
+                <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[11px] font-bold">
+                  {selectedEnrollmentIds.length}
+                </span>
+                <span>kursiyer seçildi</span>
+              </div>
+
+              <div className="h-4 w-px bg-slate-700" />
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkApproveModalOpen(true)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Toplu Nihai Onay Ver</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBulkRemediationModalOpen(true)}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Telafiye Sevk Et</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedEnrollmentIds([])}
+                  className="px-2.5 py-1.5 text-slate-400 hover:text-white transition"
+                >
+                  Seçimi Kaldır
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -681,17 +990,17 @@ export const SuccessDecisionPage: React.FC = () => {
               </div>
 
               {/* Tescilli Kütük Tablosu */}
-              <div className="border border-slate-200 rounded-lg overflow-x-auto">
+              <div className="border border-slate-200 rounded-lg overflow-x-auto max-h-[460px] overflow-y-auto relative">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-4">Kayıt No</th>
-                      <th className="py-3 px-4">Kursiyer Adı</th>
-                      <th className="py-3 px-4">Program & Dönem</th>
-                      <th className="py-3 px-3 text-center">Devam / Not</th>
-                      <th className="py-3 px-3 text-center">Akademik Tescil</th>
-                      <th className="py-3 px-3 text-center">Yönetici Kararı</th>
-                      <th className="py-3 px-3 text-center">Belge Hakkı</th>
+                      <th className="py-3 px-4 bg-slate-50">Kayıt No</th>
+                      <th className="py-3 px-4 bg-slate-50">Kursiyer Adı</th>
+                      <th className="py-3 px-4 bg-slate-50">Program & Dönem</th>
+                      <th className="py-3 px-3 text-center bg-slate-50">Devam / Not</th>
+                      <th className="py-3 px-3 text-center bg-slate-50">Akademik Tescil</th>
+                      <th className="py-3 px-3 text-center bg-slate-50">Yönetici Kararı</th>
+                      <th className="py-3 px-3 text-center bg-slate-50">Belge Hakkı</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -777,11 +1086,10 @@ export const SuccessDecisionPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 1. Devam */}
                 <div
-                  className={`p-3 rounded-lg border space-y-1 ${
-                    selectedDossier.attendanceEligible
-                      ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                      : 'bg-red-50/60 border-red-200 text-red-900'
-                  }`}
+                  className={`p-3 rounded-lg border space-y-1 ${selectedDossier.attendanceEligible
+                    ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+                    : 'bg-red-50/60 border-red-200 text-red-900'
+                    }`}
                 >
                   <div className="flex items-center justify-between font-bold">
                     <span>1. Devam Oranı</span>
@@ -797,11 +1105,10 @@ export const SuccessDecisionPage: React.FC = () => {
 
                 {/* 2. Ödev Notu */}
                 <div
-                  className={`p-3 rounded-lg border space-y-1 ${
-                    selectedDossier.gradeEligible
-                      ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                      : 'bg-red-50/60 border-red-200 text-red-900'
-                  }`}
+                  className={`p-3 rounded-lg border space-y-1 ${selectedDossier.gradeEligible
+                    ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+                    : 'bg-red-50/60 border-red-200 text-red-900'
+                    }`}
                 >
                   <div className="flex items-center justify-between font-bold">
                     <span>2. Ödev Ortalaması</span>
@@ -817,11 +1124,10 @@ export const SuccessDecisionPage: React.FC = () => {
 
                 {/* 3. Zorunlu Onaylar */}
                 <div
-                  className={`p-3 rounded-lg border space-y-1 ${
-                    selectedDossier.mandatoryEligible
-                      ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                      : 'bg-amber-50/60 border-amber-200 text-amber-900'
-                  }`}
+                  className={`p-3 rounded-lg border space-y-1 ${selectedDossier.mandatoryEligible
+                    ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50/60 border-amber-200 text-amber-900'
+                    }`}
                 >
                   <div className="flex items-center justify-between font-bold">
                     <span>3. Zorunlu Onaylar</span>
@@ -862,11 +1168,10 @@ export const SuccessDecisionPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {/* Onay Seçeneği */}
                   <label
-                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-                      modalDecision === 'approved'
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-500'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    } ${!selectedDossier.academicEligible ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`}
+                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${modalDecision === 'approved'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-500'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      } ${!selectedDossier.academicEligible ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold flex items-center gap-1.5">
@@ -887,11 +1192,10 @@ export const SuccessDecisionPage: React.FC = () => {
 
                   {/* Telafi Seçeneği */}
                   <label
-                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-                      modalDecision === 'remediation'
-                        ? 'border-amber-500 bg-amber-50 text-amber-900 ring-1 ring-amber-500'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
+                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${modalDecision === 'remediation'
+                      ? 'border-amber-500 bg-amber-50 text-amber-900 ring-1 ring-amber-500'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold flex items-center gap-1.5">
@@ -911,11 +1215,10 @@ export const SuccessDecisionPage: React.FC = () => {
 
                   {/* Ek İnceleme Seçeneği */}
                   <label
-                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-                      modalDecision === 'additional_review'
-                        ? 'border-purple-500 bg-purple-50 text-purple-900 ring-1 ring-purple-500'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
+                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${modalDecision === 'additional_review'
+                      ? 'border-purple-500 bg-purple-50 text-purple-900 ring-1 ring-purple-500'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold flex items-center gap-1.5">
@@ -935,11 +1238,10 @@ export const SuccessDecisionPage: React.FC = () => {
 
                   {/* Başarısız Seçeneği */}
                   <label
-                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-                      modalDecision === 'rejected'
-                        ? 'border-red-500 bg-red-50 text-red-900 ring-1 ring-red-500'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
+                    className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${modalDecision === 'rejected'
+                      ? 'border-red-500 bg-red-50 text-red-900 ring-1 ring-red-500'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold flex items-center gap-1.5">
@@ -1145,6 +1447,116 @@ export const SuccessDecisionPage: React.FC = () => {
                 <Button type="submit">Kütüğü Kapat ve Kilitle</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TOPLU NİHAİ ONAY */}
+      {bulkApproveModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Toplu Nihai Onay</h3>
+                <p className="text-xs text-slate-500">
+                  {selectedEnrollmentIds.length} kursiyer için başarı belgesi hakkı tescil edilecek.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
+              Seçilen kursiyerlerin akademik koşulları (%80 devam ve 70 not barajı) denetim kütüğüne işlenecek ve sistem otomatik bildirim gönderecektir.
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Yönetici Karar Notu (Opsiyonel):
+              </label>
+              <textarea
+                rows={2}
+                value={bulkNote}
+                onChange={(e) => setBulkNote(e.target.value)}
+                placeholder="Örn: Yönetim kurulu kararı gereğince toplu onay tescil edildi..."
+                className="w-full text-xs border border-slate-300 rounded-lg p-2.5"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkApproveModalOpen(false)}
+              >
+                Vazgeç
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                onClick={handleExecuteBulkApprove}
+              >
+                Onayları Tescil Et ({selectedEnrollmentIds.length})
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TOPLU TELAFİYE SEVK */}
+      {bulkRemediationModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Toplu Telafiye Sevk Et</h3>
+                <p className="text-xs text-slate-500">
+                  {selectedEnrollmentIds.length} kursiyer için telafi süreci başlatılacak.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
+              Kursiyerlere eksik devam veya ödev notlarını telafi etmeleri için 20 Kasım 2026 tarihine kadar süre tanınacak ve eğitmenlerine bilgi verilecektir.
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Telafi Açıklaması / Talimat:
+              </label>
+              <textarea
+                rows={2}
+                value={bulkNote}
+                onChange={(e) => setBulkNote(e.target.value)}
+                placeholder="Örn: Eksik ödevlerin revize edilerek sisteme yüklenmesi..."
+                className="w-full text-xs border border-slate-300 rounded-lg p-2.5"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkRemediationModalOpen(false)}
+              >
+                Vazgeç
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-amber-600 hover:bg-amber-500 text-white"
+                onClick={handleExecuteBulkRemediation}
+              >
+                Telafi Sürecini Başlat ({selectedEnrollmentIds.length})
+              </Button>
+            </div>
           </div>
         </div>
       )}

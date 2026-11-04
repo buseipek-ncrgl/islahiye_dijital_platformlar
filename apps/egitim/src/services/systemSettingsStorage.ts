@@ -14,11 +14,44 @@ import {
   SystemSettingsHistoryItem,
   UserRole,
 } from '../types';
+import { educationApi } from './apiClient';
 import { recordAuditLog } from './auditStorage';
 
 const SETTINGS_STORAGE_KEY = 'islahiye_education_system_settings_v1';
 const SETTINGS_HISTORY_STORAGE_KEY = 'islahiye_education_settings_history_v1';
 export const SETTINGS_UPDATE_EVENT = 'islahiye_system_settings_updated';
+
+export const syncSystemSettingsWithApi = async (): Promise<SystemSettings> => {
+  try {
+    const list = await educationApi.systemSettings();
+    if (list && list.length > 0) {
+      const current = getStoredSystemSettings();
+      const attSetting = list.find((s) => s.key === 'AttendanceMinPercentage');
+      const asgSetting = list.find((s) => s.key === 'AssignmentPassGrade');
+
+      const updated: SystemSettings = {
+        ...current,
+        attendancePolicy: {
+          ...current.attendancePolicy,
+          minAttendanceRateRequired: attSetting ? parseInt(attSetting.value, 10) : current.attendancePolicy.minAttendanceRateRequired,
+        },
+        assignmentPolicy: {
+          ...current.assignmentPolicy,
+          minPassingAssignmentAverage: asgSetting ? parseInt(asgSetting.value, 10) : current.assignmentPolicy.minPassingAssignmentAverage,
+        },
+      };
+      saveSettingsToStorage(updated, getStoredSettingsHistory());
+      return updated;
+    }
+  } catch (err) {
+    console.warn('API sync settings notice:', err);
+  }
+  return getStoredSystemSettings();
+};
+
+if (typeof window !== 'undefined') {
+  syncSystemSettingsWithApi().catch(() => {});
+}
 
 export const INITIAL_SYSTEM_SETTINGS: SystemSettings = {
   version: 1,

@@ -35,6 +35,7 @@ import {
 } from '../services/notificationStorage';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { KpiStrip } from '../components/ui/KpiStrip';
 
 type FilterTab = 'all' | 'unread' | 'application' | 'classes' | 'communication' | 'certificate';
 
@@ -178,79 +179,106 @@ export const NotificationCenterPage: React.FC = () => {
     }
   };
 
+  const appNotifsCount = notifications.filter((n) => n.category === 'application').length;
+  const classNotifsCount = notifications.filter((n) => ['session', 'assignment'].includes(n.category)).length;
+  const otherNotifsCount = notifications.filter((n) => ['certificate', 'communication', 'announcement'].includes(n.category)).length;
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Top Header & Context */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-              <Bell className="w-4 h-4" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-900">Bildirim Merkezi</h1>
-            {unreadCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                {unreadCount} Okunmamış
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Aktif Profil: <strong className="text-slate-800">{currentUser.fullName}</strong> ({currentUser.title || currentRole})
-            — Yalnızca kimliğinize atanmış bildirimler listelenmektedir.
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Bildirim Merkezi</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Aktif Profil: <strong className="text-slate-800 font-semibold">{currentUser.fullName}</strong> ({currentUser.title || currentRole})
+            — Kimliğinize tanımlanmış resmî sistem bildirimleri.
           </p>
         </div>
 
         {/* Global Action */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {unreadCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<CheckCheck className="w-3.5 h-3.5" />}
+            <button
               onClick={handleMarkAllAsRead}
+              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
             >
-              Tümünü Okundu Yap
-            </Button>
+              <CheckCheck className="w-4 h-4 shrink-0" />
+              <span>Tümünü Okundu Yap</span>
+            </button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+          <button
             onClick={loadData}
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
           >
-            Yenile
-          </Button>
+            <RefreshCw className="w-4 h-4 shrink-0" />
+            <span>Yenile</span>
+          </button>
         </div>
       </div>
 
+      {/* 4 TOP KPI STRIP (Stripe / Canvas LMS Standart Metrik Bandı) */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Okunmamış Bildirim',
+            value: unreadCount,
+            icon: <Bell className="w-4 h-4" />,
+            subtext: 'İşlem veya inceleme bekliyor',
+            badge: unreadCount > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-800 border border-blue-200">
+                Yeni
+              </span>
+            ) : undefined,
+          },
+          {
+            label: 'Başvuru & Kayıt',
+            value: appNotifsCount,
+            icon: <FileText className="w-4 h-4" />,
+            subtext: 'Ön değerlendirme & kabul',
+          },
+          {
+            label: 'Akademik & Ders',
+            value: classNotifsCount,
+            icon: <Calendar className="w-4 h-4" />,
+            subtext: 'Oturum, ödev & revizyon',
+          },
+          {
+            label: 'Belge & İletişim',
+            value: otherNotifsCount,
+            icon: <Award className="w-4 h-4" />,
+            subtext: 'Karekod, duyuru & mesaj',
+          },
+        ]}
+      />
+
       {/* Action Toast Feedback */}
       {actionMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-800 flex items-center gap-2 animate-in fade-in">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-medium text-emerald-800 flex items-center gap-2 animate-in fade-in">
           <Check className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{actionMessage}</span>
         </div>
       )}
 
-      {/* Failed Events Simulation Alert (Requirement #5 & Scenario 27) */}
+      {/* Failed Events Simulation Alert */}
       {failedEvents.length > 0 && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
           <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Bekleyen / Başarısız Bildirim Olayı Tespit Edildi (Demo Kuyruk Simülasyonu)</span>
+            <span>Bekleyen Bildirim Olayı Tespit Edildi (Kuyruk Kontrolü)</span>
           </div>
           <p className="text-xs text-amber-800 leading-relaxed">
-            Asıl işlem başarıyla kaydedilmiş ancak bildirim dağıtım kuyruğu simülasyonunda hata oluşmuştur.
-            Aşağıdaki butona basarak bildirimi kontrollü olarak yeniden deneyebilirsiniz:
+            Asıl işlem başarıyla kaydedilmiş ancak bildirim dağıtım kuyruğunda gecikme oluşmuştur.
+            Aşağıdaki butona basarak bildirimi kontrollü olarak yeniden tetikleyebilirsiniz:
           </p>
           <div className="pt-1 flex flex-wrap gap-2">
             {failedEvents.map((fe) => (
               <button
                 key={fe.id}
                 onClick={() => handleRetryFailedEvent(fe.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-semibold shadow-sm transition"
+                className="h-9 px-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-xs transition inline-flex items-center gap-1.5"
               >
-                <RefreshCw className="w-3 h-3" />
-                <span>Yeniden Dene: {fe.title}</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Yeniden Tetikle: {fe.title}</span>
               </button>
             ))}
           </div>
@@ -465,17 +493,6 @@ export const NotificationCenterPage: React.FC = () => {
             );
           })
         )}
-      </div>
-
-      {/* Privacy & Scope Disclaimer Notice */}
-      <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200 text-slate-600 text-[11px] leading-relaxed flex items-start gap-2.5">
-        <AlertCircle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-        <div>
-          <strong className="text-slate-800">Bildirim Mahremiyeti ve Güvenlik İlkesi:</strong> Bu ekranda yalnızca
-          oturum açmış aktif kullanıcıya ait resmi bilgilendirme kayıtları görüntülenir. Kurum içi değerlendirme notları,
-          diğer kursiyerlerin bireysel teslimleri ve özel mesaj içerikleri gizlilik esası gereği bildirim metinlerinde açığa çıkarılmaz.
-          Bildirimi gizlemek asıl başvuru veya ödev kaydını silmez.
-        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Menu, Bell, LogOut, Sparkles } from 'lucide-react';
+import { Menu, Bell, LogOut, ArrowLeftRight, User, Search } from 'lucide-react';
 import { useDemoRole } from './DemoRoleContext';
 import { AppNotification } from '../../types';
 import {
@@ -10,6 +10,7 @@ import {
   subscribeToNotificationUpdates,
 } from '../../services/notificationStorage';
 import { authService } from '../../services/authAdapter';
+import { CommandPaletteModal } from './CommandPaletteModal';
 
 interface TopbarProps {
   onToggleMobileMenu: () => void;
@@ -20,6 +21,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
   const navigate = useNavigate();
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [userNotifications, setUserNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -54,6 +56,18 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Global Ctrl + K / Cmd + K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLogout = async () => {
     await authService.logout();
     setRole('visitor');
@@ -63,7 +77,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
   const getRoleLabel = () => {
     switch (currentRole) {
       case 'superadmin':
-        return 'Süper Yönetici';
+        return 'Sistem Yöneticisi';
       case 'admin':
         return 'Yönetici';
       case 'instructor':
@@ -101,38 +115,63 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
               <span>Eğitim Portalı</span>
               <span className="hidden sm:inline text-slate-300">|</span>
               <span className="hidden sm:inline text-slate-500 font-normal">
-                {getRoleLabel()} Paneli
+                {currentRole === 'superadmin' || currentRole === 'admin'
+                  ? 'Yönetim Paneli'
+                  : currentRole === 'instructor'
+                  ? 'Eğitmen Portalı'
+                  : currentRole === 'trainee'
+                  ? 'Kursiyer Portalı'
+                  : currentRole === 'applicant'
+                  ? 'Aday Portalı'
+                  : 'Bilgi Portalı'}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Sağ Alan: Demo Köprüsü, Bildirimler ve Kullanıcı Profili */}
-      <div className="flex items-center gap-2.5 sm:gap-4">
-        {/* Ayrılmış Demo / Sunum Masası Butonu (Rol değiştirici yerine temiz köprü) */}
-        <Link
-          to="/demo"
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition shadow-xs"
-          title="Demo ve Rol Yönetim Masasına Geç"
+      {/* Orta Alan: Hızlı Arama & Komut Paleti (Ctrl + K) */}
+      <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
+        <button
+          type="button"
+          onClick={() => setCommandPaletteOpen(true)}
+          className="w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-slate-400 bg-slate-50 hover:bg-slate-100 hover:text-slate-600 border border-slate-200/90 rounded-xl transition shadow-2xs group"
+          title="Komut Paletini Aç (Ctrl + K)"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-          <span className="hidden sm:inline">Demo Masası</span>
-          <span className="sm:hidden">Demo</span>
-        </Link>
+          <div className="flex items-center gap-2 truncate">
+            <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition" />
+            <span className="text-slate-500 font-medium truncate">Modül, ders veya sayfa ara...</span>
+          </div>
+          <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 rounded shadow-3xs shrink-0">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
+      </div>
+
+      {/* Sağ Alan: Bildirimler ve Kullanıcı Profili */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Mobil Arama Butonu */}
+        <button
+          onClick={() => setCommandPaletteOpen(true)}
+          className="md:hidden w-10 h-10 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition"
+          aria-label="Hızlı Arama"
+          title="Hızlı Arama (Ctrl + K)"
+        >
+          <Search className="w-5 h-5 text-slate-600" />
+        </button>
 
         {/* Bildirim Merkezi Açılır Menüsü */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotifMenuOpen(!notifMenuOpen)}
-            className="p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 relative transition"
+            className="w-10 h-10 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center relative transition"
             aria-expanded={notifMenuOpen}
             aria-label={`Bildirimler (${unreadCount} okunmamış)`}
             title={`${unreadCount} Okunmamış Bildirim`}
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-5 h-5 text-slate-600" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center leading-none ring-2 ring-white">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center leading-none ring-2 ring-white shadow-xs">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -235,7 +274,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
                 {currentUser.fullName}
               </div>
               <div className="text-[10px] text-slate-500 font-medium">
-                {getRoleLabel()}
+                {currentUser.fullName === getRoleLabel()
+                  ? currentUser.email || 'İTO Yönetim'
+                  : getRoleLabel()}
               </div>
             </div>
             <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
@@ -268,13 +309,22 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
                 <Link
                   to="/demo"
                   onClick={() => setProfileMenuOpen(false)}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-amber-50 text-amber-900 transition font-medium"
+                  className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 text-slate-700 transition font-medium"
                 >
                   <span className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Demo ve Rol Masası</span>
+                    <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Rol & Panel Değiştir</span>
                   </span>
-                  <span className="text-[10px] text-amber-600 font-bold">Aç</span>
+                  <span className="text-[10px] text-blue-600 font-bold">Seç</span>
+                </Link>
+
+                <Link
+                  to={currentRole === 'instructor' ? '/egitmen/profil' : '/kursiyer/profil'}
+                  onClick={() => setProfileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition"
+                >
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Profilim & Bilgilerim</span>
                 </Link>
 
                 <Link
@@ -300,6 +350,12 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
           )}
         </div>
       </div>
+
+      {/* Global Komut Paleti Modalı */}
+      <CommandPaletteModal
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
     </header>
   );
 };

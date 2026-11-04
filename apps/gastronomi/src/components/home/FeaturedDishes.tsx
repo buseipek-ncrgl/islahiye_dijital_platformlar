@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Filter, Clock, ChefHat, Users, ArrowRight, UtensilsCrossed, Eye, Sparkles } from 'lucide-react';
-import { Dish, DishCategory, Recipe } from '../../types';
+import { Filter, Clock, ChefHat, Users, ArrowRight, UtensilsCrossed, Sparkles } from 'lucide-react';
+import { Dish, DishCategory } from '../../types';
 import { useContent } from '../../hooks/useContent';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 
 interface FeaturedDishesProps {
-  onSelectDish: (dish: Dish) => void;
+  onSelectDish?: (dish: Dish) => void;
   onOpenWorkshop?: (recipeId: string) => void;
 }
 
 export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
   onSelectDish,
-  onOpenWorkshop,
 }) => {
+  const navigate = useNavigate();
   const { getDishes, getRecipeById } = useContent();
   const publishedDishes = getDishes(true);
 
@@ -73,14 +74,6 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
     return filteredDishes.find((d) => d.id === activeDishId) || filteredDishes[0];
   }, [filteredDishes, activeDishId]);
 
-  // Check if active dish has a valid recipe
-  const linkedRecipe: Recipe | undefined = useMemo(() => {
-    if (!activeDish?.recipeId) return undefined;
-    const r = getRecipeById(activeDish.recipeId);
-    if (r && r.publicationStatus !== 'archived') return r;
-    return undefined;
-  }, [activeDish, getRecipeById]);
-
   // Keyboard navigation handler for right list items
   const handleItemKeyDown = (e: React.KeyboardEvent, dishId: string) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -99,12 +92,12 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
             <div className="flex items-center gap-2.5 mb-3">
               <span className="w-8 h-px bg-copper" />
               <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
-                02 / İSLAHİYE MUTFAK ENVENTARİ
+                03 / YÖRESEL TARİFLER &amp; GASTRONOMİ
               </span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-forest leading-tight">
-              Yöresel Lezzetler & Mutfak Monografisi
+              Yöresel Tarifler
             </h2>
 
             <p className="text-sm sm:text-base text-charcoal/75 mt-3 max-w-2xl font-sans leading-relaxed">
@@ -314,34 +307,28 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
 
                       {/* Action Buttons: Differentiated Hierarchy */}
                       <div className="flex flex-wrap items-center gap-4">
-                        {/* Primary Action: Atölyede Pişir (Only if valid recipe exists) */}
-                        {linkedRecipe && onOpenWorkshop ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenWorkshop(linkedRecipe.id)}
-                            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-widest hover:bg-forest-600 active:scale-[0.99] transition-all shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
-                          >
-                            <span>Atölyede Pişir</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-copper-light" />
-                          </button>
-                        ) : null}
-
-                        {/* Secondary Action: Hızlı Önizleme / Detay Modal */}
                         <button
                           type="button"
-                          onClick={() => onSelectDish(activeDish)}
-                          className={`inline-flex items-center gap-2 px-6 py-3.5 rounded-sm text-xs font-semibold uppercase tracking-wider transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-copper ${
-                            linkedRecipe
-                              ? 'border border-sand bg-paper hover:bg-sand/30 text-charcoal hover:text-forest'
-                              : 'bg-forest text-ivory hover:bg-forest-600 shadow-xs'
-                          }`}
+                          onClick={() => {
+                            if (onSelectDish) {
+                              onSelectDish(activeDish);
+                            } else {
+                              navigate(`/yemekler/${activeDish.id}`);
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-widest hover:bg-forest-600 active:scale-[0.99] transition-all shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
                         >
-                          <Eye className="w-3.5 h-3.5 text-copper" />
-                          <span>
-                            {linkedRecipe
-                              ? 'Malzeme & Tarif Önizlemesi'
-                              : 'Lezzet Detaylarını İncele'}
-                          </span>
+                          <span>Tarifi &amp; Pişirme Adımlarını Öğren</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-copper-light" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => navigate('/yemekler')}
+                          className="inline-flex items-center gap-2 px-5 py-3.5 rounded-sm border border-sand bg-paper hover:bg-sand/30 text-charcoal hover:text-forest text-xs font-semibold uppercase tracking-wider transition-all"
+                        >
+                          <UtensilsCrossed className="w-3.5 h-3.5 text-copper" />
+                          <span>Tüm Kataloğu Gör</span>
                         </button>
                       </div>
                     </div>
@@ -465,6 +452,26 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
             </button>
           </div>
         )}
+
+        {/* Catalog CTA Footer */}
+        <div className="mt-12 pt-8 border-t border-sand/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-copper-dark font-semibold block mb-0.5">
+              GENİŞLETİLMİŞ ARŞİV
+            </span>
+            <p className="text-sm text-charcoal/80 font-sans">
+              Tüm tescilli ve geleneksel lezzetleri, porsiyon ölçekleri ve malzeme filtreleriyle katalogda inceleyin.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/yemekler')}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xs border border-forest/30 bg-paper text-forest text-xs font-semibold uppercase tracking-wider hover:bg-forest hover:text-ivory transition-all shadow-xs shrink-0"
+          >
+            <span>Tüm Yemek &amp; Tarif Kataloğu</span>
+            <ArrowRight className="w-3.5 h-3.5 text-copper" />
+          </button>
+        </div>
 
       </div>
     </section>

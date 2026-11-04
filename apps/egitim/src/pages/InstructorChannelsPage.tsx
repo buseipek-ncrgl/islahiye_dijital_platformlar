@@ -8,9 +8,12 @@ import {
   ArrowLeft,
   Info,
   ShieldCheck,
-  ChevronRight,
   AlertCircle,
   Filter,
+  CornerUpLeft,
+  X,
+  CheckSquare,
+  Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
@@ -22,15 +25,21 @@ import {
   getChannelsForUser,
   getMessagesForChannel,
   sendChannelMessage,
+  editChannelMessage,
+  deleteChannelMessage,
+  deleteMultipleChannelMessages,
+  toggleChannelMessageReaction,
   CHANNELS_UPDATE_EVENT,
   CHANNEL_MESSAGES_UPDATE_EVENT,
 } from '../services/channelStorage';
 import { getStoredGroups } from '../services/enrollmentStorage';
+import { ChatMessageBubble } from '../components/common/ChatMessageBubble';
+import { playMessageSentSound } from '../services/soundFx';
 
 export const InstructorChannelsPage: React.FC = () => {
   const { currentUser } = useDemoRole();
-  const instructorId = currentUser?.id || 'user-instructor-01';
-  const instructorName = currentUser?.name || 'Murat Özkan';
+  const instructorId = currentUser?.id || (currentUser?.email ? `usr-${currentUser.email.split('@')[0].replace(/\./g, '-')}` : 'usr-instructor');
+  const instructorName = currentUser?.fullName || currentUser?.name || 'Murat Özkan';
 
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
@@ -41,8 +50,38 @@ export const InstructorChannelsPage: React.FC = () => {
   const [isPinned, setIsPinned] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<{ id: string; senderName: string; senderRole?: string; content: string } | null>(null);
+
+  // Toplu Seçim & Silme State'leri
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMsgIds, setSelectedMsgIds] = useState<string[]>([]);
+  const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleSelectMessage = (msgId: string) => {
+    setSelectedMsgIds((prev) =>
+      prev.includes(msgId) ? prev.filter((id) => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  const handleSelectAllMessages = () => {
+    const selectable = messages.filter(
+      (m) => !m.isDeleted && (m.senderId === instructorId || m.senderRole === 'trainee')
+    );
+    setSelectedMsgIds(selectable.map((m) => m.id));
+  };
+
+  const handleConfirmBatchDelete = () => {
+    if (selectedMsgIds.length === 0) return;
+    const res = deleteMultipleChannelMessages(selectedMsgIds, instructorId, 'instructor');
+    if (res.success && selectedChannelId) {
+      loadMessages(selectedChannelId);
+    }
+    setSelectedMsgIds([]);
+    setSelectionMode(false);
+    setShowBatchDeleteModal(false);
+  };
 
   const loadChannels = () => {
     const userChans = getChannelsForUser(instructorId, 'instructor');
@@ -95,8 +134,12 @@ export const InstructorChannelsPage: React.FC = () => {
     }
   }, [selectedChannelId]);
 
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevMsgCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMsgCountRef.current = messages.length;
   }, [messages]);
 
   const assignedGroups = getStoredGroups().filter((g) => g.instructorIds.includes(instructorId));
@@ -126,57 +169,56 @@ export const InstructorChannelsPage: React.FC = () => {
       channelId: selectedChannelId,
       senderId: instructorId,
       senderName: instructorName,
+      senderEmail: currentUser?.email,
       senderRole: 'instructor',
       title: activeChannel.type === 'announcement' ? announcementTitle : undefined,
       content: inputText,
       isPinned: activeChannel.type === 'announcement' ? isPinned : false,
+      replyTo: replyTarget || undefined,
     });
 
     if (!res.success) {
       setErrorMsg(res.error || 'Duyuru/mesaj paylaşılamadı.');
     } else {
+      playMessageSentSound();
       setInputText('');
       setAnnouncementTitle('');
       setIsPinned(false);
+      setReplyTarget(null);
       setErrorMsg(null);
       loadMessages(selectedChannelId);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Üst Başlık & Ekmek Kırıntısı */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      {/* Üst Başlık & Hızlı Butonlar */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link to="/egitmen" className="hover:text-brand-blue transition-colors">
-              Eğitmen Masası
-            </Link>
-            <ChevronRight className="w-3.5 h-3.5" />
-            <span className="text-slate-800 font-semibold">Sınıf Kanalları</span>
-          </div>
-          <h1 className="text-2xl font-bold text-brand-navy">Sınıf & Grup Kanal Yönetimi</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Atandığınız eğitim gruplarına resmi duyuru yayımlama ve sınıf tartışmalarına katılma alanı.
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Sınıf & Grup Kanal Yönetimi
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Atandığınız eğitim gruplarına resmî duyuru yayımlama ve sınıf tartışmalarına katılma alanı.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Link
             to="/egitmen/mesajlar"
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-md border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-sm"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
           >
-            <MessageSquare className="w-4 h-4 text-brand-blue" />
+            <MessageSquare className="w-4 h-4 text-blue-600 shrink-0" />
             <span>Kursiyer Mesajlarım</span>
           </Link>
         </div>
       </div>
 
-      {/* Dürüst Demo Bilgilendirme Kartı */}
-      <div className="bg-slate-100 border border-slate-200 rounded-lg p-3.5 flex items-start gap-3">
-        <Info className="w-5 h-5 text-slate-600 shrink-0 mt-0.5" />
+      {/* Yetki Sınırı Bilgilendirmesi */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-start gap-3">
+        <Info className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
         <div className="text-xs text-slate-700 leading-relaxed">
-          <span className="font-semibold">Yetki Sınırı:</span> Yalnızca odanın size atadığı grupların kanallarında duyuru yayımlayabilir veya tartışmalara katılabilirsiniz. Başka eğitmene ait grupların kanallarına erişim frontend demo seviyesinde engellenmiştir.
+          <span className="font-semibold text-slate-900">Yetki Sınırı:</span> Yalnızca odanın size atadığı grupların kanallarında duyuru yayımlayabilir veya tartışmalara katılabilirsiniz.
         </div>
       </div>
 
@@ -314,105 +356,154 @@ export const InstructorChannelsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-                  <ShieldCheck className="w-3.5 h-3.5 text-brand-blue" />
-                  <span>Yetkili Eğitmen</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectionMode((prev) => !prev);
+                      setSelectedMsgIds([]);
+                    }}
+                    className={`h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer ${
+                      selectionMode
+                        ? 'border-blue-400 bg-blue-100 text-blue-900'
+                        : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
+                    }`}
+                    title="Toplu Mesaj Seçimi ve Silme"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="hidden sm:inline">{selectionMode ? 'Seçimi Kapat' : 'Toplu Seç'}</span>
+                  </button>
+
+                  <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
+                    <ShieldCheck className="w-3.5 h-3.5 text-brand-blue" />
+                    <span>Yetkili Eğitmen</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Mesaj / Duyuru Akışı */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[440px]">
+              {/* Toplu Seçim Aksiyon Çubuğu */}
+              {selectionMode && (
+                <div className="px-4 py-2 bg-blue-50/95 border-b border-blue-200 flex items-center justify-between text-xs animate-in slide-in-from-top-1">
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-blue-900">
+                      {selectedMsgIds.length} mesaj seçildi
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllMessages}
+                      className="text-blue-700 hover:underline font-semibold cursor-pointer"
+                    >
+                      Tümünü Seç
+                    </button>
+                    {selectedMsgIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMsgIds([])}
+                        className="text-slate-600 hover:underline cursor-pointer"
+                      >
+                        Seçimi Temizle
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={selectedMsgIds.length === 0}
+                      onClick={() => setShowBatchDeleteModal(true)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-2xs ${
+                        selectedMsgIds.length > 0
+                          ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Seçilenleri Sil ({selectedMsgIds.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectionMode(false);
+                        setSelectedMsgIds([]);
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
+                      title="Seçim modunu kapat"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mesaj / Duyuru Akışı (WhatsApp / Telegram Balon Görünümü) */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-2.5 max-h-[440px] bg-slate-100/60">
                 {messages.length === 0 ? (
                   <div className="p-8 text-center text-xs text-slate-400">
                     Bu kanalda henüz paylaşılan bir içerik bulunmuyor.
                   </div>
                 ) : (
                   messages.map((msg) => {
-                    const isInstructor = msg.senderRole === 'instructor';
-                    const isMe = msg.senderId === instructorId;
-                    const isAnnounce = activeChannel.type === 'announcement';
-                    const dateStr = new Date(msg.createdAt).toLocaleDateString('tr-TR', {
-                      day: 'numeric',
-                      month: 'long',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+                    const currentUserName = (currentUser?.fullName || currentUser?.name || '').trim().toLowerCase();
+                    const currentUserId = (currentUser?.id || '').trim();
+                    const currentUserEmail = (currentUser?.email || '').trim().toLowerCase();
 
-                    // DUYURU MESAJI GÖRÜNÜMÜ
-                    if (isAnnounce) {
-                      return (
-                        <div
-                          key={msg.id}
-                          className="bg-white rounded-xl border border-amber-200 shadow-sm p-4 relative overflow-hidden"
-                        >
-                          <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-amber-500" />
-                          <div className="flex items-start justify-between gap-3 mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="p-1 rounded bg-amber-100 text-amber-800">
-                                <Megaphone className="w-3.5 h-3.5" />
-                              </span>
-                              <h3 className="text-xs font-bold text-brand-navy">
-                                {msg.title || 'Resmi Duyuru'}
-                              </h3>
-                              {msg.isPinned && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  <Pin className="w-2.5 h-2.5" />
-                                  <span>Sabitlendi</span>
-                                </span>
-                              )}
-                            </div>
+                    const msgSenderName = (msg.senderName || '').trim().toLowerCase();
+                    const msgSenderId = (msg.senderId || '').trim();
+                    const msgSenderEmail = (msg.senderEmail || '').trim().toLowerCase();
 
-                            <span className="text-[10px] text-slate-400 shrink-0">{dateStr}</span>
-                          </div>
+                    // Gönderici adı mevcut ve oturum açan kullanıcının adından farklıysa ASLA 'isMe' olamaz
+                    const nameDiffers = Boolean(currentUserName && msgSenderName && currentUserName !== msgSenderName);
 
-                          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed mb-3">
-                            {msg.content}
-                          </p>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px] text-slate-500">
-                            <span className="font-semibold text-slate-700">Yayınlayan: {msg.senderName}</span>
-                            <span className="text-slate-400">Yerel Demoya Kaydedildi</span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // TARTIŞMA MESAJI GÖRÜNÜMÜ
+                    // Eşleşme kontrolü: İsimler tam uyuşuyorsa veya benzersiz e-posta / özel ID uyuşuyorsa
+                    const isMe = !nameDiffers && Boolean(
+                      (currentUserName && msgSenderName && currentUserName === msgSenderName) ||
+                      (currentUserEmail && msgSenderEmail && currentUserEmail === msgSenderEmail) ||
+                      (currentUserId && msgSenderId && currentUserId === msgSenderId && !msgSenderId.startsWith('user-instructor-01') && !msgSenderId.startsWith('user-instructor'))
+                    );
                     return (
-                      <div
+                      <ChatMessageBubble
                         key={msg.id}
-                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                      >
-                        <div className="text-[10px] text-slate-400 mb-0.5 px-1 flex items-center gap-1.5">
-                          <span className="font-medium text-slate-600">
-                            {isMe ? 'Siz (Eğitmen)' : msg.senderName}
-                          </span>
-                          {!isInstructor && (
-                            <span className="px-1 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                              Kursiyer
-                            </span>
-                          )}
-                          <span>•</span>
-                          <span>{dateStr}</span>
-                        </div>
-
-                        <div
-                          className={`max-w-[82%] sm:max-w-[70%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
-                            isMe
-                              ? 'bg-brand-navy text-white rounded-br-xs'
-                              : 'bg-white text-slate-800 border border-slate-200 rounded-bl-xs'
-                          }`}
-                        >
-                          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                          <div
-                            className={`mt-1 pt-0.5 text-right text-[9px] ${
-                              isMe ? 'text-blue-200' : 'text-slate-400'
-                            }`}
-                          >
-                            <span>Yerel Demoya Kaydedildi</span>
-                          </div>
-                        </div>
-                      </div>
+                        id={msg.id}
+                        senderId={msg.senderId}
+                        senderName={msg.senderName}
+                        senderRole={msg.senderRole}
+                        title={msg.title}
+                        content={msg.content}
+                        createdAt={msg.createdAt}
+                        isPinned={msg.isPinned}
+                        isEdited={msg.isEdited}
+                        editedAt={msg.editedAt}
+                        isDeleted={msg.isDeleted}
+                        deletedAt={msg.deletedAt}
+                        replyTo={msg.replyTo}
+                        reactions={msg.reactions}
+                        currentUserId={instructorId}
+                        isMe={isMe}
+                        canEdit={isMe && !msg.isDeleted}
+                        canDelete={!msg.isDeleted && (isMe || msg.senderRole === 'trainee')}
+                        selectionMode={selectionMode}
+                        isSelected={selectedMsgIds.includes(msg.id)}
+                        onToggleSelect={handleToggleSelectMessage}
+                        onReply={(id, name, text) => setReplyTarget({ id, senderName: name, content: text })}
+                        onReact={(messageId, emoji) => {
+                          toggleChannelMessageReaction(messageId, emoji, instructorId);
+                          if (selectedChannelId) {
+                            loadMessages(selectedChannelId);
+                          }
+                        }}
+                        onEdit={(messageId, newContent) => {
+                          const editRes = editChannelMessage(messageId, newContent, instructorId);
+                          if (editRes.success && selectedChannelId) {
+                            loadMessages(selectedChannelId);
+                          }
+                        }}
+                        onDelete={(messageId) => {
+                          const delRes = deleteChannelMessage(messageId, instructorId, 'instructor');
+                          if (delRes.success && selectedChannelId) {
+                            loadMessages(selectedChannelId);
+                          }
+                        }}
+                      />
                     );
                   })
                 )}
@@ -429,6 +520,24 @@ export const InstructorChannelsPage: React.FC = () => {
 
               {/* Eğitmen Gönderim Formu */}
               <form onSubmit={handleSendMessage} className="p-3.5 bg-white border-t border-slate-200 space-y-2">
+                {/* Yanıtlanan Mesaj Başlığı (Varsa) */}
+                {replyTarget && (
+                  <div className="flex items-center justify-between p-2 px-3 bg-blue-50/90 border border-blue-200 rounded-xl text-xs text-blue-900 animate-in fade-in">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CornerUpLeft className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="font-bold truncate">{replyTarget.senderName} yanıtlanıyor:</span>
+                      <span className="italic text-slate-500 truncate text-[11px]">"{replyTarget.content}"</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyTarget(null)}
+                      className="p-1 text-slate-400 hover:text-slate-700 ml-2 cursor-pointer"
+                      title="Yanıtı İptal Et"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 {activeChannel.type === 'announcement' ? (
                   <>
                     <div className="flex items-center gap-2">
@@ -436,7 +545,7 @@ export const InstructorChannelsPage: React.FC = () => {
                         type="text"
                         value={announcementTitle}
                         onChange={(e) => setAnnouncementTitle(e.target.value)}
-                        placeholder="Resmi Duyuru Başlığı (Örn: 3. Hafta Saha İncelemesi)"
+                        placeholder="Resmi Duyuru Başlığı (Zorunlu) *"
                         className="flex-1 p-2 text-xs rounded border border-slate-300 font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-blue"
                         maxLength={150}
                       />
@@ -512,7 +621,6 @@ export const InstructorChannelsPage: React.FC = () => {
                       ? '* Yayınlanan duyuru grubun tüm kursiyerleri tarafından okunabilir.'
                       : '* Eğitmen yanıtı sınıf tartışma akışına iletilir.'}
                   </span>
-                  <span>Yerel Demo Simülasyonu</span>
                 </div>
               </form>
             </>
@@ -527,6 +635,50 @@ export const InstructorChannelsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Toplu Mesaj Silme Onay Modalı */}
+      {showBatchDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
+                <div className="w-7 h-7 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                </div>
+                <span>Toplu Mesaj Silme</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBatchDeleteModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Seçilen <strong className="text-slate-900">{selectedMsgIds.length} adet</strong> mesajı silmek istediğinizden emin misiniz? Silinen mesajların yerine <em>"Bu mesaj silindi"</em> bildirimi yerleştirilecektir.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowBatchDeleteModal(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBatchDelete}
+                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white shadow-2xs transition cursor-pointer"
+              >
+                Evet, {selectedMsgIds.length} Mesajı Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UserRole, UserProfile } from '../../types';
-import { DEMO_USERS } from '../../data/educationData';
+import { authService, REAL_ACCOUNTS } from '../../services/authAdapter';
 
 interface DemoRoleContextType {
   currentRole: UserRole;
@@ -13,12 +13,24 @@ interface DemoRoleContextType {
 
 const DemoRoleContext = createContext<DemoRoleContextType | undefined>(undefined);
 
+const GUEST_USER: UserProfile = {
+  id: 'usr-guest',
+  fullName: 'Ziyaretçi',
+  email: 'ziyaretci@islahiye-dijital.org',
+  role: 'visitor',
+  roles: ['visitor'],
+  title: 'Ziyaretçi Kullanıcı',
+  isActive: true,
+};
+
 export const DemoRoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // URL rotasına göre başlangıç rolünü tahmin et veya varsayılan yap
   const getInitialRole = (): UserRole => {
+    const saved = authService.getCurrentUser();
+    if (saved && saved.role) return saved.role;
+
     const path = location.pathname;
     if (path.startsWith('/aday')) return 'applicant';
     if (
@@ -36,16 +48,36 @@ export const DemoRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const [currentRole, setCurrentRole] = useState<UserRole>(getInitialRole);
-  const [activeUserKey, setActiveUserKey] = useState<string>(getInitialRole());
+  const [activeUserKey, setActiveUserKey] = useState<string>(() => {
+    const saved = authService.getCurrentUser();
+    return saved?.email ?? getInitialRole();
+  });
+  const [liveUser, setLiveUser] = useState<UserProfile | null>(() => authService.getCurrentUser());
 
-  // Sayfa yolu değiştiğinde rolü güncelle
+  // Listen to auth user changes (login, logout, account switch)
+  useEffect(() => {
+    const handleAuthChange = (e: Event) => {
+      const customEvent = e as CustomEvent<UserProfile | null>;
+      const user = customEvent.detail;
+      setLiveUser(user);
+      if (user) {
+        setCurrentRole(user.role);
+        setActiveUserKey(user.email);
+      } else {
+        setCurrentRole('visitor');
+        setActiveUserKey('visitor');
+      }
+    };
+
+    window.addEventListener('auth_user_changed', handleAuthChange);
+    return () => window.removeEventListener('auth_user_changed', handleAuthChange);
+  }, []);
+
+  // Update role based on URL navigation
   useEffect(() => {
     const path = location.pathname;
     if (path.startsWith('/aday') && currentRole !== 'applicant') {
       setCurrentRole('applicant');
-      if (activeUserKey !== 'applicant' && activeUserKey !== 'applicant2') {
-        setActiveUserKey('applicant');
-      }
     } else if (
       (path.startsWith('/yonetim/super-admin') ||
         path.startsWith('/yonetim/kullanicilar') ||
@@ -54,7 +86,6 @@ export const DemoRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       currentRole !== 'superadmin'
     ) {
       setCurrentRole('superadmin');
-      setActiveUserKey('superadmin');
     } else if (
       path.startsWith('/yonetim') &&
       !path.startsWith('/yonetim/super-admin') &&
@@ -65,48 +96,82 @@ export const DemoRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       currentRole !== 'superadmin'
     ) {
       setCurrentRole('admin');
-      setActiveUserKey('admin');
     } else if (path.startsWith('/egitmen') && currentRole !== 'instructor') {
       setCurrentRole('instructor');
-      setActiveUserKey('instructor');
     } else if (path.startsWith('/kursiyer') && currentRole !== 'trainee') {
       setCurrentRole('trainee');
-      setActiveUserKey('trainee');
     }
   }, [location.pathname]);
 
   const handleSetRole = (newRole: UserRole) => {
     setCurrentRole(newRole);
     if (newRole === 'applicant') {
-      setActiveUserKey('applicant');
       navigate('/aday');
     } else if (newRole === 'visitor') {
-      setActiveUserKey('visitor');
       navigate('/');
     } else if (newRole === 'trainee') {
-      setActiveUserKey('trainee');
       navigate('/kursiyer');
     } else if (newRole === 'instructor') {
-      setActiveUserKey('instructor');
       navigate('/egitmen');
     } else if (newRole === 'admin') {
-      setActiveUserKey('admin');
       navigate('/yonetim');
     } else if (newRole === 'superadmin') {
-      setActiveUserKey('superadmin');
       navigate('/yonetim/super-admin');
     }
   };
 
+  const resolveUniqueUserId = (acc: typeof REAL_ACCOUNTS[0]): string => {
+    if (acc.email === 'admin@islahiye.bel.tr') return 'usr-admin-hakan';
+    if (acc.email === 'superadmin.zeynep@islahiye.bel.tr') return 'usr-superadmin-zeynep';
+    if (acc.email === 'kursiyer.ahmet@islahiye.bel.tr') return 'usr-trainee';
+    if (acc.email === 'egitmen.mehmet@islahiye.bel.tr') return 'usr-instructor';
+    const prefix = acc.email.split('@')[0].replace(/\./g, '-');
+    return `usr-${prefix}`;
+  };
+
   const handleSetActiveUserKey = (key: string) => {
     setActiveUserKey(key);
-    const user = DEMO_USERS[key];
-    if (user && user.role !== currentRole) {
-      setCurrentRole(user.role);
+    const matchedAccount = REAL_ACCOUNTS.find((a) => a.email === key || a.role === key);
+    if (matchedAccount) {
+      const switchedProfile: UserProfile = {
+        id: resolveUniqueUserId(matchedAccount),
+        fullName: matchedAccount.name,
+        name: matchedAccount.name,
+        email: matchedAccount.email,
+        role: matchedAccount.role,
+        roles: [matchedAccount.role],
+        title: matchedAccount.label,
+        isActive: true,
+      };
+      setLiveUser(switchedProfile);
+      setCurrentRole(matchedAccount.role);
     }
   };
 
-  const currentUser = DEMO_USERS[activeUserKey] || DEMO_USERS[currentRole] || DEMO_USERS.visitor;
+  const getDefaultRoleProfile = (role: UserRole): UserProfile => {
+    const acc = REAL_ACCOUNTS.find((a) => a.role === role);
+    if (!acc) return GUEST_USER;
+
+    const id = resolveUniqueUserId(acc);
+
+    return {
+      id,
+      fullName: acc.name,
+      name: acc.name,
+      email: acc.email,
+      role: acc.role,
+      roles: [acc.role],
+      title: acc.label,
+      isActive: true,
+    };
+  };
+
+  const currentUser: UserProfile = liveUser
+    ? {
+        ...liveUser,
+        title: (liveUser.title || '').replace(/süper yönetici/i, 'Sistem Yöneticisi') || 'Kullanıcı',
+      }
+    : getDefaultRoleProfile(currentRole);
 
   return (
     <DemoRoleContext.Provider

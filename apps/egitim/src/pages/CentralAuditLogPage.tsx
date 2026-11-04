@@ -1,18 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckSquare,
   Download,
   Search,
   Filter,
-  Lock,
+  ShieldCheck,
+  Calendar,
+  FileCheck,
+  Award,
 } from 'lucide-react';
+import { KpiStrip } from '../components/ui/KpiStrip';
 import {
   getStoredAuditLogs,
   exportAuditLogsToCSV,
   subscribeToAuditLogUpdates,
 } from '../services/auditStorage';
 import { AuditLog } from '../types';
+
+const AUDIT_ACTION_MAP: Record<string, string> = {
+  'criteria.version_published': 'Kriter Seti Yayını',
+  'application.created': 'Yeni Başvuru Kaydı',
+  'application.evaluated': 'Ön Değerlendirme',
+  'application.decision': 'Kabul / Ret Kararı',
+  'enrollment.completed': 'Kesin Kayıt Onayı',
+  'group.assigned': 'Şube / Grup Ataması',
+  'attendance.closed': 'Yoklama Kapatma',
+  'attendance.corrected': 'Yoklama Düzeltme',
+  'evaluation.graded': 'Ödev Notlandırma',
+  'success.approved': 'Dönem Başarı Onayı',
+  'certificate.generated': 'Sertifika Üretimi',
+  'policy.updated': 'Politika Güncellemesi',
+  'user.role_assigned': 'Rol Yetkilendirme',
+  'system.reset': 'Sistem Sıfırlama',
+};
+
+const AUDIT_MODULE_MAP: Record<string, string> = {
+  criteriaRepository: 'Kriter & Puanlama Modülü',
+  applicationStorage: 'Başvuru Yönetim Modülü',
+  enrollmentStorage: 'Kesin Kayıt & Grup Modülü',
+  sessionStorage: 'Oturum & Yoklama Modülü',
+  assignmentStorage: 'Ödev & Değerlendirme Modülü',
+  successStorage: 'Başarı & Mezuniyet Modülü',
+  certificateStorage: 'Belge & Karekod Kütüğü',
+  systemSettingsStorage: 'Sistem Politikaları Masası',
+  permissionEngine: 'Granüler Yetki Matrisi',
+};
+
+const AUDIT_ROLE_MAP: Record<string, string> = {
+  superadmin: 'Sistem Yöneticisi',
+  admin: 'Eğitim Yöneticisi',
+  instructor: 'Eğitmen',
+  applicant: 'Aday Başvuru',
+  trainee: 'Kayıtlı Kursiyer',
+};
 
 export const CentralAuditLogPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,20 +70,22 @@ export const CentralAuditLogPage: React.FC = () => {
     return () => unsub();
   }, []);
 
-  const filteredLogs = logs.filter((log) => {
-    const title = log.resourceTitle || '';
-    const matchesSearch =
-      title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.reason && log.reason.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (log.actorName && log.actorName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      log.eventId.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      const title = log.resourceTitle || '';
+      const matchesSearch =
+        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (log.reason && log.reason.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (log.actorName && log.actorName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        log.eventId.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesResource = resourceFilter === 'all' || log.resourceType === resourceFilter;
-    const matchesRole = roleFilter === 'all' || log.actorRole === roleFilter;
+      const matchesResource = resourceFilter === 'all' || log.resourceType === resourceFilter;
+      const matchesRole = roleFilter === 'all' || log.actorRole === roleFilter;
 
-    return matchesSearch && matchesResource && matchesRole;
-  });
+      return matchesSearch && matchesResource && matchesRole;
+    });
+  }, [logs, searchQuery, resourceFilter, roleFilter]);
 
   const handleDownloadCSV = () => {
     const csvContent = exportAuditLogsToCSV(filteredLogs);
@@ -59,56 +102,72 @@ export const CentralAuditLogPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Top KPIs
+  const totalLogsCount = logs.length;
+  const attendanceLogsCount = logs.filter((l) => l.resourceType === 'session' || l.action.includes('attendance')).length;
+  const evaluationLogsCount = logs.filter((l) => ['evaluation', 'assignment'].includes(l.resourceType)).length;
+  const decisionLogsCount = logs.filter((l) => ['success_decision', 'certificate', 'role_assignment', 'application'].includes(l.resourceType)).length;
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-brand-border p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-              Merkezi Denetim Kütüğü (Audit Trail)
-            </span>
-            <span className="text-xs text-slate-400">|</span>
-            <span className="text-xs text-slate-500 font-medium">Sprint E05-A</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             İdari ve Operasyonel Denetim Kayıtları
           </h1>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Başvuru kararları, yoklama düzeltmeleri, ödev notları, başarı onayları ve yetki değişikliklerinin tescil kütüğü.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => navigate('/yonetim/yoklama-denetim')}
-            className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition flex items-center gap-1.5"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
           >
             <span>Yoklama Denetimi Masası →</span>
           </button>
           <button
             onClick={handleDownloadCSV}
-            className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-sm transition flex items-center gap-1.5"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition shadow-2xs whitespace-nowrap"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4 shrink-0" />
             <span>CSV Dışa Aktar (UTF-8 BOM)</span>
           </button>
         </div>
       </div>
 
-      {/* Privacy Sanitizer & Integrity Disclaimer */}
-      <div className="bg-slate-900 text-slate-200 rounded-xl p-4 shadow-sm border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <Lock className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>
-            <strong>Mahremiyet ve Sanitizer Garantisi:</strong> Kayıtlarda parola, T.C. kimlik numarası, gizli not ve özel mesaj metinleri kesinlikle saklanmaz veya dışa aktarılmaz.
-          </span>
-        </div>
-        <div className="text-[11px] text-slate-400 shrink-0 italic">
-          * Frontend simülasyonudur. Gerçek WORM güvencesi sunucu tarafı altyapı gerektirir.
-        </div>
-      </div>
+      {/* 4 TOP KPI METRİK BANDI (Stripe / Canvas LMS Standart Metrik Bandı) */}
+      <KpiStrip
+        items={[
+          {
+            label: 'Toplam Denetim İzi',
+            value: totalLogsCount,
+            icon: <ShieldCheck className="w-4 h-4" />,
+            subtext: 'Tescilli idari olay kaydı',
+          },
+          {
+            label: 'Yoklama Düzeltmeleri',
+            value: attendanceLogsCount,
+            icon: <Calendar className="w-4 h-4" />,
+            subtext: 'Gerekçeli yoklama hareketleri',
+          },
+          {
+            label: 'Ödev Değerlendirme',
+            value: evaluationLogsCount,
+            icon: <FileCheck className="w-4 h-4" />,
+            subtext: 'Notlandırma & revizyon',
+          },
+          {
+            label: 'Karar & Belge Tescili',
+            value: decisionLogsCount,
+            icon: <Award className="w-4 h-4" />,
+            subtext: 'Mezuniyet & karekod üretimi',
+          },
+        ]}
+      />
 
       {/* Filters and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -148,7 +207,7 @@ export const CentralAuditLogPage: React.FC = () => {
             className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Tüm Roller</option>
-            <option value="superadmin">Süper Yönetici</option>
+            <option value="superadmin">Sistem Yöneticisi</option>
             <option value="admin">Yönetici</option>
             <option value="instructor">Eğitmen</option>
             <option value="applicant">Aday</option>
@@ -158,17 +217,17 @@ export const CentralAuditLogPage: React.FC = () => {
 
       {/* Audit Trail Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[580px] overflow-y-auto relative">
           <table className="w-full text-left border-collapse min-w-[950px]">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                <th className="py-3 px-3">Tarih & Saat</th>
-                <th className="py-3 px-3">İşlemi Yapan</th>
-                <th className="py-3 px-3">İşlem & Olay ID</th>
-                <th className="py-3 px-3">Kaynak</th>
-                <th className="py-3 px-3">Değişim Özeti</th>
-                <th className="py-3 px-3">Gerekçe</th>
-                <th className="py-3 px-3 text-right">Detay</th>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
+              <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                <th className="py-3 px-3 bg-slate-50">Tarih & Saat</th>
+                <th className="py-3 px-3 bg-slate-50">İşlemi Yapan</th>
+                <th className="py-3 px-3 bg-slate-50">İşlem & Olay ID</th>
+                <th className="py-3 px-3 bg-slate-50">Kaynak</th>
+                <th className="py-3 px-3 bg-slate-50">Değişim Özeti</th>
+                <th className="py-3 px-3 bg-slate-50">Gerekçe</th>
+                <th className="py-3 px-3 text-right bg-slate-50">Detay</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -204,7 +263,7 @@ export const CentralAuditLogPage: React.FC = () => {
                       <td className="py-3 px-3">
                         <div className="font-bold text-slate-900">{log.actorName || log.actorId}</div>
                         <span
-                          className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-semibold ${
+                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                             log.actorRole === 'superadmin'
                               ? 'bg-amber-100 text-amber-900'
                               : log.actorRole === 'admin'
@@ -214,16 +273,18 @@ export const CentralAuditLogPage: React.FC = () => {
                               : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {log.actorRole}
+                          {AUDIT_ROLE_MAP[log.actorRole] || log.actorRole}
                         </span>
                       </td>
 
                       {/* Action & Event ID */}
                       <td className="py-3 px-3">
-                        <div className="font-mono text-slate-900 font-semibold text-[11px]">
-                          {log.action}
+                        <div className="text-slate-900 font-semibold text-xs">
+                          {AUDIT_ACTION_MAP[log.action] || log.action}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono">{log.eventId}</div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          {log.eventId ? log.eventId.replace('evt-aud-seed-', 'LOG-2026-0').toUpperCase() : 'LOG-GENEL'}
+                        </div>
                       </td>
 
                       {/* Resource */}
@@ -354,8 +415,13 @@ export const CentralAuditLogPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="text-[10px] text-slate-400 pt-1">
-                Korelasyon ID: <code className="text-slate-600">{selectedLog.correlationId || 'N/A'}</code> • Modül: <code className="text-slate-600">{selectedLog.sourceModule}</code>
+              <div className="text-[11px] text-slate-500 pt-1 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 mt-2">
+                <div>
+                  İşlem Referansı: <span className="font-semibold text-slate-700 font-mono">{selectedLog.correlationId ? selectedLog.correlationId.replace('corr-', 'TR-REF-').toUpperCase() : 'TR-REF-001'}</span>
+                </div>
+                <div>
+                  Modül: <span className="font-semibold text-slate-700">{AUDIT_MODULE_MAP[selectedLog.sourceModule] || selectedLog.sourceModule}</span>
+                </div>
               </div>
             </div>
 

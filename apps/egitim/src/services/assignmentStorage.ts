@@ -7,7 +7,7 @@ import {
   AssignmentRevisionHistoryItem,
   AssignmentSubmissionContent,
 } from '../types';
-import { DEMO_TRAINEE_ASSIGNMENTS } from '../data/educationData';
+import { educationApi, AssignmentDto } from './apiClient';
 import { getGroupAssignmentsByGroup } from './enrollmentStorage';
 import {
   notifyAssignmentPublished,
@@ -15,25 +15,148 @@ import {
   notifyAssignmentEvaluated,
 } from './notificationEngine';
 
-export const COURSE_ASSIGNMENTS_STORAGE_KEY = 'islahiye_education_course_assignments_v1';
-export const SUBMISSIONS_STORAGE_KEY = 'islahiye_education_submissions_v1';
-export const EVALUATIONS_STORAGE_KEY = 'islahiye_education_evaluations_v1';
+export const COURSE_ASSIGNMENTS_STORAGE_KEY = 'islahiye_education_course_assignments_v2';
+export const SUBMISSIONS_STORAGE_KEY = 'islahiye_education_submissions_v2';
+export const EVALUATIONS_STORAGE_KEY = 'islahiye_education_evaluations_v2';
 export const ASSIGNMENTS_UPDATE_EVENT = 'islahiye_education_assignments_updated';
+
+export const mapAssignmentDtoToAssignment = (dto: AssignmentDto): Assignment => {
+  return {
+    id: dto.id,
+    programId: 'prog-01',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: dto.groupId,
+    groupName: dto.groupName,
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    title: dto.title,
+    description: dto.description,
+    assignedAt: dto.createdAt,
+    dueAt: dto.dueDate,
+    dueDate: new Date(dto.dueDate).toLocaleDateString('tr-TR'),
+    maxScore: dto.maxScore,
+    isMandatory: dto.isMandatory,
+    isRequired: dto.isMandatory,
+    acceptedSubmissionTypes: ['text', 'link', 'file'],
+    lateSubmissionPolicy: 'allow_with_flag',
+    publicationStatus: 'published',
+    createdAt: dto.createdAt,
+    updatedAt: dto.createdAt,
+  };
+};
+
+export const syncAssignmentsWithApi = async (): Promise<Assignment[]> => {
+  try {
+    const list = await educationApi.assignments();
+    if (list && list.length > 0) {
+      const mapped = list.map(mapAssignmentDtoToAssignment);
+      const merged = [...INITIAL_COURSE_ASSIGNMENTS];
+      mapped.forEach((apiAsgn) => {
+        const idx = merged.findIndex(
+          (m) => m.id === apiAsgn.id || (m.groupId === apiAsgn.groupId && m.title === apiAsgn.title)
+        );
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], ...apiAsgn, id: merged[idx].id, groupId: merged[idx].groupId };
+        } else {
+          merged.push(apiAsgn);
+        }
+      });
+      saveCourseAssignmentsToStorage(merged);
+      return merged;
+    }
+  } catch (err) {
+    console.warn('API sync assignments notice:', err);
+  }
+  return getStoredCourseAssignments();
+};
+
+if (typeof window !== 'undefined') {
+  syncAssignmentsWithApi().catch(() => {});
+}
 
 // ============================================================================
 // 1. BAŞLANGIÇ DEMO ÖDEV TANIMLARI
 // ============================================================================
 export const INITIAL_COURSE_ASSIGNMENTS: Assignment[] = [
-  ...DEMO_TRAINEE_ASSIGNMENTS,
+  {
+    id: 'asg-01',
+    programId: 'prog-01',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    title: 'Ödev #1: Coğrafi İşaretli Ürün Listeleme & Pazar Açıklaması',
+    description: 'Tescilli İslahiye biberi için pazaryeri standartlarına uygun 3 adet ürün başlığı ve içerik açıklaması hazırlığı.',
+    assignedAt: '2026-10-14T10:00:00+03:00',
+    dueAt: '2026-10-18T23:59:00+03:00',
+    dueDate: '18 Ekim 2026',
+    maxScore: 100,
+    isMandatory: true,
+    isRequired: true,
+    acceptedSubmissionTypes: ['text', 'link'],
+    lateSubmissionPolicy: 'allow_with_flag',
+    publicationStatus: 'published',
+    createdAt: '2026-10-14T10:00:00+03:00',
+    updatedAt: '2026-10-14T10:00:00+03:00',
+  },
+  {
+    id: 'asg-02',
+    programId: 'prog-01',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    title: 'Ödev #2: E-Ticaret Sipariş & Kargo/Lojistik Yönetimi Planı',
+    description: 'Soğuk zincir ve gıda ambalajı güvenliği protokollerine uygun kargo paketleme ve iade süreci şeması.',
+    assignedAt: '2026-10-17T10:00:00+03:00',
+    dueAt: '2026-10-25T23:59:00+03:00',
+    dueDate: '25 Ekim 2026',
+    maxScore: 100,
+    isMandatory: true,
+    isRequired: true,
+    acceptedSubmissionTypes: ['text', 'link', 'file'],
+    lateSubmissionPolicy: 'allow_with_flag',
+    publicationStatus: 'published',
+    createdAt: '2026-10-17T10:00:00+03:00',
+    updatedAt: '2026-10-17T10:00:00+03:00',
+  },
+  {
+    id: 'asg-03',
+    programId: 'prog-01',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-01',
+    groupName: 'Grup A — Sabah Oturumu',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    title: 'Ödev #3: Gıda Güvenliği ve Hijyen Kontrol Tablosu',
+    description: 'Üretim ve kurutma tesislerinde HACCP ve ISO standartlarına uygun kontrol listesi oluşturma.',
+    assignedAt: '2026-10-20T10:00:00+03:00',
+    dueAt: '2026-10-30T23:59:00+03:00',
+    dueDate: '30 Ekim 2026',
+    maxScore: 100,
+    isMandatory: true,
+    isRequired: true,
+    acceptedSubmissionTypes: ['text', 'file'],
+    lateSubmissionPolicy: 'allow_with_flag',
+    publicationStatus: 'published',
+    createdAt: '2026-10-20T10:00:00+03:00',
+    updatedAt: '2026-10-20T10:00:00+03:00',
+  },
   {
     id: 'asg-04',
     programId: 'prog-01',
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Akşam)',
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
+    groupName: 'Grup A — Sabah Oturumu',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     title: 'Ödev #4: Sosyal Medya İletişim & Dijital Tanıtım Şablonu (İsteğe Bağlı)',
     description: 'Yöresel gastronomi ürününün sosyal medya tanıtımı için 1 adet gönderi metni ve etiket stratejisi oluşturma.',
     assignedAt: '2026-10-21T10:00:00+03:00',
@@ -54,9 +177,9 @@ export const INITIAL_COURSE_ASSIGNMENTS: Assignment[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Akşam)',
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
+    groupName: 'Grup A — Sabah Oturumu',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     title: 'Taslak Ödev #5: Gelişmiş İhracat Dokümantasyonu ve Akreditif Simülasyonu',
     description: 'Akreditifli satış sürecinde düzenlenmesi gereken konşimento ve menşe şahadetnamesi taslağı hazırlığı.',
     assignedAt: '2026-10-21T14:00:00+03:00',
@@ -67,32 +190,9 @@ export const INITIAL_COURSE_ASSIGNMENTS: Assignment[] = [
     isRequired: true,
     acceptedSubmissionTypes: ['file', 'text'],
     lateSubmissionPolicy: 'allow',
-    publicationStatus: 'draft', // Kursiyere görünmez!
+    publicationStatus: 'draft',
     createdAt: '2026-10-21T14:00:00+03:00',
     updatedAt: '2026-10-21T14:00:00+03:00',
-  },
-  {
-    id: 'asg-06-grp2',
-    programId: 'prog-02',
-    termId: 'term-2026-fall',
-    cohortName: '2026 Güz Dönemi',
-    groupId: 'grp-02',
-    groupName: 'Grup B (Hafta Sonu Gündüz)',
-    instructorId: 'user-instructor-02',
-    instructorName: 'Selin Yılmaz',
-    title: 'Ödev #1: Pazaryeri Mağaza Açılış Evrakları ve Sözleşme İncelemesi',
-    description: 'E-Ticaret pazaryerinde kurumsal satıcı hesabı başvurusu için gerekli vergi levhası ve imza sirküleri kontrol listesi.',
-    assignedAt: '2026-10-18T10:00:00+03:00',
-    dueAt: '2026-10-28T23:59:00+03:00',
-    dueDate: '28 Ekim 2026',
-    maxScore: 100,
-    isMandatory: true,
-    isRequired: true,
-    acceptedSubmissionTypes: ['text', 'file'],
-    lateSubmissionPolicy: 'allow_with_flag',
-    publicationStatus: 'published',
-    createdAt: '2026-10-18T10:00:00+03:00',
-    updatedAt: '2026-10-18T10:00:00+03:00',
   },
 ];
 
@@ -100,6 +200,59 @@ export const INITIAL_COURSE_ASSIGNMENTS: Assignment[] = [
 // 2. BAŞLANGIÇ DEMO TESLİMLERİ (Submissions)
 // ============================================================================
 export const INITIAL_SUBMISSIONS: AssignmentSubmission[] = [
+  // Ahmet Kaya (usr-trainee) -> Ödev #1 (Onaylandı - 85 Puan)
+  {
+    id: 'sub-ahmet-01',
+    assignmentId: 'asg-01',
+    enrollmentId: 'enr-trainee-ahmet',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
+    submittedAt: '2026-10-15T10:30:00+03:00',
+    submissionVersion: 1,
+    content: {
+      text: 'İslahiye pul biberi ve kuru biber için pazaryeri ürün kartları hazırlandı. Gramaj ve coğrafi işaret tescili eklendi.',
+      linkUrl: 'https://ornek-pazaryeri.com/magaza/ahmet-kaya-biber',
+    },
+    status: 'approved',
+    isLate: false,
+    createdAt: '2026-10-15T10:30:00+03:00',
+    updatedAt: '2026-10-16T11:00:00+03:00',
+  },
+  // Ahmet Kaya -> Ödev #2 (Onaylandı - 90 Puan)
+  {
+    id: 'sub-ahmet-02',
+    assignmentId: 'asg-02',
+    enrollmentId: 'enr-trainee-ahmet',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
+    submittedAt: '2026-10-22T14:15:00+03:00',
+    submissionVersion: 1,
+    content: {
+      text: 'Kargo paketleme ve soğuk hava korumalı koli yerleşimi şeması hazırlandı.',
+    },
+    status: 'approved',
+    isLate: false,
+    createdAt: '2026-10-22T14:15:00+03:00',
+    updatedAt: '2026-10-23T16:00:00+03:00',
+  },
+  // Ahmet Kaya -> Ödev #3 (Onaylandı - 80 Puan)
+  {
+    id: 'sub-ahmet-03',
+    assignmentId: 'asg-03',
+    enrollmentId: 'enr-trainee-ahmet',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
+    submittedAt: '2026-10-28T09:40:00+03:00',
+    submissionVersion: 1,
+    content: {
+      text: 'Depo giriş ve kurutma kontrol takip matrisi hazırlandı.',
+    },
+    status: 'approved',
+    isLate: false,
+    createdAt: '2026-10-28T09:40:00+03:00',
+    updatedAt: '2026-10-29T14:00:00+03:00',
+  },
+
   // Ayşe Demir (user-trainee-01 / t-02) -> Ödev #1 (Onaylandı)
   {
     id: 'sub-ayse-01',
@@ -173,22 +326,41 @@ export const INITIAL_SUBMISSIONS: AssignmentSubmission[] = [
     createdAt: '2026-10-15T09:15:00+03:00',
     updatedAt: '2026-10-15T14:00:00+03:00',
   },
-  // Fatma Şahin (user-applicant-01 / t-06) -> Ödev #1 (Değerlendirme Bekliyor)
+  // Fatma Şahin (usr-real-12) -> Ödev #1 (Değerlendirme Bekliyor)
   {
     id: 'sub-fatma-01',
     assignmentId: 'asg-01',
-    enrollmentId: 'enr-fatma-01',
-    traineeId: 'user-applicant-01',
+    enrollmentId: 'enr-trainee-fatma',
+    traineeId: 'usr-real-12',
     traineeName: 'Fatma Şahin',
-    submittedAt: '2026-10-15T22:30:00+03:00',
+    submittedAt: '2026-10-17T15:30:00+03:00',
     submissionVersion: 1,
     content: {
       text: 'Kurutmalık biber ve pul biber ihracat ambalajı açıklamaları hazırlandı.',
     },
     status: 'submitted',
     isLate: false,
-    createdAt: '2026-10-15T22:30:00+03:00',
-    updatedAt: '2026-10-15T22:30:00+03:00',
+    createdAt: '2026-10-17T15:30:00+03:00',
+    updatedAt: '2026-10-17T15:30:00+03:00',
+  },
+  // Mehmet Öztürk (usr-real-13) -> Ödev #2 (Değerlendirme Bekliyor)
+  {
+    id: 'sub-mehmet-02',
+    assignmentId: 'asg-02',
+    enrollmentId: 'enr-trainee-mehmet',
+    traineeId: 'usr-real-13',
+    traineeName: 'Mehmet Öztürk',
+    submittedAt: '2026-10-24T18:00:00+03:00',
+    submissionVersion: 1,
+    content: {
+      text: 'Pazaryeri mağaza kurulumu ve kargo lojistik protokolü teslim edildi.',
+      fileName: 'mehmet_ozturk_lojistik_protokol.pdf',
+      fileSize: '2.4 MB',
+    },
+    status: 'submitted',
+    isLate: false,
+    createdAt: '2026-10-24T18:00:00+03:00',
+    updatedAt: '2026-10-24T18:00:00+03:00',
   },
 ];
 
@@ -196,6 +368,52 @@ export const INITIAL_SUBMISSIONS: AssignmentSubmission[] = [
 // 3. BAŞLANGIÇ DEMO DEĞERLENDİRMELERİ (Evaluations)
 // ============================================================================
 export const INITIAL_EVALUATIONS: AssignmentEvaluation[] = [
+  // Ahmet Kaya -> Ödev #1
+  {
+    id: 'eval-ahmet-01',
+    submissionId: 'sub-ahmet-01',
+    assignmentId: 'asg-01',
+    traineeId: 'usr-trainee',
+    evaluatorId: 'usr-instructor',
+    evaluatorName: 'Şef Mehmet Yılmaz',
+    score: 85,
+    feedback: 'Ürün açıklamaları gayet başarılı. Coğrafi işaret standardı doğru aktarılmış.',
+    decision: 'approved',
+    evaluatedAt: '2026-10-16T11:00:00+03:00',
+    revisionRequested: false,
+    evaluationVersion: 1,
+  },
+  // Ahmet Kaya -> Ödev #2
+  {
+    id: 'eval-ahmet-02',
+    submissionId: 'sub-ahmet-02',
+    assignmentId: 'asg-02',
+    traineeId: 'usr-trainee',
+    evaluatorId: 'usr-instructor',
+    evaluatorName: 'Şef Mehmet Yılmaz',
+    score: 90,
+    feedback: 'Paketleme ve kargo planı eksiksiz hazırlanmış. Tebrikler.',
+    decision: 'approved',
+    evaluatedAt: '2026-10-23T16:00:00+03:00',
+    revisionRequested: false,
+    evaluationVersion: 1,
+  },
+  // Ahmet Kaya -> Ödev #3
+  {
+    id: 'eval-ahmet-03',
+    submissionId: 'sub-ahmet-03',
+    assignmentId: 'asg-03',
+    traineeId: 'usr-trainee',
+    evaluatorId: 'usr-instructor',
+    evaluatorName: 'Şef Mehmet Yılmaz',
+    score: 80,
+    feedback: 'Kontrol tablosu hijyen kurallarına tam uyumlu.',
+    decision: 'approved',
+    evaluatedAt: '2026-10-29T14:00:00+03:00',
+    revisionRequested: false,
+    evaluationVersion: 1,
+  },
+
   // Ayşe Demir -> Ödev #1
   {
     id: 'eval-ayse-01',
@@ -266,7 +484,14 @@ export const getStoredCourseAssignments = (): Assignment[] => {
       return INITIAL_COURSE_ASSIGNMENTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_COURSE_ASSIGNMENTS;
+    if (Array.isArray(parsed) && parsed.length >= 4) {
+      return parsed;
+    }
+    localStorage.setItem(
+      COURSE_ASSIGNMENTS_STORAGE_KEY,
+      JSON.stringify(INITIAL_COURSE_ASSIGNMENTS)
+    );
+    return INITIAL_COURSE_ASSIGNMENTS;
   } catch (err) {
     console.error('getStoredCourseAssignments error:', err);
     return INITIAL_COURSE_ASSIGNMENTS;
@@ -287,11 +512,14 @@ export const getCourseAssignmentsByGroup = (
   includeDrafts = false
 ): Assignment[] => {
   const all = getStoredCourseAssignments();
-  return all.filter((a) => {
+  const matched = all.filter((a) => {
     if (a.groupId !== groupId) return false;
     if (!includeDrafts && a.publicationStatus === 'draft') return false;
     return true;
   });
+  if (matched.length > 0) return matched;
+  // Demo deneyimi için eğer seçili gruba özel atanmış ödev yoksa genel havuzdaki yayınlanmış ödevleri döndür
+  return all.filter((a) => (!includeDrafts ? a.publicationStatus !== 'draft' : true));
 };
 
 export const createCourseAssignment = (
@@ -381,7 +609,15 @@ export const getStoredSubmissions = (): AssignmentSubmission[] => {
       return INITIAL_SUBMISSIONS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_SUBMISSIONS;
+    if (
+      Array.isArray(parsed) &&
+      parsed.length >= 4 &&
+      parsed.some((s) => s.traineeId === 'usr-trainee')
+    ) {
+      return parsed;
+    }
+    localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(INITIAL_SUBMISSIONS));
+    return INITIAL_SUBMISSIONS;
   } catch (err) {
     console.error('getStoredSubmissions error:', err);
     return INITIAL_SUBMISSIONS;
@@ -413,7 +649,15 @@ export const getLatestSubmission = (
 ): AssignmentSubmission | null => {
   const all = getStoredSubmissions();
   const matched = all
-    .filter((s) => s.assignmentId === assignmentId && s.traineeId === traineeId)
+    .filter(
+      (s) =>
+        s.assignmentId === assignmentId &&
+        (s.traineeId === traineeId ||
+          (traineeId === 'usr-trainee' &&
+            (s.traineeId === 'user-trainee-01' || s.traineeId === 'usr-trainee')) ||
+          (traineeId === 'user-trainee-01' &&
+            (s.traineeId === 'usr-trainee' || s.traineeId === 'user-trainee-01')))
+    )
     .sort((a, b) => b.submissionVersion - a.submissionVersion);
   return matched[0] || null;
 };

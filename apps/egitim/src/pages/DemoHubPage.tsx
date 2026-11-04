@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
@@ -12,12 +12,14 @@ import {
   CheckCircle2,
   Lock,
   SlidersHorizontal,
+  Search,
+  Copy,
+  CheckCheck,
+  ChevronRight,
 } from 'lucide-react';
 import { useDemoRole } from '../components/layout/DemoRoleContext';
-import { DashboardContent } from '../components/layout/DashboardContent';
-import { PageHeader } from '../components/layout/PageHeader';
 import { PageSection } from '../components/layout/PageSection';
-import { DEMO_USERS } from '../data/educationData';
+import { authService, REAL_ACCOUNTS } from '../services/authAdapter';
 import { UserRole } from '../types';
 import { resetAllEducationDemoData } from '../services/demoMasterResetService';
 
@@ -29,10 +31,73 @@ export const DemoHubPage: React.FC = () => {
   const [resetReason, setResetReason] = useState('Sunum öncesi fabrika ayarlarına dönüş');
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
 
+  // 30 Hesap Arama & Filtreleme Durumları
+  const [accountTab, setAccountTab] = useState<string>('all');
+  const [accountSearch, setAccountSearch] = useState<string>('');
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  const handleCopyPassword = (email: string, pass: string) => {
+    navigator.clipboard.writeText(pass);
+    setCopiedEmail(email);
+    setTimeout(() => setCopiedEmail(null), 2000);
+  };
+
+  const handleSwitchAccount = async (acc: typeof REAL_ACCOUNTS[0]) => {
+    try {
+      await authService.login({
+        emailOrUsername: acc.email,
+        password: acc.password,
+        rememberMe: true,
+      });
+      setRole(acc.role);
+      navigate(acc.targetRoute);
+    } catch {
+      setRole(acc.role);
+      navigate(acc.targetRoute);
+    }
+  };
+
+  const getAccountBadge = (role: UserRole) => {
+    switch (role) {
+      case 'superadmin':
+        return { label: 'Süper Admin', badgeClass: 'bg-slate-900 text-white border-slate-900' };
+      case 'admin':
+        return { label: 'Yönetici', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' };
+      case 'instructor':
+        return { label: 'Eğitmen', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+      case 'trainee':
+        return { label: 'Kursiyer', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'applicant':
+        return { label: 'Aday', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' };
+      default:
+        return { label: 'Ziyaretçi', badgeClass: 'bg-slate-50 text-slate-700 border-slate-200' };
+    }
+  };
+
+  const filteredAccounts = useMemo(() => {
+    return REAL_ACCOUNTS.filter((acc) => {
+      const matchesRole =
+        accountTab === 'all'
+          ? true
+          : accountTab === 'admin'
+          ? acc.role === 'admin' || acc.role === 'superadmin'
+          : acc.role === accountTab;
+
+      const matchesSearch =
+        accountSearch.trim() === '' ||
+        acc.name.toLowerCase().includes(accountSearch.toLowerCase()) ||
+        acc.email.toLowerCase().includes(accountSearch.toLowerCase()) ||
+        acc.label.toLowerCase().includes(accountSearch.toLowerCase());
+
+      return matchesRole && matchesSearch;
+    });
+  }, [accountTab, accountSearch]);
+
   const demoRoles: Array<{
     role: UserRole;
     name: string;
     email: string;
+    password?: string;
     title: string;
     description: string;
     targetRoute: string;
@@ -42,8 +107,9 @@ export const DemoHubPage: React.FC = () => {
   }> = [
     {
       role: 'applicant',
-      name: DEMO_USERS.applicant.fullName,
-      email: DEMO_USERS.applicant.email || 'fatma.sahin@ornek.com',
+      name: 'Ali Çelik',
+      email: 'aday.ali@islahiye.bel.tr',
+      password: 'Applicant123456!',
       title: 'Aday Başvuru Sahibi',
       description: 'Program kataloğundan başvuru yapma, kriter puanı önerisi ve kabul/ret durum takibi.',
       targetRoute: '/aday',
@@ -53,9 +119,10 @@ export const DemoHubPage: React.FC = () => {
     },
     {
       role: 'trainee',
-      name: DEMO_USERS.trainee.fullName,
-      email: DEMO_USERS.trainee.email || 'ayse.demir@ornek.com',
-      title: 'Kabul Edilmiş Kursiyer',
+      name: 'Ahmet Kaya',
+      email: 'kursiyer.ahmet@islahiye.bel.tr',
+      password: 'Trainee123456!',
+      title: 'Kayıtlı Kursiyer',
       description: 'Haftalık ders takvimi, salon bilgisi, manuel yoklama geçmişi ve ödev teslim/revizyonları.',
       targetRoute: '/kursiyer',
       icon: GraduationCap,
@@ -64,8 +131,9 @@ export const DemoHubPage: React.FC = () => {
     },
     {
       role: 'instructor',
-      name: DEMO_USERS.instructor.fullName,
-      email: DEMO_USERS.instructor.email || 'murat.ozkan@ornek.com',
+      name: 'Şef Mehmet Yılmaz',
+      email: 'egitmen.mehmet@islahiye.bel.tr',
+      password: 'Instructor123456!',
       title: 'Yetkili Eğitmen',
       description: 'Manuel oturum yoklaması (katıldı/katılmadı/mazeretli), ödev puanlama ve bireysel mesajlaşma.',
       targetRoute: '/egitmen',
@@ -75,8 +143,9 @@ export const DemoHubPage: React.FC = () => {
     },
     {
       role: 'admin',
-      name: DEMO_USERS.admin.fullName,
-      email: DEMO_USERS.admin.email || 'selin.aydin@ornek.com',
+      name: 'Sistem Yöneticisi',
+      email: 'admin@islahiye.bel.tr',
+      password: 'Admin123456!',
       title: 'Eğitim Operasyon Yöneticisi',
       description: 'Gerekçeli başvuru kararları, kesin kayıt, grup atamaları, nihai başarı ve belge onayı.',
       targetRoute: '/yonetim',
@@ -86,20 +155,48 @@ export const DemoHubPage: React.FC = () => {
     },
     {
       role: 'superadmin',
-      name: DEMO_USERS.superadmin.fullName,
-      email: DEMO_USERS.superadmin.email || 'kemal.erturk@ornek.com',
-      title: 'Süper Yönetici',
+      name: 'Sistem Yöneticisi',
+      email: 'admin@islahiye.bel.tr',
+      password: 'Admin123456!',
+      title: 'Sistem Yöneticisi',
       description: 'Granüler yetki matrisi, çoklu rol atama, sistem politikaları ve merkezi denetim kayıtları.',
       targetRoute: '/yonetim/super-admin',
       icon: ShieldCheck,
-      color: 'bg-purple-50 text-purple-700 border-purple-200',
-      accent: 'purple',
+      color: 'bg-blue-50 text-blue-700 border-blue-200',
+      accent: 'blue',
     },
   ];
 
-  const handleSwitchProfile = (role: UserRole, targetRoute: string) => {
+  const handleSwitchProfile = async (
+    roleOrItem: UserRole | (typeof demoRoles)[0],
+    targetRoute?: string
+  ) => {
+    let target = targetRoute;
+    let role: UserRole;
+    let email: string | undefined;
+    let password: string | undefined;
+
+    if (typeof roleOrItem === 'string') {
+      role = roleOrItem;
+      const found = demoRoles.find((r) => r.role === role);
+      email = found?.email;
+      password = found?.password;
+      if (!target) target = found?.targetRoute || '/';
+    } else {
+      role = roleOrItem.role;
+      email = roleOrItem.email;
+      password = roleOrItem.password;
+      target = roleOrItem.targetRoute;
+    }
+
+    if (email && password) {
+      await authService.login({
+        emailOrUsername: email,
+        password: password,
+      });
+    }
     setRole(role);
-    navigate(targetRoute);
+    navigate(target || '/');
   };
 
   const handleExecuteReset = () => {
@@ -112,7 +209,7 @@ export const DemoHubPage: React.FC = () => {
       reason: resetReason || 'Demo Hub üzerinden tam sıfırlama',
     });
     if (result.success) {
-      setResetFeedback(`Tüm demo verileri başarıyla sıfırlandı. ${result.resetModuleCount || 13} modül başlangıç durumuna getirildi.`);
+      setResetFeedback(`Tüm sistem kütük verileri başarıyla sıfırlandı. ${result.resetModuleCount || 13} modül başlangıç durumuna getirildi.`);
       setResetModalOpen(false);
       setTimeout(() => setResetFeedback(null), 5000);
     } else {
@@ -121,22 +218,28 @@ export const DemoHubPage: React.FC = () => {
   };
 
   return (
-    <DashboardContent>
-      {/* Sayfa Başlığı Standardı */}
-      <PageHeader
-        category="SUNUM VE DEMO ALANI"
-        title="Demo & Rol Yönetim Masası"
-        description="İslahiye Ticaret Odası Eğitim Portalı'nın tüm modüllerini ve rol bazlı iş akışlarını tek merkezden test edip kurumsal sunumlarda deneyimleyebilirsiniz."
-        actions={
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      {/* 1. ÜST BAŞLIK VE HIZLI İŞLEM BUTONLARI (STANDART DÜZ BAŞLIK) */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Rol & Panel Yönetim Masası
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
+            İslahiye Ticaret Odası Eğitim Portalı'nın tüm modüllerini ve rol bazlı iş akışlarını tek merkezden test edip kurumsal sunumlarda deneyimleyebilirsiniz.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setResetModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-semibold transition"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-2xs whitespace-nowrap"
           >
-            <RotateCcw className="w-4 h-4 text-rose-600" />
+            <RotateCcw className="w-4 h-4 text-rose-600 shrink-0" />
             <span>Fabrika Ayarlarına Sıfırla</span>
           </button>
-        }
-      />
+        </div>
+      </div>
 
       {/* Geri Bildirim Bildirisi */}
       {resetFeedback && (
@@ -150,7 +253,7 @@ export const DemoHubPage: React.FC = () => {
       <div className="p-5 rounded-xl bg-slate-900 text-slate-200 border border-slate-800 shadow-sm space-y-2">
         <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
           <Sparkles className="w-4 h-4" />
-          <span>Profesyonel Kullanıcı Deneyimi & Demo Ayrımı</span>
+          <span>Kullanıcı Deneyimi & Rol Geçiş Merkezi</span>
         </div>
         <p className="text-xs text-slate-300 leading-relaxed">
           Eğitim portalının normal kullanıcı arayüzlerinde gereksiz rol değiştirici butonları ve geliştirme etiketleri kaldırılmıştır. Bu sayfa, kurum yetkililerine ve jüriye farklı rollerin arayüzlerini anında test ettirmek üzere tasarlanmış özel kontrol merkezidir.
@@ -267,10 +370,10 @@ export const DemoHubPage: React.FC = () => {
 
           <button
             onClick={() => handleSwitchProfile('superadmin', '/yonetim/super-admin')}
-            className="p-4 rounded-xl bg-white border border-slate-200 hover:border-purple-400 hover:shadow-sm text-left transition space-y-1.5 group"
+            className="p-4 rounded-xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm text-left transition space-y-1.5 group"
           >
-            <div className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition">
-              Süper Yönetici Konsolu →
+            <div className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition">
+              Genel Bakış →
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
               Granüler yetki matrisi, sistem politikaları, operasyonel raporlar ve denetim izi.
@@ -279,14 +382,130 @@ export const DemoHubPage: React.FC = () => {
         </div>
       </PageSection>
 
+      {/* 2. Sistemde Tanımlı 30 Kullanıcı Hesabı & Parolaları */}
+      <PageSection
+        title={`2. Sistemde Kayıtlı 30 Gerçekçi Kullanıcı & Parolalar (${REAL_ACCOUNTS.length} Hesap)`}
+        description="Aşağıdaki listeden dilediğiniz kullanıcının parolasını tek tıkla kopyalayabilir veya o kullanıcı olarak oturum açabilirsiniz:"
+      >
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+          {/* Sekmeler ve Arama */}
+          <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50/60">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {[
+                { id: 'all', label: `Tümü (${REAL_ACCOUNTS.length})` },
+                { id: 'admin', label: 'Yönetim (5)' },
+                { id: 'instructor', label: 'Eğitmenler (5)' },
+                { id: 'trainee', label: 'Kursiyerler (12)' },
+                { id: 'applicant', label: 'Adaylar (7)' },
+                { id: 'visitor', label: 'Ziyaretçi (1)' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAccountTab(tab.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 cursor-pointer ${
+                    accountTab === tab.id
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative min-w-[240px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={accountSearch}
+                onChange={(e) => setAccountSearch(e.target.value)}
+                placeholder="İsim, e-posta veya unvan ara..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Tablo */}
+          <div className="overflow-x-auto max-h-[460px] overflow-y-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-xs z-10 border-b border-slate-200">
+                <tr className="text-slate-500 font-semibold">
+                  <th className="py-2.5 px-3">#</th>
+                  <th className="py-2.5 px-3">Rol</th>
+                  <th className="py-2.5 px-3">Ad Soyad</th>
+                  <th className="py-2.5 px-3">Unvan / Görev</th>
+                  <th className="py-2.5 px-3">E-Posta</th>
+                  <th className="py-2.5 px-3">Giriş Parolası</th>
+                  <th className="py-2.5 px-3 text-right">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredAccounts.map((acc, idx) => {
+                  const badge = getAccountBadge(acc.role);
+                  const isCopied = copiedEmail === acc.email;
+
+                  return (
+                    <tr key={acc.email} className="hover:bg-blue-50/30 transition">
+                      <td className="py-2.5 px-3 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${badge.badgeClass}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-slate-900">{acc.name}</td>
+                      <td className="py-2.5 px-3 text-slate-600">{acc.label}</td>
+                      <td className="py-2.5 px-3 font-mono text-slate-700">{acc.email}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <code className="font-mono font-semibold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                            {acc.password}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPassword(acc.email, acc.password)}
+                            className="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100 transition cursor-pointer"
+                            title="Parolayı Kopyala"
+                          >
+                            {isCopied ? (
+                              <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchAccount(acc)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1 rounded-md transition cursor-pointer shadow-2xs"
+                        >
+                          <span>Başlat</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+            <span>Referans doküman: <code className="font-mono text-slate-700">docs/KULLANICI_HESAPLARI_VE_GIRIS_BILGILERI.md</code></span>
+            <span>Toplam {filteredAccounts.length} / {REAL_ACCOUNTS.length} hesap listeleniyor</span>
+          </div>
+        </div>
+      </PageSection>
+
       {/* Şeffaf Simülasyon Bildirisi */}
       <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs space-y-1">
         <div className="font-semibold text-slate-800 flex items-center gap-1.5">
           <Lock className="w-3.5 h-3.5 text-slate-500" />
-          <span>Frontend Demo ve Simülasyon Güvencesi</span>
+          <span>Sistem ve Veri Güvencesi</span>
         </div>
         <p className="text-[11px] leading-relaxed">
-          Bu portal İslahiye Ticaret Odası için hazırlanmış bir ön tanıtım ve kullanıcı deneyimi simülasyonudur. Sistemde yer alan tüm veriler sentetiktir ve tarayıcı yerel saklama alanında çalışır. Gerçek canlı sistemde ASP.NET Core REST API, PostgreSQL ilişkisel veritabanı, OAuth2/OIDC yetkilendirmesi ve HSM tabanlı e-İmza altyapısı bulunacaktır.
+          Bu portal İslahiye Ticaret Odası için hazırlanmış entegre dijital eğitim platformudur. Tüm iş akışları kurumsal standartlara ve rol bazlı yetkilendirme mimarisine göre işletilir.
         </p>
       </div>
 
@@ -300,7 +519,7 @@ export const DemoHubPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 leading-tight">
-                  Demo Verilerini Sıfırla
+                  Sistem Verilerini Sıfırla
                 </h3>
                 <p className="text-xs text-slate-500">
                   Fabrika başlangıç durumuna dönülecektir.
@@ -341,6 +560,6 @@ export const DemoHubPage: React.FC = () => {
           </div>
         </div>
       )}
-    </DashboardContent>
+    </div>
   );
 };

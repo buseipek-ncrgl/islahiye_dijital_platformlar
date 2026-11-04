@@ -1,10 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Menu, X, LogIn, ChevronRight } from 'lucide-react';
+import { Menu, X, LogIn, ChevronRight, LayoutDashboard, User } from 'lucide-react';
+import { useDemoRole } from '../layout/DemoRoleContext';
 
 export const PublicHeader: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { currentRole, currentUser } = useDemoRole();
+
+  const getHomePath = () => {
+    switch (currentRole) {
+      case 'superadmin':
+        return '/yonetim/super-admin';
+      case 'admin':
+        return '/yonetim';
+      case 'trainee':
+        return '/kursiyer';
+      case 'instructor':
+        return '/egitmen';
+      case 'applicant':
+        return '/aday';
+      default:
+        return '/';
+    }
+  };
+
+  const isAuthenticated = currentRole !== 'visitor';
+  const homePath = getHomePath();
 
   // Close mobile menu on escape key
   useEffect(() => {
@@ -28,13 +50,19 @@ export const PublicHeader: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
 
-  const navLinks = [
-    { to: '/', label: 'Ana Sayfa', end: true },
-    { to: '/egitimler', label: 'Eğitimler', end: false },
-    { to: '/egitim-takvimi', label: 'Eğitim Takvimi', end: false },
-    { to: '/basvuru-rehberi', label: 'Başvuru Rehberi', end: false },
-    { to: '/belge-dogrula', label: 'Belge Doğrulama', end: false },
-  ];
+  const navLinks = currentRole === 'applicant'
+    ? [
+        { to: '/aday/katalog', label: 'Eğitimler', end: false },
+        { to: '/aday/takvim', label: 'Eğitim Takvimi', end: false },
+        { to: '/aday/rehber', label: 'Başvuru Rehberi', end: false },
+        { to: '/belge-dogrula', label: 'Belge Doğrulama', end: false },
+      ]
+    : [
+        { to: '/egitimler', label: 'Eğitimler', end: false },
+        { to: '/egitim-takvimi', label: 'Eğitim Takvimi', end: false },
+        { to: '/basvuru-rehberi', label: 'Başvuru Rehberi', end: false },
+        { to: '/belge-dogrula', label: 'Belge Doğrulama', end: false },
+      ];
 
   return (
     <>
@@ -51,7 +79,7 @@ export const PublicHeader: React.FC = () => {
           
           {/* Brand Logo & Typographic Title */}
           <Link
-            to="/"
+            to={homePath}
             className="flex items-center gap-2.5 sm:gap-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-lg p-1 shrink-0 whitespace-nowrap"
             title="İslahiye Ticaret Odası Eğitim Portalı Ana Sayfa"
           >
@@ -109,35 +137,36 @@ export const PublicHeader: React.FC = () => {
               </svg>
             </button>
 
-            {/* Giriş Yap (Outline Button) */}
-            <button
-              onClick={() => navigate('/giris')}
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 hover:text-blue-600 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
-            >
-              <LogIn className="w-3.5 h-3.5 text-slate-500" />
-              <span>Giriş Yap</span>
-            </button>
+            {isAuthenticated ? (
+              <button
+                onClick={() => navigate(homePath)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Genel Bakışa Dön ({currentUser.fullName.split(' ')[0]})</span>
+              </button>
+            ) : (
+              <>
+                {/* Giriş Yap (Outline Button) */}
+                <button
+                  onClick={() => navigate('/')}
+                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 hover:text-blue-600 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Giriş Yap</span>
+                </button>
 
-            {/* Hesap Oluştur (Primary Blue Button) */}
-            <button
-              onClick={() => navigate('/hesap-olustur')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-              <span>Hesap Oluştur</span>
-            </button>
+                {/* Hesap Oluştur (Primary Blue Button) */}
+                <button
+                  onClick={() => navigate('/hesap-olustur')}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Hesap Oluştur</span>
+                </button>
+              </>
+            )}
 
-            {/* Demo Önizleme Badge Button */}
-            <button
-              onClick={() => navigate('/demo-hub')}
-              className="hidden xl:inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-2.5 py-1.5 rounded-full transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              title="Rol panellerini ve prototip senaryolarını doğrudan inceleyin"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Demo Önizleme</span>
-            </button>
 
             {/* Mobile Hamburger Button */}
             <button
@@ -218,18 +247,31 @@ export const PublicHeader: React.FC = () => {
           {/* Mobile Drawer Bottom Actions */}
           <div className="p-4 border-t border-brand-border bg-slate-50 space-y-3">
             <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200">
-              <strong>Demo Simülasyonu:</strong> Bu arayüz ön tanıtım ve gösterim amacıyla çalışmaktadır.
+              <strong>İslahiye Ticaret Odası:</strong> Resmi Akademi ve Eğitim Koordinasyon Portalı.
             </div>
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                navigate('/giris');
-              }}
-              className="w-full flex items-center justify-center gap-2 text-sm bg-brand-blue hover:bg-brand-blueHover text-white font-medium py-3 rounded-lg shadow-2xs transition-colors"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Giriş Yap & Rol Seç</span>
-            </button>
+            {isAuthenticated ? (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigate(homePath);
+                }}
+                className="w-full flex items-center justify-center gap-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-2xs transition-colors"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Genel Bakışa Dön ({currentUser.fullName.split(' ')[0]})</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigate('/giris');
+                }}
+                className="w-full flex items-center justify-center gap-2 text-sm bg-brand-blue hover:bg-brand-blueHover text-white font-medium py-3 rounded-lg shadow-2xs transition-colors"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Giriş Yap & Rol Seç</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -350,7 +392,7 @@ export const PublicHeader: React.FC = () => {
                 </ul>
               </div>
               <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-500">
-                * Bu yazılım arayüzü ön tanıtım ve simülasyon amacıyla geliştirilmiştir. Tüm eğitim programları kurumsal simülasyondur.
+                * Eğitim programları ve takvim İslahiye Ticaret Odası koordinasyonunda güncellenmektedir.
               </div>
             </div>
 

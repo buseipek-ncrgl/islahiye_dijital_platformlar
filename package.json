@@ -8,8 +8,10 @@
   "scripts": {
     "dev:gastronomi": "npm run dev --workspace=apps/gastronomi",
     "dev:egitim": "npm run dev --workspace=apps/egitim",
+    "dev:api": "dotnet run --project services/education-api/src/Education.Api",
     "build:gastronomi": "npm run build --workspace=apps/gastronomi",
     "build:egitim": "npm run build --workspace=apps/egitim",
+    "test:e2e:b01": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-b01-e2e.ps1",
     "build": "npm run build --workspaces --if-present"
   },
   "keywords": [
@@ -19,5 +21,8 @@
     "monorepo"
   ],
   "author": "İslahiye Ticaret Odası",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
 }

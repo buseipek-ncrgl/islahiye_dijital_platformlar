@@ -5,24 +5,77 @@ import {
   AttendanceMarkStatus,
   AttendanceStatus,
 } from '../types';
+import { educationApi, CourseSessionDto } from './apiClient';
 import { getGroupAssignmentsByGroup } from './enrollmentStorage';
 import {
   notifySessionScheduled,
   notifySessionCancelled,
 } from './notificationEngine';
 
-const SESSIONS_STORAGE_KEY = 'islahiye_education_sessions_v1';
-const ATTENDANCE_STORAGE_KEY = 'islahiye_education_attendance_v1';
+const SESSIONS_STORAGE_KEY = 'islahiye_education_sessions_v2';
+const ATTENDANCE_STORAGE_KEY = 'islahiye_education_attendance_v2';
 
 const SESSIONS_UPDATE_EVENT = 'islahiye_sessions_updated';
 const ATTENDANCE_UPDATE_EVENT = 'islahiye_attendance_updated';
+
+export const mapCourseSessionDtoToSession = (dto: CourseSessionDto): Session => {
+  const sessNum = parseInt(dto.title.match(/#(\d+)/)?.[1] || '1', 10);
+  const status: SessionStatus =
+    dto.status === 2 ? 'completed' : dto.status === 1 ? 'active' : 'scheduled';
+  return {
+    id: dto.id,
+    groupId: dto.groupId,
+    groupName: dto.groupName,
+    sessionNumber: sessNum,
+    title: dto.title,
+    topic: dto.notes || dto.title,
+    date: dto.date,
+    startTime: dto.startTime,
+    endTime: dto.endTime,
+    location: dto.classroom || 'Uygulama Salonu',
+    isOnline: false,
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    status,
+    notes: dto.notes,
+  };
+};
+
+export const syncSessionsWithApi = async (): Promise<Session[]> => {
+  try {
+    const list = await educationApi.sessions();
+    if (list && list.length > 0) {
+      const mapped = list.map(mapCourseSessionDtoToSession);
+      const merged = [...INITIAL_SESSIONS];
+      mapped.forEach((apiSess) => {
+        const idx = merged.findIndex(
+          (m) => m.id === apiSess.id || (m.groupId === apiSess.groupId && m.sessionNumber === apiSess.sessionNumber)
+        );
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], ...apiSess, id: merged[idx].id, groupId: merged[idx].groupId };
+        } else {
+          merged.push(apiSess);
+        }
+      });
+      saveSessionsToStorage(merged);
+      return merged;
+    }
+  } catch (err) {
+    console.warn('API sync sessions notice:', err);
+  }
+  return getStoredSessions();
+};
+
+if (typeof window !== 'undefined') {
+  syncSessionsWithApi().catch(() => {});
+}
 
 // -----------------------------------------------------------------------------
 // SEED SESSIONS (Program -> Dönem -> Grup Hiyerarşisine Bağlı)
 // -----------------------------------------------------------------------------
 
 export const INITIAL_SESSIONS: Session[] = [
-  // Grup A: İslahiye Biberi & Tarımsal E-Ticaret (grp-01)
+  // 1-6. Grup A: İslahiye Biberi & Tarımsal E-Ticaret (grp-01) - Şef Mehmet Yılmaz & Murat Özkan
   {
     id: 'sess-01',
     programId: 'prog-01',
@@ -30,20 +83,20 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     sessionNumber: 1,
-    title: 'Yöresel Ürünlerde Coğrafi İşaret ve Marka Değeri',
+    title: 'Modül 1: Yöresel Ürünlerde Coğrafi İşaret ve Marka Değeri',
     topic: 'Tescilli İslahiye biberinin pazar avantajları ve ürün standardizasyonu.',
-    date: '2026-10-13',
-    startTime: '14:00',
-    endTime: '17:00',
-    location: 'Seminer Salonu B',
+    date: '2026-10-13', // Salı
+    startTime: '09:00',
+    endTime: '12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     isOnline: false,
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     status: 'completed',
-    attendanceClosedAt: '13 Ekim 2026 17:15',
-    attendanceClosedBy: 'Murat Özkan (Eğitmen)',
+    attendanceClosedAt: '13 Ekim 2026 12:15',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
     notes: 'İlk oturum eksiksiz tamamlandı.',
   },
   {
@@ -53,20 +106,20 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     sessionNumber: 2,
-    title: 'E-Ticaret Altyapıları ve Pazaryeri Kurulumu',
+    title: 'Modül 2: E-Ticaret Altyapıları ve Pazaryeri Kurulumu',
     topic: 'Trendyol, Hepsiburada ve özel e-ticaret sitelerinde satıcı hesabı açma.',
-    date: '2026-10-15',
-    startTime: '14:00',
-    endTime: '17:00',
-    location: 'Seminer Salonu B',
+    date: '2026-10-15', // Perşembe
+    startTime: '09:00',
+    endTime: '12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     isOnline: false,
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     status: 'completed',
-    attendanceClosedAt: '15 Ekim 2026 17:10',
-    attendanceClosedBy: 'Murat Özkan (Eğitmen)',
+    attendanceClosedAt: '15 Ekim 2026 12:10',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
   },
   {
     id: 'sess-03',
@@ -75,20 +128,20 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     sessionNumber: 3,
-    title: 'Ürün Fotoğraflama, Listeleme ve Açıklama Yazımı',
+    title: 'Modül 3: Ürün Fotoğraflama, Listeleme ve Açıklama Yazımı',
     topic: 'Görsel kalite kuralları ve müşteri güveni oluşturan ürün detayları.',
-    date: '2026-10-20',
-    startTime: '14:00',
-    endTime: '17:00',
-    location: 'Seminer Salonu B',
+    date: '2026-10-20', // Salı
+    startTime: '09:00',
+    endTime: '12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     isOnline: false,
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     status: 'completed',
-    attendanceClosedAt: '20 Ekim 2026 17:20',
-    attendanceClosedBy: 'Murat Özkan (Eğitmen)',
+    attendanceClosedAt: '20 Ekim 2026 12:20',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
   },
   {
     id: 'sess-04',
@@ -97,19 +150,21 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     sessionNumber: 4,
-    title: 'Gıda Güvenliği, Paketleme ve Soğuk Zincir/Kargo',
+    title: 'Modül 4: Gıda Güvenliği, Paketleme ve Soğuk Zincir/Kargo',
     topic: 'Paketleme standartları ve lojistik anlaşmalarının yönetimi.',
-    date: '2026-10-22',
-    startTime: '14:00',
-    endTime: '17:00',
-    location: 'Seminer Salonu B',
+    date: '2026-10-22', // Perşembe
+    startTime: '09:00',
+    endTime: '12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     isOnline: false,
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
-    status: 'attendance_open',
-    notes: 'Bugünkü aktif oturum: Manuel yoklama alınmaktadır.',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    status: 'completed',
+    attendanceClosedAt: '22 Ekim 2026 12:15',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+    notes: 'Manuel yoklama tamamlandı ve onaylandı.',
   },
   {
     id: 'sess-05',
@@ -118,18 +173,21 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     sessionNumber: 5,
-    title: 'Stok Takibi ve Fatura Entegrasyonu',
+    title: 'Modül 5: Geleneksel Üretim Standartları ve Kalite Güvencesi',
     topic: 'E-Fatura, vergi muafiyeti ve sipariş karşılama simülasyonu.',
-    date: '2026-10-27',
-    startTime: '14:00',
-    endTime: '17:00',
-    location: 'Seminer Salonu B',
+    date: '2026-10-27', // Salı
+    startTime: '09:00',
+    endTime: '12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     isOnline: false,
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
-    status: 'scheduled',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    status: 'completed',
+    attendanceClosedAt: '27 Ekim 2026 12:10',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+    notes: 'Manuel yoklama tamamlandı ve onaylandı.',
   },
   {
     id: 'sess-06',
@@ -138,21 +196,21 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-01',
-    groupName: 'Grup A (Hafta İçi Öğleden Sonra)',
+    groupName: 'Grup A — Sabah Oturumu',
     sessionNumber: 6,
-    title: 'Sosyal Medyadan Satış ve Müşteri Hizmetleri',
+    title: 'Modül 6: Sosyal Medyadan Satış ve Müşteri Hizmetleri',
     topic: 'Instagram/WhatsApp işletme hesapları ve iade süreçleri.',
-    date: '2026-10-29',
-    startTime: '14:00',
-    endTime: '17:00',
-    location: 'Seminer Salonu B',
+    date: '2026-10-29', // Perşembe
+    startTime: '09:00',
+    endTime: '12:00',
+    location: 'IE Ana Derslik 1 (Zemin Kat)',
     isOnline: false,
-    instructorId: 'user-instructor-01',
-    instructorName: 'Murat Özkan',
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     status: 'scheduled',
   },
 
-  // Grup B: Dış Ticaret & İhracat Yönetimi (grp-02)
+  // 7-10. Grup B: Dış Ticaret & İhracat Yönetimi (grp-02) - Kemal Aksoy
   {
     id: 'sess-02-01',
     programId: 'prog-02',
@@ -160,19 +218,19 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-02',
-    groupName: 'Grup B (Hafta Sonu)',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
     sessionNumber: 1,
     title: 'Temel Dış Ticaret Kavramları ve Teslim Şekilleri (Incoterms 2020)',
     topic: 'FOB, CIF, EXW sorumluluk ve risk paylaşımı.',
-    date: '2026-10-17',
-    startTime: '10:00',
-    endTime: '13:00',
+    date: '2026-10-14', // Çarşamba
+    startTime: '13:30',
+    endTime: '16:30',
     location: 'Derslik 2',
     isOnline: false,
-    instructorId: 'user-instructor-02',
+    instructorId: 'usr-real-8',
     instructorName: 'Kemal Aksoy',
     status: 'completed',
-    attendanceClosedAt: '17 Ekim 2026 13:10',
+    attendanceClosedAt: '14 Ekim 2026 16:40',
     attendanceClosedBy: 'Kemal Aksoy (Eğitmen)',
   },
   {
@@ -182,17 +240,149 @@ export const INITIAL_SESSIONS: Session[] = [
     termId: 'term-2026-fall',
     cohortName: '2026 Güz Dönemi',
     groupId: 'grp-02',
-    groupName: 'Grup B (Hafta Sonu)',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
     sessionNumber: 2,
-    title: 'Gümrük Mevzuatı ve İhracat Belgeleri',
+    title: 'Gümrük Mevzuatı ve İhracat Belgeleri (ATR, EUR.1)',
     topic: 'ATR, EUR1, Menşe Şahadetnamesi ve Gümrük Beyannamesi hazırlığı.',
-    date: '2026-10-24',
-    startTime: '10:00',
-    endTime: '13:00',
+    date: '2026-10-16', // Cuma
+    startTime: '13:30',
+    endTime: '16:30',
     location: 'Derslik 2',
     isOnline: false,
-    instructorId: 'user-instructor-02',
+    instructorId: 'usr-real-8',
     instructorName: 'Kemal Aksoy',
+    status: 'completed',
+    attendanceClosedAt: '16 Ekim 2026 16:35',
+    attendanceClosedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'sess-02-03',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    sessionNumber: 3,
+    title: 'Uluslararası Ödeme Yöntemleri ve Akreditif Operasyonları',
+    topic: 'Vesaik mukabili, peşin ve akreditifli ödemelerde banka süreçleri.',
+    date: '2026-10-21', // Çarşamba
+    startTime: '13:30',
+    endTime: '16:30',
+    location: 'Derslik 2',
+    isOnline: false,
+    instructorId: 'usr-real-8',
+    instructorName: 'Kemal Aksoy',
+    status: 'completed',
+    attendanceClosedAt: '21 Ekim 2026 16:40',
+    attendanceClosedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'sess-02-04',
+    programId: 'prog-02',
+    programTitle: 'Dış Ticaret & İhracat Yönetimi',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-02',
+    groupName: 'Grup B — Öğleden Sonra Oturumu',
+    sessionNumber: 4,
+    title: 'Sınır Kapısı ve Uluslararası Nakliye/Lojistik Yönetimi',
+    topic: 'Konteyner ve karayolu sevkiyatı hazırlığı.',
+    date: '2026-10-23', // Cuma
+    startTime: '13:30',
+    endTime: '16:30',
+    location: 'Derslik 2',
+    isOnline: false,
+    instructorId: 'usr-real-8',
+    instructorName: 'Kemal Aksoy',
+    status: 'scheduled',
+  },
+
+  // 11-14. Grup C: İslahiye Gastronomi ve Mutfak Sanatları (grp-03) - Şef Mehmet Yılmaz & Ayşe Demir
+  {
+    id: 'sess-03-01',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    sessionNumber: 1,
+    title: 'İslahiye Biberiyle Geleneksel Reçeteler ve Mutfak Hijyeni',
+    topic: 'Bölgesel lezzet standardizasyonu ve profesyonel mutfak gereçleri.',
+    date: '2026-10-12', // Pazartesi
+    startTime: '14:00',
+    endTime: '17:00',
+    location: 'Uygulama Mutfağı Atölyesi',
+    isOnline: false,
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    status: 'completed',
+    attendanceClosedAt: '12 Ekim 2026 17:15',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'sess-03-02',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    sessionNumber: 2,
+    title: 'Yöresel Kurutmalıklar, Salçalar ve Saklama Teknikleri',
+    topic: 'Güneşte kurutma ve geleneksel fırınlama teknikleri.',
+    date: '2026-10-17', // Cumartesi
+    startTime: '10:00',
+    endTime: '13:00',
+    location: 'Uygulama Mutfağı Atölyesi',
+    isOnline: false,
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
+    status: 'completed',
+    attendanceClosedAt: '17 Ekim 2026 13:10',
+    attendanceClosedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'sess-03-03',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    sessionNumber: 3,
+    title: 'Coğrafi İşaretli Menü Planlama ve Tabak Sunum Sanatı',
+    topic: 'Modern gastronomi sunumları ve tabak kompozisyonu.',
+    date: '2026-10-19', // Pazartesi
+    startTime: '14:00',
+    endTime: '17:00',
+    location: 'Uygulama Mutfağı Atölyesi',
+    isOnline: false,
+    instructorId: 'usr-real-10',
+    instructorName: 'Ayşe Demir',
+    status: 'completed',
+    attendanceClosedAt: '19 Ekim 2026 17:10',
+    attendanceClosedBy: 'Ayşe Demir (Eğitmen)',
+  },
+  {
+    id: 'sess-03-04',
+    programId: 'prog-03',
+    programTitle: 'İslahiye Gastronomi ve Mutfak Sanatları',
+    termId: 'term-2026-fall',
+    cohortName: '2026 Güz Dönemi',
+    groupId: 'grp-03',
+    groupName: 'Grup A — Uygulama Mutfağı',
+    sessionNumber: 4,
+    title: 'Yöresel Tadım Atölyesi ve Mutfak Maliyet Analizi',
+    topic: 'Reçete maliyetlendirme (Food Cost) ve menü fiyatlandırması.',
+    date: '2026-10-24', // Cumartesi
+    startTime: '10:00',
+    endTime: '13:00',
+    location: 'Uygulama Mutfağı Atölyesi',
+    isOnline: false,
+    instructorId: 'usr-instructor',
+    instructorName: 'Şef Mehmet Yılmaz',
     status: 'scheduled',
   },
 ];
@@ -202,57 +392,604 @@ export const INITIAL_SESSIONS: Session[] = [
 // -----------------------------------------------------------------------------
 
 export const INITIAL_ATTENDANCE_RECORDS: SessionAttendanceRecord[] = [
-  // sess-01 (Ayşe Demir & Diğerleri)
+  // sess-01 (13 Ekim) - Grup A (6 Kursiyer)
   {
-    id: 'att-s01-u01',
+    id: 'att-s01-ahmet',
     sessionId: 'sess-01',
     groupId: 'grp-01',
-    enrollmentId: 'enr-trainee-01',
-    candidateId: 'user-trainee-01',
-    traineeId: 'user-trainee-01',
-    traineeName: 'Ayşe Demir',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
     status: 'attended',
-    markedAt: '13 Ekim 2026 17:15',
-    markedBy: 'Murat Özkan (Eğitmen)',
+    markedAt: '13 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
   },
-  // sess-02 (Ayşe Demir)
   {
-    id: 'att-s02-u01',
+    id: 'att-s01-fatma',
+    sessionId: 'sess-01',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    status: 'attended',
+    markedAt: '13 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s01-mehmet',
+    sessionId: 'sess-01',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mehmet',
+    candidateId: 'usr-real-13',
+    traineeId: 'usr-real-13',
+    traineeName: 'Mehmet Öztürk',
+    status: 'attended',
+    markedAt: '13 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s01-elif',
+    sessionId: 'sess-01',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-elif',
+    candidateId: 'usr-real-14',
+    traineeId: 'usr-real-14',
+    traineeName: 'Elif Çetin',
+    status: 'attended',
+    markedAt: '13 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s01-mustafa',
+    sessionId: 'sess-01',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mustafa',
+    candidateId: 'usr-real-15',
+    traineeId: 'usr-real-15',
+    traineeName: 'Mustafa Demir',
+    status: 'attended',
+    markedAt: '13 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s01-emine',
+    sessionId: 'sess-01',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-emine',
+    candidateId: 'usr-real-16',
+    traineeId: 'usr-real-16',
+    traineeName: 'Emine Koç',
+    status: 'excused',
+    markedAt: '13 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+    correctionReason: 'Kooperatif genel kurulu için izinli sayıldı.',
+  },
+
+  // sess-02 (15 Ekim) - Grup A
+  {
+    id: 'att-s02-ahmet',
     sessionId: 'sess-02',
     groupId: 'grp-01',
-    enrollmentId: 'enr-trainee-01',
-    candidateId: 'user-trainee-01',
-    traineeId: 'user-trainee-01',
-    traineeName: 'Ayşe Demir',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
     status: 'attended',
-    markedAt: '15 Ekim 2026 17:10',
-    markedBy: 'Murat Özkan (Eğitmen)',
+    markedAt: '15 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
   },
-  // sess-03 (Ayşe Demir)
   {
-    id: 'att-s03-u01',
+    id: 'att-s02-fatma',
+    sessionId: 'sess-02',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    status: 'attended',
+    markedAt: '15 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s02-mehmet',
+    sessionId: 'sess-02',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mehmet',
+    candidateId: 'usr-real-13',
+    traineeId: 'usr-real-13',
+    traineeName: 'Mehmet Öztürk',
+    status: 'attended',
+    markedAt: '15 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s02-elif',
+    sessionId: 'sess-02',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-elif',
+    candidateId: 'usr-real-14',
+    traineeId: 'usr-real-14',
+    traineeName: 'Elif Çetin',
+    status: 'attended',
+    markedAt: '15 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s02-mustafa',
+    sessionId: 'sess-02',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mustafa',
+    candidateId: 'usr-real-15',
+    traineeId: 'usr-real-15',
+    traineeName: 'Mustafa Demir',
+    status: 'absent',
+    markedAt: '15 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s02-emine',
+    sessionId: 'sess-02',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-emine',
+    candidateId: 'usr-real-16',
+    traineeId: 'usr-real-16',
+    traineeName: 'Emine Koç',
+    status: 'attended',
+    markedAt: '15 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+
+  // sess-03 (20 Ekim) - Grup A
+  {
+    id: 'att-s03-ahmet',
     sessionId: 'sess-03',
     groupId: 'grp-01',
-    enrollmentId: 'enr-trainee-01',
-    candidateId: 'user-trainee-01',
-    traineeId: 'user-trainee-01',
-    traineeName: 'Ayşe Demir',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
     status: 'attended',
-    markedAt: '20 Ekim 2026 17:20',
-    markedBy: 'Murat Özkan (Eğitmen)',
+    markedAt: '20 Ekim 2026 12:20',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
   },
-  // sess-04 (Ayşe Demir - Yoklama Açık, taslak işaretlendi)
   {
-    id: 'att-s04-u01',
+    id: 'att-s03-fatma',
+    sessionId: 'sess-03',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    status: 'attended',
+    markedAt: '20 Ekim 2026 12:20',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s03-mehmet',
+    sessionId: 'sess-03',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mehmet',
+    candidateId: 'usr-real-13',
+    traineeId: 'usr-real-13',
+    traineeName: 'Mehmet Öztürk',
+    status: 'absent',
+    markedAt: '20 Ekim 2026 12:20',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s03-elif',
+    sessionId: 'sess-03',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-elif',
+    candidateId: 'usr-real-14',
+    traineeId: 'usr-real-14',
+    traineeName: 'Elif Çetin',
+    status: 'attended',
+    markedAt: '20 Ekim 2026 12:20',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s03-mustafa',
+    sessionId: 'sess-03',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mustafa',
+    candidateId: 'usr-real-15',
+    traineeId: 'usr-real-15',
+    traineeName: 'Mustafa Demir',
+    status: 'attended',
+    markedAt: '20 Ekim 2026 12:20',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s03-emine',
+    sessionId: 'sess-03',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-emine',
+    candidateId: 'usr-real-16',
+    traineeId: 'usr-real-16',
+    traineeName: 'Emine Koç',
+    status: 'attended',
+    markedAt: '20 Ekim 2026 12:20',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+
+  // sess-04 (22 Ekim) - Grup A
+  {
+    id: 'att-s04-ahmet',
     sessionId: 'sess-04',
     groupId: 'grp-01',
-    enrollmentId: 'enr-trainee-01',
-    candidateId: 'user-trainee-01',
-    traineeId: 'user-trainee-01',
-    traineeName: 'Ayşe Demir',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
     status: 'attended',
-    markedAt: '22 Ekim 2026 14:15',
-    markedBy: 'Murat Özkan (Eğitmen)',
+    markedAt: '22 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s04-fatma',
+    sessionId: 'sess-04',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    status: 'excused',
+    markedAt: '22 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+    correctionReason: 'Sağlık raporu ibraz edildi.',
+  },
+  {
+    id: 'att-s04-mehmet',
+    sessionId: 'sess-04',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mehmet',
+    candidateId: 'usr-real-13',
+    traineeId: 'usr-real-13',
+    traineeName: 'Mehmet Öztürk',
+    status: 'attended',
+    markedAt: '22 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s04-elif',
+    sessionId: 'sess-04',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-elif',
+    candidateId: 'usr-real-14',
+    traineeId: 'usr-real-14',
+    traineeName: 'Elif Çetin',
+    status: 'attended',
+    markedAt: '22 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s04-mustafa',
+    sessionId: 'sess-04',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mustafa',
+    candidateId: 'usr-real-15',
+    traineeId: 'usr-real-15',
+    traineeName: 'Mustafa Demir',
+    status: 'attended',
+    markedAt: '22 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s04-emine',
+    sessionId: 'sess-04',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-emine',
+    candidateId: 'usr-real-16',
+    traineeId: 'usr-real-16',
+    traineeName: 'Emine Koç',
+    status: 'attended',
+    markedAt: '22 Ekim 2026 12:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+
+  // sess-05 (27 Ekim) - Grup A
+  {
+    id: 'att-s05-ahmet',
+    sessionId: 'sess-05',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-ahmet',
+    candidateId: 'usr-trainee',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
+    status: 'attended',
+    markedAt: '27 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s05-fatma',
+    sessionId: 'sess-05',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-fatma',
+    candidateId: 'usr-real-12',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    status: 'attended',
+    markedAt: '27 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s05-mehmet',
+    sessionId: 'sess-05',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mehmet',
+    candidateId: 'usr-real-13',
+    traineeId: 'usr-real-13',
+    traineeName: 'Mehmet Öztürk',
+    status: 'attended',
+    markedAt: '27 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s05-elif',
+    sessionId: 'sess-05',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-elif',
+    candidateId: 'usr-real-14',
+    traineeId: 'usr-real-14',
+    traineeName: 'Elif Çetin',
+    status: 'attended',
+    markedAt: '27 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s05-mustafa',
+    sessionId: 'sess-05',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-mustafa',
+    candidateId: 'usr-real-15',
+    traineeId: 'usr-real-15',
+    traineeName: 'Mustafa Demir',
+    status: 'absent',
+    markedAt: '27 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s05-emine',
+    sessionId: 'sess-05',
+    groupId: 'grp-01',
+    enrollmentId: 'enr-trainee-emine',
+    candidateId: 'usr-real-16',
+    traineeId: 'usr-real-16',
+    traineeName: 'Emine Koç',
+    status: 'attended',
+    markedAt: '27 Ekim 2026 12:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+
+  // sess-02-01 (14 Ekim) - Grup B (4 Kursiyer)
+  {
+    id: 'att-s201-caner',
+    sessionId: 'sess-02-01',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-caner',
+    candidateId: 'usr-real-17',
+    traineeId: 'usr-real-17',
+    traineeName: 'Caner Yıldız',
+    status: 'attended',
+    markedAt: '14 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s201-busra',
+    sessionId: 'sess-02-01',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-busra',
+    candidateId: 'usr-real-18',
+    traineeId: 'usr-real-18',
+    traineeName: 'Büşra Kurt',
+    status: 'attended',
+    markedAt: '14 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s201-serdar',
+    sessionId: 'sess-02-01',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-serdar',
+    candidateId: 'usr-real-19',
+    traineeId: 'usr-real-19',
+    traineeName: 'Serdar Aslan',
+    status: 'attended',
+    markedAt: '14 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s201-zeynep',
+    sessionId: 'sess-02-01',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-zeynep-polat',
+    candidateId: 'usr-real-20',
+    traineeId: 'usr-real-20',
+    traineeName: 'Zeynep Polat',
+    status: 'attended',
+    markedAt: '14 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+
+  // sess-02-02 (16 Ekim) - Grup B
+  {
+    id: 'att-s202-caner',
+    sessionId: 'sess-02-02',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-caner',
+    candidateId: 'usr-real-17',
+    traineeId: 'usr-real-17',
+    traineeName: 'Caner Yıldız',
+    status: 'attended',
+    markedAt: '16 Ekim 2026 16:35',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s202-busra',
+    sessionId: 'sess-02-02',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-busra',
+    candidateId: 'usr-real-18',
+    traineeId: 'usr-real-18',
+    traineeName: 'Büşra Kurt',
+    status: 'attended',
+    markedAt: '16 Ekim 2026 16:35',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s202-serdar',
+    sessionId: 'sess-02-02',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-serdar',
+    candidateId: 'usr-real-19',
+    traineeId: 'usr-real-19',
+    traineeName: 'Serdar Aslan',
+    status: 'excused',
+    markedAt: '16 Ekim 2026 16:35',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s202-zeynep',
+    sessionId: 'sess-02-02',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-zeynep-polat',
+    candidateId: 'usr-real-20',
+    traineeId: 'usr-real-20',
+    traineeName: 'Zeynep Polat',
+    status: 'absent',
+    markedAt: '16 Ekim 2026 16:35',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+
+  // sess-02-03 (21 Ekim) - Grup B
+  {
+    id: 'att-s203-caner',
+    sessionId: 'sess-02-03',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-caner',
+    candidateId: 'usr-real-17',
+    traineeId: 'usr-real-17',
+    traineeName: 'Caner Yıldız',
+    status: 'attended',
+    markedAt: '21 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s203-busra',
+    sessionId: 'sess-02-03',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-busra',
+    candidateId: 'usr-real-18',
+    traineeId: 'usr-real-18',
+    traineeName: 'Büşra Kurt',
+    status: 'attended',
+    markedAt: '21 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s203-serdar',
+    sessionId: 'sess-02-03',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-serdar',
+    candidateId: 'usr-real-19',
+    traineeId: 'usr-real-19',
+    traineeName: 'Serdar Aslan',
+    status: 'attended',
+    markedAt: '21 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+  {
+    id: 'att-s203-zeynep',
+    sessionId: 'sess-02-03',
+    groupId: 'grp-02',
+    enrollmentId: 'enr-trainee-zeynep-polat',
+    candidateId: 'usr-real-20',
+    traineeId: 'usr-real-20',
+    traineeName: 'Zeynep Polat',
+    status: 'attended',
+    markedAt: '21 Ekim 2026 16:40',
+    markedBy: 'Kemal Aksoy (Eğitmen)',
+  },
+
+  // sess-03-01 (12 Ekim) - Grup C (2 Kursiyer)
+  {
+    id: 'att-s301-ibrahim',
+    sessionId: 'sess-03-01',
+    groupId: 'grp-03',
+    enrollmentId: 'enr-trainee-ibrahim',
+    candidateId: 'usr-real-21',
+    traineeId: 'usr-real-21',
+    traineeName: 'İbrahim Çelik',
+    status: 'attended',
+    markedAt: '12 Ekim 2026 17:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s301-merve',
+    sessionId: 'sess-03-01',
+    groupId: 'grp-03',
+    enrollmentId: 'enr-trainee-merve',
+    candidateId: 'usr-real-22',
+    traineeId: 'usr-real-22',
+    traineeName: 'Merve Doğan',
+    status: 'attended',
+    markedAt: '12 Ekim 2026 17:15',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+
+  // sess-03-02 (17 Ekim) - Grup C
+  {
+    id: 'att-s302-ibrahim',
+    sessionId: 'sess-03-02',
+    groupId: 'grp-03',
+    enrollmentId: 'enr-trainee-ibrahim',
+    candidateId: 'usr-real-21',
+    traineeId: 'usr-real-21',
+    traineeName: 'İbrahim Çelik',
+    status: 'attended',
+    markedAt: '17 Ekim 2026 13:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+  {
+    id: 'att-s302-merve',
+    sessionId: 'sess-03-02',
+    groupId: 'grp-03',
+    enrollmentId: 'enr-trainee-merve',
+    candidateId: 'usr-real-22',
+    traineeId: 'usr-real-22',
+    traineeName: 'Merve Doğan',
+    status: 'attended',
+    markedAt: '17 Ekim 2026 13:10',
+    markedBy: 'Şef Mehmet Yılmaz (Eğitmen)',
+  },
+
+  // sess-03-03 (19 Ekim) - Grup C
+  {
+    id: 'att-s303-ibrahim',
+    sessionId: 'sess-03-03',
+    groupId: 'grp-03',
+    enrollmentId: 'enr-trainee-ibrahim',
+    candidateId: 'usr-real-21',
+    traineeId: 'usr-real-21',
+    traineeName: 'İbrahim Çelik',
+    status: 'attended',
+    markedAt: '19 Ekim 2026 17:10',
+    markedBy: 'Ayşe Demir (Eğitmen)',
+  },
+  {
+    id: 'att-s303-merve',
+    sessionId: 'sess-03-03',
+    groupId: 'grp-03',
+    enrollmentId: 'enr-trainee-merve',
+    candidateId: 'usr-real-22',
+    traineeId: 'usr-real-22',
+    traineeName: 'Merve Doğan',
+    status: 'attended',
+    markedAt: '19 Ekim 2026 17:10',
+    markedBy: 'Ayşe Demir (Eğitmen)',
   },
 ];
 
@@ -268,7 +1005,11 @@ export const getStoredSessions = (): Session[] => {
       return INITIAL_SESSIONS;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (
+      Array.isArray(parsed) &&
+      parsed.length >= 10 &&
+      parsed.some((s) => s.groupId === 'grp-01')
+    ) {
       return parsed;
     }
     localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(INITIAL_SESSIONS));
@@ -505,7 +1246,15 @@ export const getStoredAttendanceRecords = (): SessionAttendanceRecord[] => {
       return INITIAL_ATTENDANCE_RECORDS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_ATTENDANCE_RECORDS;
+    if (
+      Array.isArray(parsed) &&
+      parsed.length >= 25 &&
+      parsed.some((r) => r.candidateId === 'usr-trainee' || r.traineeId === 'usr-trainee')
+    ) {
+      return parsed;
+    }
+    localStorage.setItem(ATTENDANCE_STORAGE_KEY, JSON.stringify(INITIAL_ATTENDANCE_RECORDS));
+    return INITIAL_ATTENDANCE_RECORDS;
   } catch (err) {
     console.error('Attendance read error:', err);
     return INITIAL_ATTENDANCE_RECORDS;
@@ -672,6 +1421,20 @@ export const closeSessionAttendance = (
   const statusRes = updateSessionStatus(sessionId, 'completed', closedBy);
   if (!statusRes.success) {
     return { success: false, error: statusRes.error };
+  }
+
+  // Canlı backend API ile senkronize et
+  try {
+    educationApi.saveSessionAttendance(
+      sessionId,
+      updatedList.map((u) => ({
+        studentUserId: u.traineeId,
+        status: u.status === 'attended' ? 1 : u.status === 'excused' ? 2 : 0,
+        notes: `Yoklama eğitmen (${closedBy}) tarafından manuel kaydedildi.`,
+      }))
+    ).catch((err) => console.warn('API sync attendance notice:', err));
+  } catch (err) {
+    console.warn('API sync attendance skipped:', err);
   }
 
   return { success: true };

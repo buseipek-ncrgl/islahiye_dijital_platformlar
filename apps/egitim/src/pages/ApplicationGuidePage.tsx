@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen,
   FileText,
@@ -26,6 +26,11 @@ import {
 } from 'lucide-react';
 
 export const ApplicationGuidePage: React.FC = () => {
+  const location = useLocation();
+  const isCandidatePanel = location.pathname.startsWith('/aday');
+  const isTraineePanel = location.pathname.startsWith('/kursiyer');
+  const isPortalMode = isCandidatePanel || isTraineePanel || location.pathname.startsWith('/yonetim');
+
   // Active Sidebar Tab State (Default: 'genel-bilgi')
   const [activeTab, setActiveTab] = useState<string>('genel-bilgi');
 
@@ -88,50 +93,43 @@ export const ApplicationGuidePage: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className={`max-w-7xl mx-auto space-y-6 pb-12 ${isPortalMode ? '' : 'px-4 sm:px-6 lg:px-8 py-8'}`}>
       
-      {/* ===================================================================== */}
-      {/* 1. BREADCRUMB NAVIGATION                                              */}
-      {/* ===================================================================== */}
-      <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Sayfa Konumu">
-        <Link to="/" className="hover:text-blue-600 transition-colors">Ana Sayfa</Link>
-        <span className="text-slate-400">/</span>
-        <span className="text-slate-800 font-medium">Başvuru Rehberi</span>
-      </nav>
+      {/* 1. BREADCRUMB (Yalnızca Kamusal Görünümde) */}
+      {!isPortalMode && (
+        <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Sayfa Konumu">
+          <Link to="/" className="hover:text-blue-600 transition-colors">Ana Sayfa</Link>
+          <span className="text-slate-400">/</span>
+          <span className="text-slate-800 font-medium">Başvuru Rehberi</span>
+        </nav>
+      )}
 
-      {/* ===================================================================== */}
-      {/* 2. PAGE HERO: Clean Typography & Trust Card (NO TOP STOCK PHOTO)      */}
-      {/* ===================================================================== */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 sm:p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
-        
-        {/* Left Side: Overline, Headline & Subtitle */}
-        <div className="max-w-2xl space-y-3">
-          <div className="text-xs font-bold text-slate-500 tracking-wider uppercase">
-            ADIM ADIM BAŞVURU SÜRECİ
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            Başvuru <span className="text-blue-600">Rehberi</span>
+      {/* 2. PAGE HEADER: Clean Typography & Quick Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Başvuru Rehberi
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            Eğitim programlarımıza başvurmak için gerekli tüm bilgileri bu rehberde bulabilirsiniz. Başvuru koşulları, gerekli belgeler, değerlendirme süreci ve sık sorulan sorularla size yol gösteriyoruz.
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+            Eğitim programlarımıza başvurmak için gerekli tüm bilgiler, başvuru koşulları, zorunlu belgeler ve değerlendirme aşamaları.
           </p>
         </div>
 
-        {/* Right Side: Trust & Guidance Card (Clean text-focused, no stock photo) */}
-        <div className="flex items-start gap-4 bg-blue-50/70 border border-blue-100 rounded-2xl p-5 sm:p-6 max-w-md shadow-xs shrink-0">
-          <div className="w-11 h-11 rounded-xl bg-blue-100/90 text-blue-600 flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-bold text-slate-900 text-sm leading-snug">
-              Doğru ve eksiksiz başvuru, eğitim yolculuğunuzun ilk adımıdır.
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Başvuru yapmadan önce rehberi dikkatlice incelemenizi öneririz.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {isPortalMode ? (
+            <Link
+              to={isCandidatePanel ? '/aday' : '/kursiyer'}
+              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs whitespace-nowrap"
+            >
+              <span>Panoya Dön →</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2.5 bg-blue-50/70 border border-blue-100 rounded-xl px-4 py-2 text-xs text-blue-900 shrink-0">
+              <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="font-medium">Resmi Başvuru Rehberi</span>
+            </div>
+          )}
         </div>
-
       </div>
 
       {/* ===================================================================== */}

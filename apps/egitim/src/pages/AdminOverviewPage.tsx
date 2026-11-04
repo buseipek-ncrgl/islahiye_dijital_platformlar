@@ -1,299 +1,569 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Layers, FileText, CheckSquare, Award, ArrowRight, Users, Bell, Mail, ShieldCheck } from 'lucide-react';
-import { DEMO_APPLICATIONS, DEMO_GROUPS_SUMMARY } from '../data/educationData';
-import { Card, CardContent } from '../components/ui/Card';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Layers,
+  CheckSquare,
+  Award,
+  ArrowRight,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  ChevronRight,
+  FileText,
+  GraduationCap,
+  Filter,
+} from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/StatusBadge';
-import {
-  getStoredAdminAnnouncements,
-  getStoredNotifications,
-  getStoredNotificationEvents,
-} from '../services/notificationStorage';
-import { getStoredEmailQueue } from '../services/massEmailStorage';
+import { KpiStrip } from '../components/ui/KpiStrip';
+import { Modal } from '../components/ui/Modal';
+import { getAllApplications } from '../services/applicationStorage';
+import { getStoredGroups, getStoredAssignments, getStoredEnrollments } from '../services/enrollmentStorage';
+import { getStoredCertificates } from '../services/certificateStorage';
+import { getStoredSessions } from '../services/sessionStorage';
+import { calculateOperationalReports } from '../services/reportingService';
+import { Application } from '../types';
 
 export const AdminOverviewPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Bekleyen kararlar listesi (tekrar eden kayıt olmadan, ilk 4 benzersiz aday)
-  const pendingApplicants = DEMO_APPLICATIONS.filter((app) => app.status === 'pending').slice(0, 4);
+  // Canlı veriler
+  const [applications] = useState<Application[]>(() => getAllApplications());
+  const [groups] = useState(() => getStoredGroups());
+  const [inspectApp, setInspectApp] = useState<Application | null>(null);
+
+  const activeAssignments = useMemo(() => {
+    return getStoredAssignments().filter((a) => a.status === 'active');
+  }, []);
+
+  const enrollments = useMemo(() => {
+    return getStoredEnrollments();
+  }, []);
+
+  const certificates = useMemo(() => {
+    return getStoredCertificates();
+  }, []);
+
+  const sessions = useMemo(() => {
+    return getStoredSessions();
+  }, []);
+
+  const completedSessions = useMemo(() => {
+    return sessions.filter((s) => s.status === 'completed');
+  }, [sessions]);
+
+  // Sayımlar
+  const totalProgramsCount = useMemo(() => {
+    return new Set(groups.map((g) => g.programId)).size;
+  }, [groups]);
+
+  const totalGroupsCount = groups.length;
+  const totalAssignedTrainees = activeAssignments.length;
+  const totalCertificatesCount = certificates.length;
+
+  // Huni (Funnel) Aşamaları
+  const totalAppsCount = applications.length;
+  const acceptedAppsCount = applications.filter((a) =>
+    ['accepted', 'enrolled'].includes(a.status)
+  ).length;
+  const confirmedEnrollmentsCount = enrollments.filter((e) =>
+    ['confirmed', 'completed'].includes(e.status)
+  ).length;
+
+  // Bugünün Türkçe Tarihi
+  const formattedTodayDate = useMemo(() => {
+    const now = new Date();
+    const days = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+    ];
+    return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}, ${days[now.getDay()]}`;
+  }, []);
+
+  const operationalReport = useMemo(() => {
+    return calculateOperationalReports();
+  }, [applications, groups, sessions, certificates, activeAssignments]);
+
+  const averageAttendance = operationalReport.attendance.averageAttendanceRate ?? 0;
+
+  const groupSummaries = useMemo(() => {
+    return groups.map((g) => {
+      const gAssignments = activeAssignments.filter((a) => a.groupId === g.id);
+      const gSessions = sessions.filter((s) => s.groupId === g.id && s.status === 'completed');
+
+      return {
+        id: g.id,
+        programTitle: g.programTitle,
+        groupName: g.name,
+        instructorName: g.instructorNames?.[0] || 'Atanmamış',
+        traineeCount: gAssignments.length,
+        attendanceAverage: gSessions.length > 0 ? averageAttendance : 0,
+        assignmentAverage: operationalReport.assignments.overallAverageScore ?? 0,
+      };
+    });
+  }, [groups, activeAssignments, sessions, averageAttendance, operationalReport.assignments.overallAverageScore]);
+
+  // Pending applicants
+  const pendingApplicants = useMemo(() => {
+    return applications
+      .filter((app) => ['pending', 'under_review', 'submitted'].includes(app.status))
+      .slice(0, 5);
+  }, [applications]);
+
+  const pendingCount = applications.filter((app) =>
+    ['pending', 'under_review', 'submitted'].includes(app.status)
+  ).length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Top Breadcrumb & Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      {/* ===================================================================== */}
+      {/* 1. ÜST BAŞLIK VE EYLEM BUTONLARI                                     */}
+      {/* ===================================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div>
-          <span className="text-xs text-slate-500">Yönetici Paneli (/yonetim):</span>
-          <h2 className="text-lg font-bold text-brand-textPrimary">Operasyonel Genel Bakış</h2>
+          <div className="text-xs font-semibold text-slate-500 mb-1">
+            {formattedTodayDate}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Eğitim Yönetimi Genel Bakış
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            İslahiye Ticaret Odası eğitim programları, başvuru kararları ve operasyonel akademik performans takibi.
+          </p>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="text-slate-500">Aktif Dönem: <strong className="text-slate-800">2026 Güz Dönemi</strong></span>
-          <StatusBadge label="Sistem Aktif" variant="success" size="sm" />
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Link
+            to="/yonetim/basvurular"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition shadow-2xs whitespace-nowrap"
+          >
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>Karar Masasını Aç</span>
+          </Link>
+          <Link
+            to="/yonetim/raporlar"
+            className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-2xs whitespace-nowrap"
+          >
+            <FileText className="w-4 h-4 text-slate-500 shrink-0" />
+            <span>Raporlar</span>
+          </Link>
         </div>
       </div>
 
-      {/* 4 TOP KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1 */}
-        <Card className="hover:border-slate-300 transition-colors">
-          <CardContent className="p-5 space-y-1">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Aktif Program & Gruplar</span>
-              <Layers className="w-4 h-4 text-blue-600" />
-            </div>
-            <div className="text-xl font-extrabold text-brand-textPrimary tabular-nums">4 Program • 8 Grup</div>
-            <div className="text-xs text-slate-500 flex items-center gap-1 pt-1">
-              <Users className="w-3.5 h-3.5 text-slate-400" />
-              <span>Toplam 156 Kayıtlı Kursiyer</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ===================================================================== */}
+      {/* 2. DÖRT KPI METRİK BANDI (STRIPE/LINEAR STANDARDI)                    */}
+      {/* ===================================================================== */}
+      <KpiStrip
+        columns={4}
+        items={[
+          {
+            label: 'Aktif Program & Gruplar',
+            value: `${totalProgramsCount} Program • ${totalGroupsCount} Grup`,
+            subtext: `${totalAssignedTrainees} Kayıtlı Kursiyer`,
+            icon: <Layers className="w-3.5 h-3.5" />,
+            to: '/yonetim/gruplar',
+          },
+          {
+            label: 'Dönem Başvuruları',
+            value: `${totalAppsCount} Toplam`,
+            subtext: `${pendingCount} İncelenmeyi Bekleyen`,
+            icon: <Clock className="w-3.5 h-3.5" />,
+            badge: (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                {pendingCount} Bekleyen
+              </span>
+            ),
+            to: '/yonetim/basvurular',
+          },
+          {
+            label: 'Yoklama & Devam Durumu',
+            value: `%${Math.round(averageAttendance)} Devam Ort.`,
+            subtext: `${completedSessions.length} Oturum Onaylandı`,
+            icon: <CheckSquare className="w-3.5 h-3.5" />,
+            to: '/yonetim/yoklama-denetim',
+          },
+          {
+            label: 'Belge Kütüğü & QR',
+            value: `${totalCertificatesCount} Onaylı Belge`,
+            subtext: '%100 Doğrulama Hazır',
+            icon: <Award className="w-3.5 h-3.5" />,
+            to: '/yonetim/belgeler',
+          },
+        ]}
+      />
 
-        {/* KPI 2 */}
-        <Card className="hover:border-slate-300 transition-colors">
-          <CardContent className="p-5 space-y-1">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Dönem Başvuruları</span>
-              <FileText className="w-4 h-4 text-amber-600" />
+      {/* ===================================================================== */}
+      {/* 2.5 BAŞVURU & KAYIT DÖNÜŞÜM HUNİSİ (EXECUTIVE CONVERSION PIPELINE)     */}
+      {/* ===================================================================== */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200/60">
+              <Filter className="w-3.5 h-3.5" />
             </div>
-            <div className="text-xl font-extrabold text-brand-textPrimary tabular-nums">240 Toplam</div>
-            <div className="text-xs text-amber-700 font-semibold pt-1">
-              14 İncelenmeyi Bekleyen Başvuru
+            <div>
+              <h2 className="text-xs sm:text-sm font-bold text-slate-900">
+                Aday Başvuru & Kayıt Dönüşüm Hunisi (2026 Güz Dönemi)
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Aday havuzundan sınıf şubesine yerleşime kadar olan 4 kritik idari aşama akışı.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Toplam Dönüşüm: %{totalAppsCount > 0 ? Math.round((totalAssignedTrainees / totalAppsCount) * 100) : 0}
+          </span>
+        </div>
 
-        {/* KPI 3 */}
-        <Card className="hover:border-slate-300 transition-colors">
-          <CardContent className="p-5 space-y-1">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Yoklama & Ödev Süreci</span>
-              <CheckSquare className="w-4 h-4 text-emerald-600" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          {/* Adım 1: Başvuru */}
+          <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition space-y-2">
+            <div className="flex items-center justify-between text-slate-500 text-[11px]">
+              <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">01</span>
+                1. Başvuru Havuzu
+              </span>
+              <span className="font-mono text-slate-700 font-bold">100%</span>
             </div>
-            <div className="text-xl font-extrabold text-brand-success tabular-nums">%83 Devam Ort.</div>
-            <div className="text-xs text-slate-500 pt-1">
-              12 Oturum Manuel Onaylandı
+            <div className="text-xl font-bold text-slate-900 tabular-nums">
+              {totalAppsCount} Aday
             </div>
-          </CardContent>
-        </Card>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div className="bg-blue-600 h-full rounded-full" style={{ width: '100%' }} />
+            </div>
+            <span className="text-[11px] text-slate-400 block">Dönem başvuru havuzu</span>
+          </div>
 
-        {/* KPI 4 */}
-        <Card
-          className="hover:border-blue-400 cursor-pointer transition-all hover:shadow-sm"
-          onClick={() => navigate('/yonetim/belgeler')}
-        >
-          <CardContent className="p-5 space-y-1">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Belge Kütüğü & PDF/QR</span>
-              <Award className="w-4 h-4 text-amber-600" />
+          {/* Adım 2: Ön Değerlendirme & Kabul */}
+          <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition space-y-2">
+            <div className="flex items-center justify-between text-slate-500 text-[11px]">
+              <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">02</span>
+                2. Asil & Kabul
+              </span>
+              <span className="font-mono text-slate-700 font-bold">
+                %{totalAppsCount > 0 ? Math.round((acceptedAppsCount / totalAppsCount) * 100) : 0}
+              </span>
             </div>
-            <div className="text-xl font-extrabold text-brand-blue tabular-nums">Belge Masası</div>
-            <div className="text-xs text-blue-700 font-semibold pt-1 flex items-center justify-between">
-              <span>PDF Üretimi & Karekod</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+            <div className="text-xl font-bold text-slate-900 tabular-nums">
+              {acceptedAppsCount} Aday
             </div>
-          </CardContent>
-        </Card>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-600 h-full rounded-full"
+                style={{
+                  width: `${totalAppsCount > 0 ? (acceptedAppsCount / totalAppsCount) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <span className="text-[11px] text-slate-400 block">Kriter barajını geçenler</span>
+          </div>
+
+          {/* Adım 3: Kesin Kayıt */}
+          <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition space-y-2">
+            <div className="flex items-center justify-between text-slate-500 text-[11px]">
+              <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">03</span>
+                3. Kesin Kayıt Onaylı
+              </span>
+              <span className="font-mono text-slate-700 font-bold">
+                %{totalAppsCount > 0 ? Math.round((confirmedEnrollmentsCount / totalAppsCount) * 100) : 0}
+              </span>
+            </div>
+            <div className="text-xl font-bold text-slate-900 tabular-nums">
+              {confirmedEnrollmentsCount} Kursiyer
+            </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-600 h-full rounded-full"
+                style={{
+                  width: `${totalAppsCount > 0 ? (confirmedEnrollmentsCount / totalAppsCount) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <span className="text-[11px] text-slate-400 block">Evrak teyidi tamamlanan</span>
+          </div>
+
+          {/* Adım 4: Gruba Yerleşen */}
+          <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition space-y-2">
+            <div className="flex items-center justify-between text-slate-500 text-[11px]">
+              <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">04</span>
+                4. Gruba Yerleşen
+              </span>
+              <span className="font-mono text-slate-700 font-bold">
+                %{totalAppsCount > 0 ? Math.round((totalAssignedTrainees / totalAppsCount) * 100) : 0}
+              </span>
+            </div>
+            <div className="text-xl font-bold text-slate-900 tabular-nums">
+              {totalAssignedTrainees} Kursiyer
+            </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-600 h-full rounded-full"
+                style={{
+                  width: `${totalAppsCount > 0 ? (totalAssignedTrainees / totalAppsCount) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <span className="text-[11px] text-slate-400 block">Ders programına aktif dahil</span>
+          </div>
+        </div>
       </div>
 
-      {/* TWO MAIN OPERATION COLUMNS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Bekleyen Yönetici Kararları Özeti */}
-        <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-brand-textPrimary">Bekleyen Yönetici Kararları</h3>
-                <p className="text-xs text-brand-textSecondary mt-0.5">
-                  Otomatik puan hesaplanmış olup nihai kabul/yedek/ret onayı yönetici kararı beklemektedir.
-                </p>
+      {/* ===================================================================== */}
+      {/* 3. ÖNCELİKLİ İDARİ GÖREVLER (TEMİZ BEYAZ KART TASARIMI - TO-DO ROWS)   */}
+      {/* ===================================================================== */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/70">
+              <AlertCircle className="w-4 h-4" />
+            </div>
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight">Öncelikli İdari Görevler & Uyarılar</h2>
+          </div>
+          <span className="text-xs text-slate-400 font-medium">Anlık Kütük Durumu</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div
+            onClick={() => navigate('/yonetim/basvurular')}
+            className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between cursor-pointer transition group"
+          >
+            <div>
+              <span className="font-bold text-slate-900 block group-hover:text-blue-600 transition">
+                {pendingCount} Başvuru Karar Bekliyor
+              </span>
+              <span className="text-[11px] text-slate-500">Ön kriter puanları hazır</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition" />
+          </div>
+
+          <div
+            onClick={() => navigate('/yonetim/yoklama-denetim')}
+            className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between cursor-pointer transition group"
+          >
+            <div>
+              <span className="font-bold text-slate-900 block group-hover:text-blue-600 transition">
+                Yoklama ve Devam Denetimi
+              </span>
+              <span className="text-[11px] text-slate-500">%80 barajı risk analizi</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition" />
+          </div>
+
+          <div
+            onClick={() => navigate('/yonetim/basari-onay')}
+            className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between cursor-pointer transition group"
+          >
+            <div>
+              <span className="font-bold text-slate-900 block group-hover:text-blue-600 transition">
+                Dönem Sonu Başarı Kütüğü
+              </span>
+              <span className="text-[11px] text-slate-500">Nihai yönetici onayı masası</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition" />
+          </div>
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* 4. İKİ KOLONLU OPERASYONEL ÇALIŞMA ALANI                              */}
+      {/* ===================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Sol Kolon: Bekleyen Başvuru Kararları Masası (6 cols) */}
+        <div className="lg:col-span-6 space-y-3.5">
+          <div className="flex items-center justify-between pb-1">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <span>Bekleyen Başvuru Kararları</span>
+                <span className="text-xs text-slate-500 font-normal">({pendingApplicants.length})</span>
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Otomatik kriter tavsiyesi hesaplanmış, idari onay bekleyen adaylar.
+              </p>
+            </div>
+            <Link
+              to="/yonetim/basvurular"
+              className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+            >
+              <span>Karar Masası</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="space-y-2.5">
+            {pendingApplicants.length === 0 ? (
+              <div className="p-8 bg-white rounded-xl border border-slate-200 text-center text-xs text-slate-400">
+                İnceleme bekleyen aday başvurusu bulunmuyor.
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-                onClick={() => navigate('/yonetim/basvurular')}
-              >
-                Tümü
-              </Button>
-            </div>
-
-            <div className="space-y-2.5 pt-1 text-xs">
-              {pendingApplicants.map((app) => (
+            ) : (
+              pendingApplicants.map((app) => (
                 <div
                   key={app.id}
-                  className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3 hover:bg-slate-100/70 transition-colors"
+                  className="p-4 bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 shadow-xs transition space-y-2.5"
                 >
-                  <div className="space-y-0.5">
-                    <div className="font-bold text-slate-900">{app.candidateName}</div>
-                    <div className="text-[11px] text-slate-500 truncate max-w-xs">
-                      {app.programTitle}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <strong className="text-sm font-bold text-slate-900">{app.candidateName}</strong>
+                        <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {app.referenceNumber}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600 font-medium mt-0.5">
+                        {app.programTitle}
+                      </div>
                     </div>
-                    {app.autoScore ? (
-                      <div className="text-[10px] text-blue-700 font-semibold">
-                        Algoritmik Öneri: {app.autoScore.total} Puan ({app.autoScore.ruleVersion})
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        Ön İnceleme Bekliyor (Sprint E02-B)
-                      </div>
-                    )}
+
+                    <StatusBadge label="İncelemede" variant="warning" size="sm" />
                   </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => navigate('/yonetim/basvurular')}
-                  >
-                    Karar Ver
-                  </Button>
+
+                  <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-100">
+                    <div className="text-slate-500">
+                      {app.autoScore ? (
+                        <span className="text-blue-700 font-semibold">
+                          Algoritmik Öneri: {app.autoScore.total} Puan
+                        </span>
+                      ) : (
+                        <span>Ön İnceleme Kriter Havuzunda</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setInspectApp(app)}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                      >
+                        Ön İncele
+                      </button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => navigate('/yonetim/basvurular')}
+                      >
+                        Karar Ver →
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              ))
+            )}
+          </div>
+        </div>
 
-        {/* Right: Grup Performans ve Devam Dağılımı */}
-        <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-brand-textPrimary">Grup Performans ve Başarı Dağılımı</h3>
-                <p className="text-xs text-brand-textSecondary mt-0.5">
-                  Grupların %80 devam barajı ve 70 ödev ortalamasına göre anlık durumu.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/yonetim/denetim')}
-                >
-                  Yoklama
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-                  onClick={() => navigate('/yonetim/odevler')}
-                >
-                  Ödev Denetimi
-                </Button>
-              </div>
+        {/* Sağ Kolon: Aktif Eğitim Şubeleri & Durum (6 cols) */}
+        <div className="lg:col-span-6 space-y-3.5">
+          <div className="flex items-center justify-between pb-1">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <GraduationCap className="w-4 h-4 text-blue-600" />
+                <span>Aktif Grup ve Şubeler</span>
+                <span className="text-xs text-slate-500 font-normal">({groups.length})</span>
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Şube kontenjanları, eğitmen atamaları ve devam ortalamaları.
+              </p>
             </div>
+            <Link
+              to="/yonetim/gruplar"
+              className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+            >
+              <span>Şube Masası</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            <div className="space-y-4 pt-2 text-xs">
-              {DEMO_GROUPS_SUMMARY.map((grp) => {
+          <div className="space-y-2.5">
+            {groupSummaries.length === 0 ? (
+              <div className="p-8 bg-white rounded-xl border border-slate-200 text-center text-xs text-slate-400">
+                Tanımlı eğitim şubesi bulunamadı.
+              </div>
+            ) : (
+              groupSummaries.map((grp) => {
                 const passAttendance = grp.attendanceAverage >= 80;
                 return (
-                  <div key={grp.id} className="space-y-1.5 p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800">{grp.programTitle}</span>
-                      <span className={`text-[11px] font-bold tabular-nums ${passAttendance ? 'text-emerald-700' : 'text-brand-danger'}`}>
-                        %{grp.attendanceAverage} Devam • {grp.assignmentAverage} Not
+                  <div
+                    key={grp.id}
+                    className="p-4 bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 shadow-xs transition space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">{grp.groupName}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{grp.programTitle}</div>
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                        {grp.traineeCount} Kursiyer
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-slate-500 flex justify-between">
-                      <span>{grp.groupName} • {grp.instructorName}</span>
-                      <span>{grp.traineeCount} Kursiyer</span>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${passAttendance ? 'bg-emerald-600' : 'bg-red-500'}`}
-                        style={{ width: `${grp.attendanceAverage}%` }}
-                      />
+                    <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-100">
+                      <div className="text-slate-600">
+                        Eğitmen: <strong className="text-slate-800">{grp.instructorName}</strong>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-500">Devam Ortalaması:</span>
+                        <span
+                          className={`font-mono font-bold ${
+                            passAttendance ? 'text-emerald-700' : 'text-amber-700'
+                          }`}
+                        >
+                          %{Math.round(grp.attendanceAverage)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+              })
+            )}
+          </div>
+        </div>
       </div>
-      {/* İLETİŞİM & BİLDİRİM ALTYAPISI (SPRINT E04-B ÖZETİ) */}
-      <Card className="border-slate-200">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-                <Bell className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">İletişim & Bildirim Altyapısı (Simülasyon Özeti)</h3>
-                <p className="text-[11px] text-slate-500">
-                  Duyuru yayınları, olay bazlı bildirim havuzu ve toplu e-posta demo işlem geçmişi.
-                </p>
-              </div>
+
+      {/* Aday Ön İnceleme Modal */}
+      {inspectApp && (
+        <Modal
+          isOpen={Boolean(inspectApp)}
+          onClose={() => setInspectApp(null)}
+          title={`Aday Başvuru Özeti: ${inspectApp.candidateName}`}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+              <div><strong>Referans No:</strong> {inspectApp.referenceNumber}</div>
+              <div><strong>Program:</strong> {inspectApp.programTitle}</div>
+              <div><strong>E-Posta:</strong> {inspectApp.email}</div>
+              <div><strong>Telefon:</strong> {inspectApp.phone}</div>
+              <div><strong>Meslek:</strong> {inspectApp.occupation || 'Belirtilmedi'}</div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Bell className="w-3.5 h-3.5" />}
-                onClick={() => navigate('/yonetim/duyurular')}
-              >
-                Kurumsal Duyurular
+            {inspectApp.autoScore && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 space-y-1">
+                <div className="font-bold">Algoritmik Kriter Puanı: {inspectApp.autoScore.total} / 100</div>
+                <div className="text-[11px]">Baraj Durumu: {inspectApp.autoScore.total >= 70 ? 'Kabul Edilebilir (>=70)' : 'İnceleme Gerekli (<70)'}</div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="secondary" size="sm" onClick={() => setInspectApp(null)}>
+                Kapat
               </Button>
               <Button
                 variant="primary"
                 size="sm"
-                leftIcon={<Mail className="w-3.5 h-3.5" />}
-                onClick={() => navigate('/yonetim/toplu-eposta')}
+                onClick={() => {
+                  setInspectApp(null);
+                  navigate('/yonetim/basvurular');
+                }}
               >
-                Toplu E-Posta Masası
+                Karar Masasına Git →
               </Button>
             </div>
           </div>
-
-          {/* 4 Communication Metric Mini Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Yayımlanan Duyurular</span>
-              <div className="text-lg font-extrabold text-slate-900 tabular-nums">
-                {getStoredAdminAnnouncements().filter((a) => a.status === 'published').length}
-              </div>
-              <div className="text-[10px] text-slate-400">Kurum & Program Düzeyi</div>
-            </div>
-
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Demo Bildirim Havuzu</span>
-              <div className="text-lg font-extrabold text-blue-700 tabular-nums">
-                {getStoredNotifications().length}
-              </div>
-              <div className="text-[10px] text-slate-400">Tekil Kişi Kayıtları</div>
-            </div>
-
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Toplu E-Posta Kuyruğu</span>
-              <div className="text-lg font-extrabold text-emerald-700 tabular-nums">
-                {getStoredEmailQueue().length}
-              </div>
-              <div className="text-[10px] text-slate-400">Simüle İşlem Kaydı</div>
-            </div>
-
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Başarısız Demo Olaylar</span>
-              <div className="text-lg font-extrabold text-slate-700 tabular-nums">
-                {getStoredNotificationEvents().filter((e) => e.status === 'failed').length}
-              </div>
-              <div className="text-[10px] text-slate-400">Yeniden Denenebilir</div>
-            </div>
-          </div>
-
-          {/* Privacy Disclaimer (Section 17 Requirement) */}
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <div>
-              <strong className="text-slate-800">Yönetim Mahremiyeti:</strong> Yöneticiler kursiyer ve eğitmenlerin birebir özel mesajlaşmalarını
-              okuyamaz veya personelin iletişim içerikleri üzerinden performans puanlaması yapamaz. Metrikler yalnızca sistem genelindeki
-              operasyonel bildirim ve duyuru sayılarını yansıtır.
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </Modal>
+      )}
     </div>
   );
 };

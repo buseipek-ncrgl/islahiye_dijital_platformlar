@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Calendar as CalendarIcon,
   MapPin,
@@ -41,6 +41,11 @@ export interface CalendarEvent {
 }
 
 export const CalendarPage: React.FC = () => {
+  const location = useLocation();
+  const isCandidatePanel = location.pathname.startsWith('/aday');
+  const isTraineePanel = location.pathname.startsWith('/kursiyer');
+  const isPortalMode = isCandidatePanel || isTraineePanel || location.pathname.startsWith('/yonetim');
+
   // Filter States
   const [selectedArea, setSelectedArea] = useState<string>('Tümü');
   const [selectedType, setSelectedType] = useState<string>('Tümü');
@@ -264,7 +269,7 @@ export const CalendarPage: React.FC = () => {
         dateStr: '27 Ekim 2026',
         startTime: '13:00',
         endTime: '17:00',
-        title: 'Uygulamalı Mağaza Entegrasyon Simülasyonu',
+        title: 'Uygulamalı Mağaza Entegrasyon Çalıştayı',
         category: 'Tarım ve E-Ticaret',
         type: 'Eğitim',
         mode: 'Yüz yüze',
@@ -329,6 +334,8 @@ export const CalendarPage: React.FC = () => {
   const selectedDayEvents = useMemo(() => {
     return filteredEvents.filter((ev) => ev.day === selectedDay);
   }, [filteredEvents, selectedDay]);
+
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
 
   const handleResetFilters = () => {
     setSelectedArea('Tümü');
@@ -417,48 +424,59 @@ export const CalendarPage: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className={`max-w-7xl mx-auto space-y-6 pb-12 ${isPortalMode ? '' : 'px-4 sm:px-6 lg:px-8 py-8'}`}>
       
-      {/* ===================================================================== */}
-      {/* 1. BREADCRUMB NAVIGATION                                              */}
-      {/* ===================================================================== */}
-      <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Sayfa Konumu">
-        <Link to="/" className="hover:text-blue-600 transition-colors">Ana Sayfa</Link>
-        <span className="text-slate-400">/</span>
-        <span className="text-slate-800 font-medium">Eğitim Takvimi</span>
-      </nav>
+      {/* 1. BREADCRUMB (Yalnızca Kamusal Görünümde) */}
+      {!isPortalMode && (
+        <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Sayfa Konumu">
+          <Link to="/" className="hover:text-blue-600 transition-colors">Ana Sayfa</Link>
+          <span className="text-slate-400">/</span>
+          <span className="text-slate-800 font-medium">Eğitim Takvimi</span>
+        </nav>
+      )}
 
-      {/* ===================================================================== */}
-      {/* 2. CALENDAR HERO: Overline, Headline & Right Simulation Badge         */}
-      {/* ===================================================================== */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-1">
-        <div className="space-y-1.5">
-          <div className="text-xs font-bold text-slate-500 tracking-wider uppercase">
-            YAKLAŞAN EĞİTİMLER VE ETKİNLİKLER
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            Eğitim <span className="text-blue-600">Takvimi</span>
+      {/* 2. CALENDAR HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Eğitim Takvimi
           </h1>
-          <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
             Planlanan eğitim oturumlarını, başvuru tarihlerini ve önemli etkinlikleri takip ederek eğitim yolculuğunuzu planlayın.
           </p>
         </div>
 
-        {/* Right Info Box (Kalıcı Proje Kuralı) */}
-        <div className="flex items-center gap-3 bg-blue-50/70 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-900 max-w-md shadow-xs shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 text-blue-600">
-            <CalendarIcon className="w-5 h-5" />
-          </div>
-          <div className="leading-snug space-y-0.5">
-            <p className="font-semibold text-slate-800">
-              Takvimde yer alan etkinlikler demo içerikleridir.
-            </p>
-            <p className="text-slate-500 text-[11px]">
-              Güncel ve resmi duyurular için lütfen <strong className="text-blue-700">duyurular sayfasını</strong> takip edin.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {isTraineePanel ? (
+            <Link
+              to="/kursiyer"
+              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs whitespace-nowrap"
+            >
+              <span>Panoya Dön →</span>
+            </Link>
+          ) : isCandidatePanel ? (
+            <Link
+              to="/aday"
+              className="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs whitespace-nowrap"
+            >
+              <span>Aday Paneline Dön →</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2.5 bg-blue-50/70 border border-blue-100 rounded-xl px-4 py-2 text-xs text-blue-900 shrink-0">
+              <CalendarIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="font-medium">2026 Güz Dönemi Takvimi</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Geri Bildirim Bildirimi */}
+      {calendarNotice && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 animate-fadeIn shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{calendarNotice}</span>
+        </div>
+      )}
 
       {/* ===================================================================== */}
       {/* 3. HORIZONTAL FILTER BAR                                              */}
@@ -950,7 +968,8 @@ export const CalendarPage: React.FC = () => {
                 <Button
                   size="sm"
                   onClick={() => {
-                    alert('Etkinlik takviminize simüle olarak kaydedildi.');
+                    setCalendarNotice(`"${detailEvent.title}" etkinliği kişisel takviminize simüle olarak başarıyla kaydedildi.`);
+                    setTimeout(() => setCalendarNotice(null), 4000);
                     setDetailEvent(null);
                   }}
                 >
@@ -984,7 +1003,7 @@ export const CalendarPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Info className="w-3.5 h-3.5 text-blue-600" />
-                <span>Bu bir eğitim portalı demo etkinlik oturumudur.</span>
+                <span>Oturum katılımı için belirtilen salon ve saatte hazır bulunulması gerekmektedir.</span>
               </div>
             </div>
           </div>

@@ -7,59 +7,59 @@ import {
 } from '../types';
 import { notifySuccessDecisionPublished } from './notificationEngine';
 
-export const SUCCESS_DECISIONS_STORAGE_KEY = 'islahiye_education_success_decisions_v1';
-export const TERM_REGISTRIES_STORAGE_KEY = 'islahiye_education_term_registries_v1';
+export const SUCCESS_DECISIONS_STORAGE_KEY = 'islahiye_education_success_decisions_v2';
+export const TERM_REGISTRIES_STORAGE_KEY = 'islahiye_education_term_registries_v2';
 export const SUCCESS_DECISIONS_UPDATE_EVENT = 'islahiye_education_success_decisions_updated';
 
 // ============================================================================
-// 1. BAŞLANGIÇ DEMO KARARLARI (Seed Data)
+// 1. BAŞLANGIÇ DEMO KARARLARI (Seed Data - Real 2026 Fall Data)
 // ============================================================================
 
 export const INITIAL_SUCCESS_DECISIONS: SuccessDecisionRecord[] = [
-  // Ahmet Karataş (Örnek Tam Onaylanmış Kursiyer)
+  // 1. Ahmet Kaya (Tam Onaylanmış Kursiyer)
   {
     decisionId: 'dec-ahmet-01',
-    enrollmentId: 'enr-ahmet-01',
-    traineeId: 'user-trainee-02',
-    traineeName: 'Ahmet Karataş',
+    enrollmentId: 'enr-trainee-ahmet',
+    traineeId: 'usr-trainee',
+    traineeName: 'Ahmet Kaya',
     programId: 'prog-01',
     termId: 'term-2026-fall',
     groupId: 'grp-01',
     decision: 'approved',
     eligibilitySnapshot: {
-      attendanceRate: 90,
-      attendedCount: 18,
-      completedSessionsCount: 20,
+      attendanceRate: 100,
+      attendedCount: 4,
+      completedSessionsCount: 4,
       excusedCount: 0,
-      assignmentAverage: 90,
+      assignmentAverage: 92,
       mandatoryAssignmentsApproved: 3,
       mandatoryAssignmentsTotal: 3,
-      sessionsEvaluatedCount: 20,
+      sessionsEvaluatedCount: 4,
       capturedAt: '2026-10-20T16:00:00+03:00',
     },
     policyVersion: 'POL-2026-V1 (Devam %80, Not 70)',
     internalNote:
-      'Kursiyer %90 devam oranı ve 90/100 ödev ortalaması ile tüm akademik şartları başarıyla tamamlamıştır. Başarı belgesi düzenlenmesi uygundur.',
+      'Kursiyer %100 devam oranı ve 92/100 ödev ortalaması ile tüm akademik şartları başarıyla tamamlamıştır. Başarı belgesi düzenlenmesi uygundur.',
     traineeDecisionMessage:
       'Tebrik ederiz! İslahiye Ticaret Odası Eğitim Portalı dönem sonu başarı değerlendirmeniz yetkili yönetim tarafından onaylanmış ve belge hakkınız tescil edilmiştir.',
-    decidedBy: 'Mehmet Kaya (Genel Sekreter Yrd.)',
+    decidedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
     decidedAt: '2026-10-20T16:00:00+03:00',
     decisionHistory: [
       {
         decision: 'approved',
-        decidedBy: 'Mehmet Kaya (Genel Sekreter Yrd.)',
+        decidedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
         decidedAt: '2026-10-20T16:00:00+03:00',
         internalNote: 'Tüm akademik şartlar sağlanmıştır.',
         traineeDecisionMessage: 'Başarı değerlendirmeniz onaylandı.',
         snapshot: {
-          attendanceRate: 90,
-          attendedCount: 18,
-          completedSessionsCount: 20,
+          attendanceRate: 100,
+          attendedCount: 4,
+          completedSessionsCount: 4,
           excusedCount: 0,
-          assignmentAverage: 90,
+          assignmentAverage: 92,
           mandatoryAssignmentsApproved: 3,
           mandatoryAssignmentsTotal: 3,
-          sessionsEvaluatedCount: 20,
+          sessionsEvaluatedCount: 4,
           capturedAt: '2026-10-20T16:00:00+03:00',
         },
       },
@@ -69,7 +69,60 @@ export const INITIAL_SUCCESS_DECISIONS: SuccessDecisionRecord[] = [
     createdAt: '2026-10-20T16:00:00+03:00',
     updatedAt: '2026-10-20T16:00:00+03:00',
   },
-  // Mehmet Doğan (Örnek Telafi Sürecindeki Kursiyer)
+  // 2. Fatma Şahin (Tam Onaylanmış Kursiyer)
+  {
+    decisionId: 'dec-fatma-01',
+    enrollmentId: 'enr-trainee-fatma',
+    traineeId: 'usr-real-12',
+    traineeName: 'Fatma Şahin',
+    programId: 'prog-01',
+    termId: 'term-2026-fall',
+    groupId: 'grp-01',
+    decision: 'approved',
+    eligibilitySnapshot: {
+      attendanceRate: 100,
+      attendedCount: 4,
+      completedSessionsCount: 4,
+      excusedCount: 0,
+      assignmentAverage: 95,
+      mandatoryAssignmentsApproved: 3,
+      mandatoryAssignmentsTotal: 3,
+      sessionsEvaluatedCount: 4,
+      capturedAt: '2026-10-21T16:00:00+03:00',
+    },
+    policyVersion: 'POL-2026-V1 (Devam %80, Not 70)',
+    internalNote:
+      'Kursiyer %100 devam ve 95/100 ortalama ile üstün başarı göstermiştir. Başarı belgesi düzenlenmesi uygundur.',
+    traineeDecisionMessage:
+      'Tebrik ederiz! Dönem sonu başarı değerlendirmeniz onaylanmış ve üstün başarı belgesi düzenlenmiştir.',
+    decidedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
+    decidedAt: '2026-10-21T16:00:00+03:00',
+    decisionHistory: [
+      {
+        decision: 'approved',
+        decidedBy: 'Selin Aydın (Eğitim Programları Müdürü)',
+        decidedAt: '2026-10-21T16:00:00+03:00',
+        internalNote: 'Tüm şartlar eksiksiz sağlandı.',
+        traineeDecisionMessage: 'Başarı değerlendirmeniz onaylandı.',
+        snapshot: {
+          attendanceRate: 100,
+          attendedCount: 4,
+          completedSessionsCount: 4,
+          excusedCount: 0,
+          assignmentAverage: 95,
+          mandatoryAssignmentsApproved: 3,
+          mandatoryAssignmentsTotal: 3,
+          sessionsEvaluatedCount: 4,
+          capturedAt: '2026-10-21T16:00:00+03:00',
+        },
+      },
+    ],
+    status: 'active',
+    certificateEligibility: 'eligible',
+    createdAt: '2026-10-21T16:00:00+03:00',
+    updatedAt: '2026-10-21T16:00:00+03:00',
+  },
+  // 3. Mehmet Doğan (Örnek Telafi Sürecindeki Kursiyer)
   {
     decisionId: 'dec-mehmet-01',
     enrollmentId: 'enr-mehmet-01',
@@ -174,7 +227,14 @@ export const getStoredSuccessDecisions = (): SuccessDecisionRecord[] => {
       return INITIAL_SUCCESS_DECISIONS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_SUCCESS_DECISIONS;
+    if (!Array.isArray(parsed) || parsed.length < 2) {
+      localStorage.setItem(
+        SUCCESS_DECISIONS_STORAGE_KEY,
+        JSON.stringify(INITIAL_SUCCESS_DECISIONS)
+      );
+      return INITIAL_SUCCESS_DECISIONS;
+    }
+    return parsed;
   } catch (err) {
     console.error('getStoredSuccessDecisions error:', err);
     return INITIAL_SUCCESS_DECISIONS;
