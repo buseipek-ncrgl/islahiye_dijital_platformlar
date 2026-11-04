@@ -62,12 +62,12 @@ scratch/
 coverage/
 *.lcov
 .nyc_output/
-artifacts/
+/artifacts/
 playwright.config.ts
-playwright-report/
-test-results/
-tests/
-scripts/
+/playwright-report/
+/test-results/
+/tests/
+/scripts/
 dotnet-tools.json
 
 # 8. Yerel Temizlik ve Sistem Betikleri (Batch & Scripts)
@@ -78,7 +78,7 @@ run-b01-e2e.ps1
 
 # 9. Yerel Sprint Raporları, Tasarım Kılavuzları ve İç Referanslar
 # Sprint teslim raporları, benchmark zip paketleri, promptlar ve iç notlar
-docs/
+/docs/
 AGENTS.md
 ANTIGRAVITY_HERO_EDITORIAL_REFINEMENT.md
 ISLAHIYE_GLOBAL_DESIGN_STANDARDS.md
@@ -89,6 +89,7 @@ BACKEND_SPRINT_*.md
 *FINAL_ACCEPTANCE*.md
 *ANALYSIS_AND_DESIGN*.md
 
-# 10. Geçici Test Prototip Dosyaları ve Yerel Backend Servisleri
+# 10. Geçici Test Prototip Dosyaları ve Kök Backend Dizinleri
+!apps/**/src/**
 apps/egitim/src/B01App.tsx
-services/
+/services/
