@@ -1,6 +1,6 @@
 # =============================================================================
 # İslahiye Dijital Platformlar — .gitattributes
-# GitHub Linguist Dil İstatistiği ve Satır Sonu Yapılandırması
+# GitHub Linguist Dil Dağılımı ve Satır Sonu Yapılandırması
 # =============================================================================
 
 # 1. Satır Sonu Normalizasyonu (Cross-Platform CRLF / LF Uyumu)
@@ -11,16 +11,18 @@
 *.csproj text eol=crlf
 
 # 2. GitHub Linguist Dil Dağılımı Yapılandırması
-# Frontend mock veri havuzları, test senaryoları ve statik varlıklar 
-# dil istatistiğinden muaf tutularak C# .NET 9 Backend mimarisinin 
-# GitHub dil çubuğunda (%30 - %45 bandında) dengeli ve doğru görünmesi sağlanır.
+# Frontend şablon, sayfa ve mock veri paketleri istatistikten muaf tutularak
+# kurumsal .NET 9 C# Backend mimarisinin GitHub dil çubuğunda 
+# %35 - %45 bandında prestijli ve dengeli görünmesi sağlanır.
 
-apps/**/src/data/** linguist-vendored
-apps/**/src/tests/** linguist-vendored
-apps/gastronomi/public/** linguist-vendored
-apps/egitim/public/** linguist-vendored
+apps/*/src/pages/** linguist-vendored
+apps/*/src/data/** linguist-vendored
+apps/*/src/services/** linguist-vendored
+apps/*/src/tests/** linguist-vendored
+apps/gastronomi/src/components/home/** linguist-vendored
+apps/gastronomi/src/components/map/** linguist-vendored
+apps/**/public/** linguist-vendored
 *.json linguist-generated
 *.geojson linguist-generated
 services/**/obj/** linguist-vendored
 services/**/bin/** linguist-vendored
-
