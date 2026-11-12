@@ -1,3 +1,4 @@
+// İslahiye Dijital Platformlar — Gastronomi .NET 9 Web API Bootstrap
 using System.Text.Json.Serialization;
 using Gastronomy.Application.Interfaces;
 using Gastronomy.Application.Services;

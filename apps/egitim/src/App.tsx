@@ -1,3 +1,4 @@
+// İslahiye Dijital Platformlar — Eğitim Portalı & Akademi Bootstrap
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DemoRoleProvider } from './components/layout/DemoRoleContext';

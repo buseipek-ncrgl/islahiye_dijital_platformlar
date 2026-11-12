@@ -1,3 +1,4 @@
+// İslahiye Dijital Platformlar — Eğitim .NET 9 Web API Bootstrap
 using System.Threading.RateLimiting;
 using Education.Api.Security;
 using Education.Infrastructure;
