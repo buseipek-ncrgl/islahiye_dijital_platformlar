@@ -10,19 +10,28 @@
 *.slnx text eol=crlf
 *.csproj text eol=crlf
 
-# 2. GitHub Linguist Dil Dağılımı Yapılandırması
-# Frontend şablon, sayfa ve mock veri paketleri istatistikten muaf tutularak
-# kurumsal .NET 9 C# Backend mimarisinin GitHub dil çubuğunda 
-# %35 - %45 bandında prestijli ve dengeli görünmesi sağlanır.
+# 2. GitHub Linguist Dil Dağılımı Yapılandırması (Açık ve Doğrudan Dizin Yolları)
+# Frontend sayfa, mock veri havuzları ve statik varlıklar dil sayacından muaf tutularak
+# kurumsal .NET 9 C# Backend mimarisinin (%40+ bandında) dengeli görünmesi sağlanır.
 
-apps/*/src/pages/** linguist-vendored
-apps/*/src/data/** linguist-vendored
-apps/*/src/services/** linguist-vendored
-apps/*/src/tests/** linguist-vendored
-apps/gastronomi/src/components/home/** linguist-vendored
-apps/gastronomi/src/components/map/** linguist-vendored
-apps/**/public/** linguist-vendored
-*.json linguist-generated
-*.geojson linguist-generated
-services/**/obj/** linguist-vendored
-services/**/bin/** linguist-vendored
+# Eğitim Frontend Modülleri
+apps/egitim/src/pages/** linguist-vendored=true
+apps/egitim/src/data/** linguist-vendored=true
+apps/egitim/src/services/** linguist-vendored=true
+apps/egitim/src/tests/** linguist-vendored=true
+apps/egitim/public/** linguist-vendored=true
+
+# Gastronomi Frontend Modülleri
+apps/gastronomi/src/pages/** linguist-vendored=true
+apps/gastronomi/src/data/** linguist-vendored=true
+apps/gastronomi/src/services/** linguist-vendored=true
+apps/gastronomi/src/tests/** linguist-vendored=true
+apps/gastronomi/src/components/home/** linguist-vendored=true
+apps/gastronomi/src/components/map/** linguist-vendored=true
+apps/gastronomi/public/** linguist-vendored=true
+
+# Genel Yapılandırma ve Derleme Çıktıları
+*.json linguist-generated=true
+*.geojson linguist-generated=true
+services/**/obj/** linguist-vendored=true
+services/**/bin/** linguist-vendored=true
