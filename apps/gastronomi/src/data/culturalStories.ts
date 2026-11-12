@@ -27,7 +27,7 @@ export const CULTURAL_STORIES: CulturalHeritageStory[] = [
           'İslahiye tavası fırına verilirken, fırın ustası tırnaklı pideleri küreğin ucunda alevle buluşturur. Fırından çıkan cızırdayan tepsi, sıcağı sıcağına kesilen tırnaklı pideyle birlikte sofraya konur. Bu ritüel, İslahiye’de asırlardır süren bir dayanışma ve gastronomi mirasıdır.',
       },
     ],
-    relatedDishIds: ['islahiye-tava', 'islahiye-kombesi'],
+    relatedDishIds: ['islahiye-tava', 'bayram-kombesi'],
     tags: ['Taş Fırın', 'Meşe Közü', 'İslahiye Tavası', 'Ocaklık Kültürü'],
   },
   {
@@ -114,7 +114,65 @@ export const CULTURAL_STORIES: CulturalHeritageStory[] = [
           'Taş fırında düşük ısıda kurutularak pişirilen kömbeler, susamla kaplı gevrek dokuları ve doğal baharatları sayesinde aylarca bayatlamadan saklanabilir. İslahiye evlerinde bayram ziyaretçilerine ikram edilen en zarif mirastır.',
       },
     ],
-    relatedDishIds: ['islahiye-kombesi'],
+    relatedDishIds: ['bayram-kombesi'],
     tags: ['Ahşap Kalıp', 'İslahiye Kömbesi', 'Bayram Geleneği', 'Mutfak Araçları'],
+  },
+  {
+    id: 'tandir-ve-semsek-boregi-ritueli',
+    slug: 'tandir-ve-semsek-boregi-ritueli',
+    title: 'Tandır Ateşi ve Şemsek İmecesi: Köy Odalarının Kadim Mirası',
+    subtitle:
+      'İncecik açılan yufkaların kıymalı harçla buluşup sac üzerinde çıtırdayarak kabardığı İslahiye köy ritüeli.',
+    category: 'traditions',
+    categoryLabel: 'Mutfak Gelenekleri',
+    coverImageUrl: '/images/semsek_boregi.jpg',
+    imageCredit: 'İslahiye Lezzet Atlası Görsel Arşivi',
+    readingTime: '4 dk',
+    publishedDate: '15 Ekim 2026',
+    leadParagraph:
+      'Şemsek Böreği, İslahiye köylerinde hasat sonu, düğün ve bayram sabahlarında kadınların sac başında toplandığı en samimi imece lezzetidir. Dervişiye ve Fevzi Çakmak ocaklarında harlanan meşe odunu ateşi, hamurun gevrek ve sulu pişmesini sağlar.',
+    bodySections: [
+      {
+        heading: 'Köy Kuzu Kıyması ve İslahiye Pul Biberi',
+        paragraph:
+          'Şemsek harcında Amanos yaylalarında otlayan kıvırcık kuzu kıyması, ince kıyılmış soğan ve İslahiye Biber Sergi Havzası’ndan gelen ipeksi pul biber harmanlanır. Çiğden yoğrulan harç, yufkanın içinde kendi buharında pişer.',
+      },
+      {
+        heading: 'Sac Üzerinde Altın Sarısı Pişirim',
+        paragraph:
+          'Yarım ay şeklinde kapatılan böreklerin kenarları parmak uçlarıyla bastırılarak kapatılır ve hafif tereyağlı sac üzerinde çevrilerek kabartılır. Yanında köy yayık ayranıyla sıcağı sıcağına ikram edilir.',
+      },
+    ],
+    relatedDishIds: ['islahiye-semsegi'],
+    tags: ['Şemsek Böreği', 'Tandır Ateşi', 'Sac Böreği', 'Köy İmecesi'],
+  },
+  {
+    id: 'dag-inciri-ve-ceviz-hasadi',
+    slug: 'dag-inciri-ve-ceviz-hasadi',
+    title: 'Amanos Dağ İnciri ve Cevizli Tatlı Geleneği',
+    subtitle:
+      'Güneşte kurutulan dağ incirlerinin süt ve cevizle tencerede ağır ağır demlendiği kış ziyafeti.',
+    category: 'seasons',
+    categoryLabel: 'Hasat & Mevsimler',
+    coverImageUrl: '/images/incir_tatlisi.jpg',
+    imageCredit: 'İslahiye Lezzet Atlası Görsel Arşivi',
+    readingTime: '3 dk',
+    publishedDate: '15 Ekim 2026',
+    leadParagraph:
+      'Amanos Dağları’nın serin rüzgârlarında olgunlaşan yabani dağ incirleri, sonbaharda toplanıp gölgede kurutulur. Kış aylarında İslahiye evlerinde ceviz içiyle doldurulup sütte demlendirilerek en asil tatlıya dönüştürülür.',
+    bodySections: [
+      {
+        heading: 'Sütte Ağır Ağır Demlenme Sırrı',
+        paragraph:
+          'Kuru incirler ılık suda bekletilip yumuşatıldıktan sonra tepe kısımlarından iri dövülmüş dağ ceviziyle doldurulur. Tencereye dizilen incirlerin üzerine köy sütü ve tereyağı gezdirilerek kısık ateşte süt çekilene dek demlendirilir.',
+      },
+      {
+        heading: 'Doğal Meyve Şekeri ve Tarçın Kokusu',
+        paragraph:
+          'Ekstra rafine şeker kullanılmadan, yalnızca incirin kendi balı ve sütün tatlılığıyla pişen bu tatlı, İslahiye’nin en eski hafif kış ikramıdır. Üzerine kaymak veya ceviz serpilerek ılık servis edilir.',
+      },
+    ],
+    relatedDishIds: ['incir-tatlisi'],
+    tags: ['Dağ İnciri', 'İncir Tatlısı', 'Amanos Bereketi', 'Ceviz'],
   },
 ];

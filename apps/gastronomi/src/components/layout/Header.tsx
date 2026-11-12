@@ -42,12 +42,13 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
   }, [mobileMenuOpen]);
 
   const navItems = [
-    { label: 'Lezzet Haritası', href: '#lezzet-haritasi', isRoute: false },
+    { label: 'Lezzet Haritası', href: '/lezzet-haritasi', isRoute: true },
     { label: 'Yöresel Tarifler', href: '/yemekler', isRoute: true },
-    { label: 'İslahiye’yi Keşfet', href: '#islahiyeyi-kesfet', isRoute: false },
     { label: 'Mutfak Mirası', href: '/mutfak-mirasi', isRoute: true },
+    { label: 'Mutfak Filmleri', href: '/filmler', isRoute: true },
     { label: 'Haberler & Yazılar', href: '/haberler', isRoute: true },
     { label: 'Etkinlikler', href: '/etkinlikler', isRoute: true },
+    { label: 'Duyurular', href: '/duyurular', isRoute: true },
   ];
 
   const handleNavClick = (target: (typeof navItems)[0] | string) => {
@@ -76,9 +77,23 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
     } else {
       const element = document.querySelector(item.href);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+        const headerEl = document.querySelector('header');
+        const headerOffset = headerEl ? headerEl.getBoundingClientRect().height + 16 : 96;
+        const y = element.getBoundingClientRect().top + window.scrollY - headerOffset;
+        window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
       }
     }
+  };
+
+  const isNavItemActive = (href: string) => {
+    const p = location.pathname;
+    if (href === '/yemekler' && (p.startsWith('/yemekler') || p.startsWith('/tarifler') || p.startsWith('/yoresel-lezzetler'))) {
+      return true;
+    }
+    if (href === '/lezzet-haritasi' && (p.startsWith('/lezzet-haritasi') || p.startsWith('/harita'))) {
+      return true;
+    }
+    return p === href || p.startsWith(`${href}/`);
   };
 
   return (
@@ -93,11 +108,12 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
             <span className="text-ivory/70 hidden sm:inline">Gastronomi & Kültür Portalı</span>
           </div>
           <div className="flex items-center gap-4 text-[10px] text-ivory/60">
-            <span className="hidden md:inline">Amanos & İslahiye Mutfak Havzası</span>
+            <span className="hidden md:inline">Amanos &amp; İslahiye Mutfak Havzası</span>
             <a
-              href="http://localhost:5174"
+              href={import.meta.env.VITE_EGITIM_URL || 'http://localhost:5174'}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
+              title="İslahiye Eğitim ve Kursiyer Portalı (Bağımsız Uygulama)"
               className="text-copper-light hover:text-ivory transition-colors flex items-center gap-1 font-medium"
             >
               <span>Eğitim Platformu</span>
@@ -116,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             {/* Left: Textual Institutional Brand Lockup */}
             <a
               href="#kesfet"
@@ -124,44 +140,54 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                 e.preventDefault();
                 handleNavClick('#kesfet');
               }}
-              className="group flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-forest rounded"
+              className="group flex flex-col shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest rounded"
             >
-              <span className="text-[10px] sm:text-[11px] font-sans font-bold tracking-[0.25em] uppercase text-charcoal/70 group-hover:text-forest transition-colors">
+              <span className="text-[10px] sm:text-[11px] font-sans font-bold tracking-[0.22em] uppercase text-charcoal/70 group-hover:text-forest transition-colors whitespace-nowrap">
                 İSLAHİYE TİCARET ODASI
               </span>
-              <span className="text-xl sm:text-2xl font-display font-bold text-forest tracking-tight flex items-center gap-1.5">
+              <span className="text-xl sm:text-2xl font-display font-bold text-forest tracking-tight flex items-center gap-1.5 whitespace-nowrap">
                 LEZZET ATLASI
                 <span className="w-1.5 h-1.5 rounded-full bg-copper inline-block group-hover:scale-125 transition-transform" />
               </span>
             </a>
 
             {/* Desktop Navigation Links (Clean, No dev badges) */}
-            <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-charcoal/80">
-              {navItems.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleNavClick(item.href);
-                  }}
-                  className="relative group py-1 text-charcoal/85 hover:text-forest transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-forest rounded"
-                >
-                  <span>{item.label}</span>
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-copper group-hover:w-full transition-all duration-300" />
-                </a>
-              ))}
+            <nav className="hidden lg:flex items-center gap-3.5 xl:gap-6 text-xs xl:text-[13px] font-medium text-charcoal/80 whitespace-nowrap">
+              {navItems.map((item) => {
+                const active = isNavItemActive(item.href);
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNavClick(item.href);
+                    }}
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative group py-1 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-forest rounded whitespace-nowrap ${
+                      active ? 'text-forest font-bold' : 'text-charcoal/85 hover:text-forest'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    <span
+                      className={`absolute bottom-0 left-0 h-0.5 bg-copper transition-all duration-300 ${
+                        active ? 'w-full' : 'w-0 group-hover:w-full'
+                      }`}
+                    />
+                  </a>
+                );
+              })}
             </nav>
 
             {/* Header Right Action */}
-            <div className="hidden lg:flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-3 shrink-0">
               <a
                 href="#lezzetler"
                 onClick={(e) => {
                   e.preventDefault();
                   handleNavClick('#lezzetler');
                 }}
-                className="inline-flex items-center justify-center px-5 py-2.5 rounded-sm bg-forest text-ivory text-xs font-semibold tracking-widest uppercase hover:bg-forest-600 active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                className="inline-flex items-center justify-center px-3.5 xl:px-5 py-2.5 rounded-sm bg-forest text-ivory text-[11px] xl:text-xs font-semibold tracking-widest uppercase hover:bg-forest-600 active:scale-[0.98] transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
               >
                 <span>Lezzetleri Keşfet</span>
               </a>
@@ -233,9 +259,9 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                   </a>
                 ))}
                 <a
-                  href="http://localhost:5174"
+                  href={import.meta.env.VITE_EGITIM_URL || 'http://localhost:5174'}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="flex items-center justify-between py-2 text-base font-medium text-copper-dark hover:text-forest border-b border-sand/30 transition-colors"
                 >
                   <span>Eğitim Platformu</span>

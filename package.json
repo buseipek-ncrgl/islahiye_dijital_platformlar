@@ -6,9 +6,14 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "npm run dev --workspace=apps/gastronomi",
     "dev:gastronomi": "npm run dev --workspace=apps/gastronomi",
     "dev:egitim": "npm run dev --workspace=apps/egitim",
     "dev:api": "dotnet run --project services/education-api/src/Education.Api",
+    "dev:api:egitim": "dotnet run --project services/education-api/src/Education.Api",
+    "dev:api:gastronomi": "dotnet run --project services/gastronomy-api/src/Gastronomy.Api",
+    "build:api:gastronomi": "dotnet build services/gastronomy-api/Gastronomy.slnx",
+    "test:api:gastronomi": "dotnet test services/gastronomy-api/tests/Gastronomy.Tests/Gastronomy.Tests.csproj",
     "build:gastronomi": "npm run build --workspace=apps/gastronomi",
     "build:egitim": "npm run build --workspace=apps/egitim",
     "test:e2e:b01": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-b01-e2e.ps1",

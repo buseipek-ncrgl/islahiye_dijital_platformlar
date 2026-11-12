@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, AlertCircle, Film, ExternalLink } from 'lucide-react';
 import { GastronomyFilm } from '../../types';
+import { sanitizeUrl } from '../../utils/security';
 
 interface CinematicVideoModalProps {
   film: GastronomyFilm | null;
@@ -85,10 +86,10 @@ export const CinematicVideoModal: React.FC<CinematicVideoModalProps> = ({ film, 
         {/* Modal Top Bar */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-sand/15 bg-forest-950/80">
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-mono font-bold tracking-widest uppercase px-2.5 py-1 rounded-xs bg-copper/20 text-copper-light border border-copper/30">
+            <span className="text-[10px] font-sans font-bold tracking-widest uppercase px-2.5 py-1 rounded-xs bg-copper/20 text-copper-light border border-copper/30">
               {film.episodeNumber ? `BÖLÜM 0${film.episodeNumber}` : `ATMOSFER KLİBİ (${film.duration || '5 sn'})`}
             </span>
-            <span className="text-xs font-mono text-sand/60 hidden sm:inline">
+            <span className="text-xs font-sans text-sand/60 hidden sm:inline">
               {film.theme}
             </span>
           </div>
@@ -97,7 +98,7 @@ export const CinematicVideoModal: React.FC<CinematicVideoModalProps> = ({ film, 
             ref={closeBtnRef}
             type="button"
             onClick={handleClose}
-            className="inline-flex items-center gap-1.5 text-sand/70 hover:text-ivory px-3 py-1.5 rounded-xs hover:bg-forest-800 transition-colors text-xs font-mono focus:outline-none focus:ring-1 focus:ring-copper"
+            className="inline-flex items-center gap-1.5 text-sand/70 hover:text-ivory px-3 py-1.5 rounded-xs hover:bg-forest-800 transition-colors text-xs font-sans focus:outline-none focus:ring-1 focus:ring-copper"
             aria-label="Videoyu kapat"
           >
             <span className="hidden sm:inline">Kapat</span>
@@ -150,15 +151,13 @@ export const CinematicVideoModal: React.FC<CinematicVideoModalProps> = ({ film, 
               </p>
 
               {/* Attribution and Media Origin */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-sand/60 font-mono">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-sand/60 font-sans">
                 <span className="inline-flex items-center gap-1.5 text-copper-light">
                   <Film className="w-3.5 h-3.5" />
                   <span>
-                    {film.mediaOrigin === 'ai-generated'
-                      ? 'Temsili Konsept Klip (Yayın Lisansı Doğrulanmamış)'
-                      : film.mediaOrigin === 'licensed-stock'
-                      ? 'Lisanslı Stok Medya'
-                      : 'Saha Kaydı'}
+                    {film.mediaOrigin === 'licensed-stock'
+                      ? 'Lisanslı Medya'
+                      : 'İslahiye Gastronomi Arşivi'}
                   </span>
                 </span>
 
@@ -169,15 +168,15 @@ export const CinematicVideoModal: React.FC<CinematicVideoModalProps> = ({ film, 
             </div>
 
             {/* Source Reference Link if available */}
-            {film.sourceUrl && (
+            {film.sourceUrl && sanitizeUrl(film.sourceUrl) && (
               <div className="shrink-0 pt-1">
                 <a
-                  href={film.sourceUrl}
+                  href={sanitizeUrl(film.sourceUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-sand/70 hover:text-copper-light transition-colors font-mono underline underline-offset-4"
+                  className="inline-flex items-center gap-1.5 text-xs text-sand/70 hover:text-copper-light transition-colors font-sans underline underline-offset-4"
                 >
-                  <span>Model / Veri Seti Kaynağı</span>
+                  <span>Kaynak Bağlantısı</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>

@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
-  Globe,
   Trash2,
   AlertCircle,
   CheckCircle2,
@@ -15,6 +14,7 @@ import {
   Quote,
 } from 'lucide-react';
 import { useContent } from '../../hooks/useContent';
+import { useAdminRole } from '../../context/AdminRoleContext';
 import {
   Article,
   ArticleParagraph,
@@ -24,34 +24,27 @@ import {
   ContentOrigin,
 } from '../../types';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
-
-const PRESET_COVERS = [
-  { label: 'Biber Közleme & Hasat', url: '/images/biber_kozleme_poster.jpg' },
-  { label: 'Taş Fırın & Meşe Közü', url: '/images/tas_firin_kozu_poster.jpg' },
-  { label: 'Hamur Zanaatı & Fırın', url: '/images/hamur_zanaati_poster.jpg' },
-  { label: 'İslahiye Biber Sergisi', url: '/images/islahiye_biberi.jpg' },
-  { label: 'Geleneksel Mutfak', url: '/images/islahiye_tava.jpg' },
-  { label: 'Amanos Firik Pilavı', url: '/images/firik_pilavi.jpg' },
-];
-
-const CATEGORIES: { id: ArticleCategory; label: string }[] = [
-  { id: 'agriculture', label: 'Toprak, Tescil & Hasat' },
-  { id: 'heritage', label: 'Mutfak Mirası' },
-  { id: 'gastronomy', label: 'Gastronomi' },
-  { id: 'culture', label: 'Kültür & Zanaat' },
-];
+import { ActionConfirmModal } from '../../components/admin/common/ActionConfirmModal';
+import { ImageUploadField } from '../../components/admin/common/ImageUploadField';
+import { FormNotificationToast, FormNotification } from '../../components/admin/common/FormNotificationToast';
+import { QuickCategoryButton } from '../../components/admin/common/QuickCategoryButton';
+import { mergeCategoryOption } from '../../data/categories';
 
 export const ArticleFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getArticles, saveArticle, deleteArticle } = useContent();
+  const { getArticles, saveArticle, deleteArticle, getCategories, getCategoryLabel } = useContent();
+  const { canCreate, canEdit, canDelete, canPublish } = useAdminRole();
 
   const isEditing = Boolean(id);
+  const canSave = isEditing ? canEdit : canCreate;
   const existingArticle = useMemo(() => {
     if (!id) return undefined;
     const articles = getArticles();
     return articles.find((a) => a.id === id || a.slug === id);
   }, [id, getArticles]);
+
+  const initializedKeyRef = useRef<string | null>(null);
 
   // Article State
   const [title, setTitle] = useState('');
@@ -67,11 +60,12 @@ export const ArticleFormPage: React.FC = () => {
   const [readingTime, setReadingTime] = useState('3 dk okuma');
   const [coverImage, setCoverImage] = useState('/images/biber_kozleme_poster.jpg');
   const [imageCaption, setImageCaption] = useState('');
-  const [imageCredit, setImageCredit] = useState('İslahiye Lezzet Atlası Demo Arşivi');
+  const [imageCredit, setImageCredit] = useState('İslahiye Lezzet Atlası Arşivi');
   const [tagsInput, setTagsInput] = useState('İslahiye, Gastronomi, Kültür');
-  const [publicationStatus, setPublicationStatus] = useState<PublicationStatus>('draft');
+  const [publicationStatus, setPublicationStatus] = useState<PublicationStatus>(() =>
+    canPublish ? 'published' : 'draft'
+  );
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('verified');
-  const [isDemo, setIsDemo] = useState(true);
 
   // Structured Paragraphs
   const [paragraphs, setParagraphs] = useState<ArticleParagraph[]>([
@@ -87,13 +81,35 @@ export const ArticleFormPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form');
   const [isDirty, setIsDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [notification, setNotification] = useState<FormNotification | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Smooth scroll and focus on missing/invalid input field
+  const scrollToField = (fieldName: string) => {
+    setActiveTab('form');
+    setTimeout(() => {
+      const element = document.getElementById(`field-${fieldName}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input =
+          element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT'
+            ? element
+            : element.querySelector('input, textarea, select');
+        if (input) {
+          (input as HTMLElement).focus();
+        }
+        element.classList.add('ring-4', 'ring-rose-500/40', 'transition-all');
+        setTimeout(() => {
+          element.classList.remove('ring-4', 'ring-rose-500/40');
+        }, 2500);
+      }
+    }, 120);
+  };
 
   // Generate slug from text
   const generateSlug = (text: string) => {
     return text
-      .toLowerCase()
+      .toLocaleLowerCase('tr-TR')
       .replace(/ğ/g, 'g')
       .replace(/ü/g, 'u')
       .replace(/ş/g, 's')
@@ -105,30 +121,75 @@ export const ArticleFormPage: React.FC = () => {
       .replace(/^-|-$/g, '');
   };
 
-  // Populate form if editing
+  // Populate form if editing or reset when switching from edit to create
   useEffect(() => {
-    if (existingArticle) {
-      setTitle(existingArticle.title);
-      setSlug(existingArticle.slug);
-      setSubtitle(existingArticle.subtitle || '');
-      setSummary(existingArticle.summary);
-      setCategory(existingArticle.category);
-      setContentType(existingArticle.contentType);
-      setContentOrigin(existingArticle.contentOrigin || 'official_press');
-      setSourceUrl(existingArticle.sourceUrl || '');
-      setAuthorName(existingArticle.author.name);
-      setAuthorTitle(existingArticle.author.title);
-      setReadingTime(existingArticle.readingTime || '3 dk okuma');
-      setCoverImage(existingArticle.coverImage);
-      setImageCaption(existingArticle.imageCaption || '');
-      setImageCredit(existingArticle.imageCredit || 'İslahiye Lezzet Atlası Demo Arşivi');
-      setTagsInput(existingArticle.tags ? existingArticle.tags.join(', ') : '');
-      setPublicationStatus(existingArticle.publicationStatus || 'published');
-      setVerificationStatus((existingArticle.verificationStatus as VerificationStatus) || 'verified');
-      setIsDemo(existingArticle.isDemo !== undefined ? existingArticle.isDemo : false);
-      setParagraphs(existingArticle.paragraphs || []);
+    if (isEditing && id) {
+      if (existingArticle) {
+        if (initializedKeyRef.current !== existingArticle.id) {
+          initializedKeyRef.current = existingArticle.id;
+          setTitle(existingArticle.title);
+          setSlug(existingArticle.slug);
+          setSubtitle(existingArticle.subtitle || '');
+          setSummary(existingArticle.summary);
+          setCategory(existingArticle.category);
+          setContentType(existingArticle.contentType);
+          setContentOrigin(existingArticle.contentOrigin || 'official_press');
+          setSourceUrl(existingArticle.sourceUrl || '');
+          setAuthorName(existingArticle.author.name);
+          setAuthorTitle(existingArticle.author.title);
+          setReadingTime(existingArticle.readingTime || '3 dk okuma');
+          setCoverImage(existingArticle.coverImage);
+          setImageCaption(existingArticle.imageCaption || '');
+          setImageCredit(existingArticle.imageCredit || 'İslahiye Lezzet Atlası Arşivi');
+          setTagsInput(existingArticle.tags ? existingArticle.tags.join(', ') : '');
+          setPublicationStatus(existingArticle.publicationStatus || 'published');
+          setVerificationStatus((existingArticle.verificationStatus as VerificationStatus) || 'verified');
+          setParagraphs(existingArticle.paragraphs || []);
+          setErrors({});
+          setIsDirty(false);
+          setActiveTab('form');
+        }
+      } else if (initializedKeyRef.current !== `__missing__${id}`) {
+        initializedKeyRef.current = `__missing__${id}`;
+        setNotification({
+          type: 'error',
+          title: 'Kayıt Bulunamadı',
+          message: 'Düzenlenecek haber veya makale kaydı bulunamadı.',
+        });
+        setTimeout(() => navigate('/yonetim/haberler'), 1200);
+      }
+    } else if (!isEditing && initializedKeyRef.current !== '__create__') {
+      initializedKeyRef.current = '__create__';
+      setTitle('');
+      setSlug('');
+      setSubtitle('');
+      setSummary('');
+      setCategory('agriculture');
+      setContentType('news');
+      setContentOrigin('official_press');
+      setSourceUrl('');
+      setAuthorName('İslahiye Lezzet Atlası Editoryal Ekibi');
+      setAuthorTitle('Kültürel Bellek ve Araştırma');
+      setReadingTime('3 dk okuma');
+      setCoverImage('/images/biber_kozleme_poster.jpg');
+      setImageCaption('');
+      setImageCredit('İslahiye Lezzet Atlası Arşivi');
+      setTagsInput('İslahiye, Gastronomi, Kültür');
+      setPublicationStatus(canPublish ? 'published' : 'draft');
+      setVerificationStatus('verified');
+      setParagraphs([
+        {
+          title: 'Giriş ve Arka Plan',
+          body: 'İslahiye Ovası ve Amanos Dağları eteklerinde yüzyıllardır sürdürülen gastronomi ritüelleri...',
+          highlightText: '',
+          quote: '',
+        },
+      ]);
+      setErrors({});
+      setIsDirty(false);
+      setActiveTab('form');
     }
-  }, [existingArticle]);
+  }, [isEditing, id, existingArticle, navigate, canPublish]);
 
   // Auto-generate slug when title changes (if not edited manually)
   const handleTitleChange = (val: string) => {
@@ -176,50 +237,88 @@ export const ArticleFormPage: React.FC = () => {
     setIsDirty(true);
   };
 
-  // Validation
+  // Validation with precise field mapping and auto-focus
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!title.trim() || title.trim().length < 5) {
-      newErrors.title = 'Başlık en az 5 karakter olmalıdır.';
+    const fieldDetails: { name: string; label: string; message: string }[] = [];
+
+    if (!title.trim() || title.trim().length < 3) {
+      const msg = 'Haber başlığı en az 3 karakter olmalıdır.';
+      newErrors.title = msg;
+      fieldDetails.push({ name: 'title', label: 'Haber Başlığı', message: msg });
     }
     if (!slug.trim()) {
-      newErrors.slug = 'URL slug alanı boş bırakılamaz.';
+      const autoSlug = generateSlug(title);
+      setSlug(autoSlug);
     }
-    if (!summary.trim() || summary.trim().length < 20) {
-      newErrors.summary = 'Özet alanı en az 20 karakter olmalıdır.';
+    if (!summary.trim() || summary.trim().length < 10) {
+      const msg = 'Özet alanı en az 10 karakter olmalıdır.';
+      newErrors.summary = msg;
+      fieldDetails.push({ name: 'summary', label: 'İçerik Özeti', message: msg });
     }
-    // Kurumsal haber ise kaynak URL zorunlu olmalı (AGENTS.md ve sprint kuralı)
-    if (contentType === 'news' && !sourceUrl.trim()) {
-      newErrors.sourceUrl =
-        'Kurumsal veya resmî haber kayıtlarında doğrulanabilir kaynak URL zorunludur.';
-    }
-    if (paragraphs.length < 1) {
-      newErrors.paragraphs = 'En az bir içerik paragrafı eklenmelidir.';
-    }
-    const emptyParagraph = paragraphs.some((p) => !p.body.trim());
-    if (emptyParagraph) {
-      newErrors.paragraphs = 'Tüm paragrafların gövde metinleri doldurulmalıdır.';
+    const trimmedSource = sourceUrl.trim();
+    if (trimmedSource && !/^https?:\/\/\S+/i.test(trimmedSource)) {
+      const msg = 'Kaynak URL http:// veya https:// ile başlamalıdır.';
+      newErrors.sourceUrl = msg;
+      fieldDetails.push({ name: 'sourceUrl', label: 'Kaynak URL', message: msg });
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    if (fieldDetails.length > 0) {
+      setActiveTab('form');
+      setNotification({
+        type: 'error',
+        title: `${fieldDetails.length} Alanda Eksiklik Bulundu`,
+        message: 'Kaydetme işleminin tamamlanması için lütfen eksik alanları doldurunuz.',
+        fields: fieldDetails,
+        onScrollToField: scrollToField,
+      });
+
+      // Automatically smoothly scroll and focus the very first missing field!
+      scrollToField(fieldDetails[0].name);
+      return false;
+    }
+
+    return true;
   };
 
   const handleSave = (targetStatus?: PublicationStatus) => {
-    if (!validate()) {
-      setActiveTab('form');
-      setNotification({ type: 'error', message: 'Lütfen formdaki zorunlu alanları kontrol edin.' });
+    if (!canSave) {
+      setNotification({
+        type: 'error',
+        title: 'Yetki Yetersiz',
+        message: 'Aktif rolünüz bu işlemde kayıt oluşturma veya düzenleme yetkisine sahip değildir.',
+      });
       return;
     }
 
-    const finalStatus = targetStatus || publicationStatus;
+    if (!validate()) {
+      return;
+    }
+
+    const requestedStatus = targetStatus || publicationStatus;
+    const finalStatus: PublicationStatus =
+      !canPublish && (requestedStatus === 'published' || requestedStatus === 'archived')
+        ? 'in_review'
+        : requestedStatus;
     const articleId = isEditing && existingArticle ? existingArticle.id : `news-${Date.now()}`;
-    const categoryObj = CATEGORIES.find((c) => c.id === category);
+    const resolvedCategoryLabel = getCategoryLabel('article', category, 'Gastronomi');
 
     const parsedTags = tagsInput
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
+
+    const finalParagraphs = paragraphs.filter((p) => p.body.trim().length > 0);
+    if (finalParagraphs.length === 0) {
+      finalParagraphs.push({
+        title: 'Giriş ve Genel Bakış',
+        body: summary.trim() || title.trim(),
+      });
+    }
+
+    const finalSourceUrl = sourceUrl.trim() || undefined;
 
     const today = new Date();
     const formattedDate = `${today.getDate()} ${
@@ -241,36 +340,45 @@ export const ArticleFormPage: React.FC = () => {
 
     const updatedArticle: Article = {
       id: articleId,
-      slug: slug.trim(),
+      slug: slug.trim() || generateSlug(title),
       title: title.trim(),
       subtitle: subtitle.trim(),
       summary: summary.trim(),
       category: (category === 'all' ? 'agriculture' : category) as Exclude<ArticleCategory, 'all'>,
-      categoryLabel: categoryObj?.label || 'Gastronomi',
+      categoryLabel: resolvedCategoryLabel,
       contentType,
       contentOrigin: (contentOrigin as ContentOrigin) || 'official_press',
-      sourceUrl: sourceUrl.trim() || undefined,
+      sourceUrl: finalSourceUrl,
       verificationStatus,
-      isDemo,
+      isDemo: false,
       coverImage,
       imageCaption: imageCaption.trim() || undefined,
-      imageCredit: imageCredit.trim() || 'İslahiye Lezzet Atlası Demo Arşivi',
+      imageCredit: imageCredit.trim() || 'İslahiye Lezzet Atlası Arşivi',
       author: {
         name: authorName.trim(),
         title: authorTitle.trim(),
       },
-      publishedAt: today.toISOString().split('T')[0],
-      formattedDate,
+      publishedAt: existingArticle?.publishedAt || today.toISOString().split('T')[0],
+      formattedDate: existingArticle?.formattedDate || formattedDate,
       readingTime,
       publicationStatus: finalStatus,
       isLead: existingArticle?.isLead || false,
-      paragraphs,
+      paragraphs: finalParagraphs,
       tags: parsedTags,
       relatedDishIds: existingArticle?.relatedDishIds,
       relatedArticleSlugs: existingArticle?.relatedArticleSlugs,
     };
 
-    saveArticle(updatedArticle);
+    const ok = saveArticle(updatedArticle);
+    if (!ok) {
+      setNotification({
+        type: 'error',
+        title: 'Kayıt Hatası',
+        message: 'Yazı yerel depoya kaydedilemedi. Tarayıcı depolama alanını kontrol ediniz.',
+      });
+      return;
+    }
+
     setIsDirty(false);
     setPublicationStatus(finalStatus);
     setNotification({
@@ -278,7 +386,11 @@ export const ArticleFormPage: React.FC = () => {
       message:
         finalStatus === 'published'
           ? 'Haber / Makale başarıyla yayımlandı ve /haberler sayfasında görünür hale geldi!'
-          : 'Haber taslak olarak kaydedildi (ziyaretçilere kapalıdır).',
+          : finalStatus === 'in_review'
+          ? 'Yazı yayın onayı için incelemeye alındı (henüz yayında değil).'
+          : finalStatus === 'archived'
+          ? 'Yazı arşivlendi ve ziyaretçi portalından kaldırıldı.'
+          : 'Yazı taslak olarak kaydedildi (ziyaretçilere kapalıdır).',
     });
 
     setTimeout(() => {
@@ -287,6 +399,7 @@ export const ArticleFormPage: React.FC = () => {
   };
 
   const handleDelete = () => {
+    if (!canDelete) return;
     if (existingArticle) {
       deleteArticle(existingArticle.id);
       setShowDeleteModal(false);
@@ -294,82 +407,113 @@ export const ArticleFormPage: React.FC = () => {
     }
   };
 
+  const effectiveSaveStatus: PublicationStatus =
+    !canPublish && (publicationStatus === 'published' || publicationStatus === 'archived')
+      ? 'in_review'
+      : publicationStatus;
+
+  const primaryButtonLabel =
+    effectiveSaveStatus === 'published'
+      ? 'Kaydet ve Yayımla'
+      : effectiveSaveStatus === 'in_review'
+      ? 'İncelemeye Gönder'
+      : effectiveSaveStatus === 'archived'
+      ? 'Arşivle ve Kaydet'
+      : 'Taslağı Kaydet';
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20 font-sans">
       {/* Top Header */}
-      <div className="bg-white p-5 rounded-sm border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
             to="/yonetim/haberler"
-            className="p-2 rounded-sm text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition shadow-2xs"
             title="Haber Listesine Dön"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-xs bg-slate-100 text-slate-700 border border-slate-200">
-                {isEditing ? 'Yazı Düzenle' : 'Yeni Haber / Makale'}
-              </span>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight font-sans">
+                {isEditing
+                  ? (title ? `Yazı Düzenle: ${title}` : 'Yazı Düzenleme')
+                  : (contentType === 'news' ? 'Yeni Resmî Haber' : 'Yeni Editoryal Makale')}
+              </h1>
               <span
-                className={`text-[10px] font-mono px-2 py-0.5 rounded-xs font-semibold ${
+                className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shrink-0 ${
                   publicationStatus === 'published'
-                    ? 'bg-emerald-100 text-emerald-800'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : publicationStatus === 'in_review'
+                    ? 'bg-sky-50 text-sky-800 border-sky-200'
                     : publicationStatus === 'archived'
-                    ? 'bg-slate-200 text-slate-700'
-                    : 'bg-amber-100 text-amber-800'
+                    ? 'bg-slate-100 text-slate-700 border-slate-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
                 }`}
               >
                 {publicationStatus === 'published'
                   ? 'Yayında'
+                  : publicationStatus === 'in_review'
+                  ? 'İncelemede'
                   : publicationStatus === 'archived'
                   ? 'Arşivde'
                   : 'Taslak'}
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-xs bg-slate-100 text-slate-600">
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
                 {contentType === 'news' ? 'Resmî Haber' : 'Editoryal Makale'}
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
-              {title || (isEditing ? 'Yazı Düzenleme' : 'Yeni Haber veya Makale')}
-            </h1>
+            <p className="text-xs text-slate-500 mt-0.5 font-sans">
+              Mutfak kültürü bülten haberleri ve saha araştırma yazıları için editoryal içerik düzenleme.
+            </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {Object.keys(errors).length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-lg animate-pulse">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+              <span>{Object.keys(errors).length} eksik alan</span>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setActiveTab(activeTab === 'form' ? 'preview' : 'form')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
           >
-            <Eye className="w-4 h-4 text-slate-500" />
-            <span>{activeTab === 'form' ? 'Editoryal Önizleme' : 'Forma Dön'}</span>
+            <Eye className="w-4 h-4 text-slate-400" />
+            <span>{activeTab === 'form' ? 'Önizle' : 'Forma Dön'}</span>
           </button>
+
+          {canSave && publicationStatus !== 'draft' && (
+            <button
+              type="button"
+              onClick={() => handleSave('draft')}
+              className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+            >
+              <Save className="w-4 h-4 text-slate-400" />
+              <span>Taslak Sakla</span>
+            </button>
+          )}
 
           <button
             type="button"
-            onClick={() => handleSave('draft')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition-colors"
+            disabled={!canSave}
+            onClick={() => handleSave()}
+            title={!canSave ? 'Aktif rolünüzle kayıt kaydedemezsiniz' : undefined}
+            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition shadow-2xs disabled:opacity-45 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4 text-slate-600" />
-            <span>Taslak Kaydet</span>
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{primaryButtonLabel}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => handleSave('published')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold shadow-xs transition-colors"
-          >
-            <Globe className="w-4 h-4" />
-            <span>Demo Olarak Yayımla</span>
-          </button>
-
-          {isEditing && (
+          {isEditing && canDelete && (
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
-              className="p-2 rounded-sm text-rose-600 hover:bg-rose-50 transition-colors border border-transparent hover:border-rose-200"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
               title="Yazıyı Sil"
             >
               <Trash2 className="w-4 h-4" />
@@ -378,36 +522,12 @@ export const ArticleFormPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Notifications */}
-      {notification && (
-        <div
-          className={`p-4 rounded-sm border flex items-center justify-between text-xs animate-fade-in ${
-            notification.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {notification.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
-            <span>{notification.message}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-slate-600 font-bold ml-4"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Floating Viewport Toast for Notifications & Validation */}
+      <FormNotificationToast notification={notification} onClose={() => setNotification(null)} />
 
       {/* Unsaved Changes Banner */}
       {isDirty && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-sm text-xs text-amber-900 flex items-center gap-2">
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
           <Info className="w-4 h-4 text-amber-700 shrink-0" />
           <span>Yazıda kaydedilmemiş düzenlemeleriniz bulunmaktadır.</span>
         </div>
@@ -416,13 +536,28 @@ export const ArticleFormPage: React.FC = () => {
       {/* Tab Contents */}
       {activeTab === 'preview' ? (
         /* Editorial Magazine Preview */
-        <div className="bg-ivory p-6 sm:p-10 rounded-sm border border-sand/80 shadow-xs space-y-8">
+        <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-5">
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Ziyaretçi Portalı Canlı Önizlemesi
+              </h3>
+              <p className="text-xs text-slate-500">
+                Editoryal dergi ve haber detay sayfasındaki okuma düzeni.
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+              {contentType === 'news' ? 'Resmî Haber' : 'Editoryal Makale'}
+            </span>
+          </div>
+
+        <div className="bg-ivory p-6 sm:p-10 rounded-xl border border-sand/80 shadow-xs space-y-8">
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="border-b border-sand pb-4">
-              <span className="text-[10px] font-mono text-copper-dark uppercase tracking-widest block font-bold">
-                EDİTORYAL DERGİ & DETAY CANLI ÖNİZLEME
+              <span className="text-[11px] font-sans text-copper-dark uppercase tracking-wider block font-bold">
+                EDİTORYAL DERGİ &amp; DETAY CANLI ÖNİZLEME
               </span>
-              <div className="flex items-center gap-2 text-xs font-mono text-charcoal/60 mt-2">
+              <div className="flex items-center gap-2 text-xs font-sans text-charcoal/60 mt-2">
                 <span>{contentType === 'news' ? 'Resmî Haber' : 'Editoryal Makale'}</span>
                 <span>•</span>
                 <span>{readingTime}</span>
@@ -439,7 +574,7 @@ export const ArticleFormPage: React.FC = () => {
               </p>
             )}
 
-            <div className="aspect-[16/9] rounded-sm overflow-hidden bg-sand/30 border border-sand">
+            <div className="aspect-[16/9] rounded-xl overflow-hidden bg-sand/30 border border-sand">
               <ImageWithFallback
                 src={coverImage}
                 alt={title}
@@ -449,7 +584,7 @@ export const ArticleFormPage: React.FC = () => {
               />
             </div>
 
-            <div className="p-4 bg-sand/20 rounded-sm text-xs font-sans text-charcoal/85 leading-relaxed font-medium">
+            <div className="p-4 bg-sand/20 rounded-xl text-xs font-sans text-charcoal/85 leading-relaxed font-medium">
               <strong>Özet:</strong> {summary || 'Özet metni buraya gelecek...'}
             </div>
 
@@ -466,7 +601,7 @@ export const ArticleFormPage: React.FC = () => {
                     {p.body}
                   </p>
                   {p.highlightText && (
-                    <div className="p-3 bg-amber-50/80 border-l-3 border-amber-600 text-xs font-mono text-amber-950">
+                    <div className="p-3 bg-amber-50/80 border-l-4 border-amber-600 text-xs font-sans text-amber-950 rounded-r-lg">
                       {p.highlightText}
                     </div>
                   )}
@@ -481,6 +616,7 @@ export const ArticleFormPage: React.FC = () => {
             </div>
           </div>
         </div>
+        </div>
       ) : (
         /* Form View */
         <form
@@ -491,14 +627,14 @@ export const ArticleFormPage: React.FC = () => {
           className="space-y-6"
         >
           {/* Section 1: Başlık, Tür ve Kategori */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              1. Yazı Başlığı, Türü & Özet
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <h2 className="text-sm font-sans font-bold text-slate-900 border-b border-slate-100 pb-2.5">
+              1. Yazı Başlığı, Türü &amp; Özet
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   İçerik Türü <span className="text-rose-500">*</span>
                 </label>
                 <select
@@ -507,26 +643,40 @@ export const ArticleFormPage: React.FC = () => {
                     setContentType(e.target.value as 'news' | 'editorial_article');
                     setIsDirty(true);
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest bg-white"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
                 >
-                  <option value="news">Resmî Haber & Kayıt (Kaynak URL zorunludur)</option>
-                  <option value="editorial_article">Editoryal Makale & Mutfak Belleği</option>
+                  <option value="news">Resmî Haber &amp; Kurumsal Bülten</option>
+                  <option value="editorial_article">Editoryal Makale &amp; Mutfak Belleği</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kategori <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Kategori <span className="text-rose-500">*</span>
+                  </label>
+                  <QuickCategoryButton
+                    scope="article"
+                    onCreated={(cat) => {
+                      setCategory(cat.id as ArticleCategory);
+                      setIsDirty(true);
+                    }}
+                  />
+                </div>
                 <select
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value as ArticleCategory);
                     setIsDirty(true);
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest bg-white"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
                 >
-                  {CATEGORIES.map((c) => (
+                  {mergeCategoryOption(
+                    getCategories('article', true),
+                    category,
+                    'article',
+                    getCategoryLabel('article', category, existingArticle?.categoryLabel)
+                  ).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.label}
                     </option>
@@ -537,34 +687,36 @@ export const ArticleFormPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Yazı Başlığı <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="field-title"
                   type="text"
                   value={title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="Örn: İslahiye Biberinde Hasat Sezonu ve İpeksi Kurutma"
-                  className={`w-full px-3 py-2 text-xs border rounded-sm focus:outline-none focus:ring-1 ${
-                    errors.title ? 'border-rose-400' : 'border-slate-300 focus:ring-forest'
+                  className={`w-full h-10 px-3.5 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                    errors.title ? 'border-rose-400 focus:ring-rose-500/20' : 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600'
                   }`}
                 />
                 {errors.title && <p className="text-[11px] text-rose-500 mt-1">{errors.title}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   URL Slug <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="field-slug"
                   type="text"
                   value={slug}
                   onChange={(e) => {
                     setSlug(e.target.value);
                     setIsDirty(true);
                   }}
-                  className={`w-full px-3 py-2 text-xs border rounded-sm font-mono focus:outline-none focus:ring-1 ${
-                    errors.slug ? 'border-rose-400' : 'border-slate-300 focus:ring-forest'
+                  className={`w-full h-10 px-3.5 text-xs sm:text-sm border rounded-lg font-sans focus:outline-none focus:ring-2 ${
+                    errors.slug ? 'border-rose-400 focus:ring-rose-500/20' : 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600'
                   }`}
                 />
                 {errors.slug && <p className="text-[11px] text-rose-500 mt-1">{errors.slug}</p>}
@@ -572,7 +724,7 @@ export const ArticleFormPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Alt Başlık (Subtitle)
               </label>
               <input
@@ -583,15 +735,16 @@ export const ArticleFormPage: React.FC = () => {
                   setIsDirty(true);
                 }}
                 placeholder="Örn: Amanos mikroklimasında yetişen biberin kurutma sergileri ve pul biber hazırlık evresi."
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest"
+                className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Haber Özeti (Lead / Summary) <span className="text-rose-500">*</span>
               </label>
               <textarea
+                id="field-summary"
                 rows={2}
                 value={summary}
                 onChange={(e) => {
@@ -599,8 +752,8 @@ export const ArticleFormPage: React.FC = () => {
                   setIsDirty(true);
                 }}
                 placeholder="Yazının ilk paragrafı ve kartlarda görünecek özet..."
-                className={`w-full px-3 py-2 text-xs border rounded-sm focus:outline-none focus:ring-1 ${
-                  errors.summary ? 'border-rose-400' : 'border-slate-300 focus:ring-forest'
+                className={`w-full p-3.5 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                  errors.summary ? 'border-rose-400 focus:ring-rose-500/20' : 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600'
                 }`}
               />
               {errors.summary && <p className="text-[11px] text-rose-500 mt-1">{errors.summary}</p>}
@@ -608,86 +761,34 @@ export const ArticleFormPage: React.FC = () => {
           </div>
 
           {/* Section 2: Kapak Görseli ve Medya */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              2. Kapak Görseli & Lisans Bilgisi
-            </h2>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Hızlı Kapak Seçimi (Doğrulanmış Arşiv):
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {PRESET_COVERS.map((cov) => (
-                  <button
-                    key={cov.url}
-                    type="button"
-                    onClick={() => {
-                      setCoverImage(cov.url);
-                      setIsDirty(true);
-                    }}
-                    className={`text-left p-2 rounded-sm border transition-all ${
-                      coverImage === cov.url
-                        ? 'border-forest bg-forest/5 ring-1 ring-forest'
-                        : 'border-slate-200 hover:border-slate-400'
-                    }`}
-                  >
-                    <div className="aspect-[16/9] rounded-xs overflow-hidden mb-1.5 bg-slate-100">
-                      <ImageWithFallback
-                        src={cov.url}
-                        alt={cov.label}
-                        fallbackText={cov.label}
-                        containerClassName="w-full h-full"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-[11px] font-sans font-semibold text-slate-800 block truncate">
-                      {cov.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kapak Görsel URL
-                </label>
-                <input
-                  type="text"
-                  value={coverImage}
-                  onChange={(e) => {
-                    setCoverImage(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm font-mono focus:outline-none focus:ring-1 focus:ring-forest"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Görsel Lisans / Kaynak Atfı
-                </label>
-                <input
-                  type="text"
-                  value={imageCredit}
-                  onChange={(e) => {
-                    setImageCredit(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest"
-                />
-              </div>
-            </div>
+          <div id="field-coverImage" className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <ImageUploadField
+              value={coverImage}
+              onChange={(url) => {
+                setCoverImage(url);
+                setIsDirty(true);
+              }}
+              altText={imageCaption}
+              onAltTextChange={(caption) => {
+                setImageCaption(caption);
+                setIsDirty(true);
+              }}
+              credit={imageCredit}
+              onCreditChange={(credit) => {
+                setImageCredit(credit);
+                setIsDirty(true);
+              }}
+              label="Haber / Makale Kapak Görseli"
+              required
+            />
           </div>
 
           {/* Section 3: Yapılandırılmış Metin Paragrafları */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div id="field-paragraphs" className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div>
-                <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold">
-                  3. İçerik Blokları & Paragraflar ({paragraphs.length} Blok)
+                <h2 className="text-sm font-sans font-bold text-slate-900">
+                  3. İçerik Blokları &amp; Paragraflar ({paragraphs.length} Blok)
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   Her blok için alt başlık, gövde metni ve opsiyonel alıntı/vurgu kutusu tanımlayabilirsiniz.
@@ -697,7 +798,7 @@ export const ArticleFormPage: React.FC = () => {
               <button
                 type="button"
                 onClick={addParagraph}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-forest text-white text-xs font-semibold hover:bg-forest-800 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition-colors shadow-2xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Blok Ekle</span>
@@ -712,11 +813,11 @@ export const ArticleFormPage: React.FC = () => {
               {paragraphs.map((p, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-slate-50 border border-slate-200 rounded-sm space-y-3 relative"
+                  className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl space-y-3 relative"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-xs bg-slate-300 text-slate-800 text-[10px] font-mono font-bold flex items-center justify-center">
+                      <span className="w-6 h-6 rounded-lg bg-slate-200 text-slate-800 text-xs font-sans font-bold flex items-center justify-center">
                         {idx + 1}
                       </span>
                       <input
@@ -724,7 +825,7 @@ export const ArticleFormPage: React.FC = () => {
                         value={p.title || ''}
                         onChange={(e) => updateParagraph(idx, { title: e.target.value })}
                         placeholder="Ara Başlık (Örn: Ürün Nitelikleri ve Şartname Standartları)"
-                        className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-300 rounded-sm w-72 focus:outline-none focus:ring-1 focus:ring-forest"
+                        className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg w-72 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                       />
                     </div>
 
@@ -767,7 +868,7 @@ export const ArticleFormPage: React.FC = () => {
                       value={p.body}
                       onChange={(e) => updateParagraph(idx, { body: e.target.value })}
                       placeholder="Bu bölümün detaylı editoryal metni..."
-                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest"
+                      className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                     />
                   </div>
 
@@ -781,7 +882,7 @@ export const ArticleFormPage: React.FC = () => {
                         value={p.highlightText || ''}
                         onChange={(e) => updateParagraph(idx, { highlightText: e.target.value })}
                         placeholder="Örn: Resmî Tescil No: 991 | Gaziantep Ticaret Borsası"
-                        className="w-full px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-forest"
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                       />
                     </div>
 
@@ -794,7 +895,7 @@ export const ArticleFormPage: React.FC = () => {
                         value={p.quote || ''}
                         onChange={(e) => updateParagraph(idx, { quote: e.target.value })}
                         placeholder="Örn: Coğrafi işaret, bölgesel üreticinin emeğini korur..."
-                        className="w-full px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-sm italic text-slate-700 focus:outline-none focus:ring-1 focus:ring-forest"
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg italic text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                       />
                     </div>
                   </div>
@@ -804,17 +905,18 @@ export const ArticleFormPage: React.FC = () => {
           </div>
 
           {/* Section 4: Kaynak, Yazar ve Doğrulama */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              4. Doğrulama, Kaynak URL & Yayın Durumu
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <h2 className="text-sm font-sans font-bold text-slate-900 border-b border-slate-100 pb-2.5">
+              4. Doğrulama, Kaynak URL &amp; Yayın Durumu
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kaynak URL {contentType === 'news' && <span className="text-rose-500">* (Resmî haberde zorunlu)</span>}
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Kaynak URL <span className="text-slate-400 font-normal">(Opsiyonel - Resmî kaynak bağlantısı)</span>
                 </label>
                 <input
+                  id="field-sourceUrl"
                   type="url"
                   value={sourceUrl}
                   onChange={(e) => {
@@ -822,20 +924,20 @@ export const ArticleFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="https://ci.turkpatent.gov.tr/..."
-                  className={`w-full px-3 py-2 text-xs border rounded-sm font-mono focus:outline-none focus:ring-1 ${
-                    errors.sourceUrl ? 'border-rose-400' : 'border-slate-300 focus:ring-forest'
+                  className={`w-full h-10 px-3.5 text-xs sm:text-sm border rounded-lg font-sans focus:outline-none focus:ring-2 ${
+                    errors.sourceUrl ? 'border-rose-400 focus:ring-rose-500/20' : 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600'
                   }`}
                 />
                 {errors.sourceUrl && (
                   <p className="text-[11px] text-rose-500 mt-1">{errors.sourceUrl}</p>
                 )}
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="text-[10px] text-slate-500 mt-1">
                   TÜRKPATENT gibi harici resmî kaynaklar otomatik olarak kurumsal basın açıklaması sayılmaz; doğrulanmış dış kaynak olarak etiketlenir.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Yazar / Kurum İsmi
                 </label>
                 <input
@@ -846,33 +948,38 @@ export const ArticleFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="Örn: Lezzet Atlası Editoryal Ekibi"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Yayın Durumu
                 </label>
                 <select
                   value={publicationStatus}
+                  disabled={!canSave}
                   onChange={(e) => {
                     setPublicationStatus(e.target.value as PublicationStatus);
                     setIsDirty(true);
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest bg-white"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white disabled:bg-slate-50"
                 >
+                  <option value="published" disabled={!canPublish}>
+                    Yayında (/haberler sayfasında görünür){!canPublish ? ' — Yayın yetkisi gerekir' : ''}
+                  </option>
                   <option value="draft">Taslak (Yalnızca CMS'te görünür)</option>
                   <option value="in_review">İncelemede (Onay bekliyor)</option>
-                  <option value="published">Yayında (/haberler sayfasında görünür)</option>
-                  <option value="archived">Arşivde (Portalda gizli)</option>
+                  <option value="archived" disabled={!canPublish}>
+                    Arşivde (Portalda gizli){!canPublish ? ' — Yayın yetkisi gerekir' : ''}
+                  </option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Etiketler (Virgülle ayırın)
                 </label>
                 <input
@@ -883,89 +990,65 @@ export const ArticleFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="İslahiye Biberi, TÜRKPATENT, Hasat"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isDemo}
-                  onChange={(e) => {
-                    setIsDemo(e.target.checked);
-                    setIsDirty(true);
-                  }}
-                  className="rounded-xs text-forest focus:ring-forest w-4 h-4"
-                />
-                <span className="text-xs font-semibold text-slate-600">
-                  Demo İçerik İşareti (Frontend Temsili Makale)
-                </span>
-              </label>
-            </div>
           </div>
 
           {/* Bottom Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4">
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-200">
+            {Object.keys(errors).length > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-lg mr-auto animate-pulse">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{Object.keys(errors).length} zorunlu alanda eksik veya hatalı bilgi var</span>
+              </div>
+            )}
+
             <Link
               to="/yonetim/haberler"
-              className="px-4 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="h-10 px-4 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
             >
               Vazgeç
             </Link>
 
-            <button
-              type="button"
-              onClick={() => handleSave('draft')}
-              className="px-4 py-2 rounded-sm bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition-colors"
-            >
-              Taslak Kaydet
-            </button>
+            {canSave && publicationStatus !== 'draft' && (
+              <button
+                type="button"
+                onClick={() => handleSave('draft')}
+                className="h-10 px-4 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+              >
+                <Save className="w-4 h-4 text-slate-400" />
+                <span>Taslak Kaydet</span>
+              </button>
+            )}
 
             <button
               type="button"
-              onClick={() => handleSave('published')}
-              className="px-6 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold shadow-xs transition-colors"
+              disabled={!canSave}
+              onClick={() => handleSave()}
+              title={!canSave ? 'Aktif rolünüzle kayıt kaydedemezsiniz' : undefined}
+              className="h-10 px-5 inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-2xs transition disabled:opacity-45 disabled:cursor-not-allowed"
             >
-              Kaydet ve Yayımla
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{primaryButtonLabel}</span>
             </button>
           </div>
         </form>
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 bg-charcoal/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-sm border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <Trash2 className="w-6 h-6" />
-              <h3 className="text-base font-bold text-slate-900">
-                Yazıyı Silmek İstiyor musunuz?
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed font-sans">
-              <strong>"{title}"</strong> yazısı silinecek ve /haberler portalından kaldırılacaktır.
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                İptal
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-sm bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
-              >
-                Evet, Sil
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActionConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Yazıyı Silmek İstiyor musunuz?"
+        message={`"${title}" yazısı silinecek ve /haberler portalından kaldırılacaktır.`}
+        confirmText="Evet, Sil"
+        cancelText="Vazgeç"
+        variant="danger"
+      />
     </div>
   );
 };

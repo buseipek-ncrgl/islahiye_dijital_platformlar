@@ -26,7 +26,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 15 }}
         transition={{ duration: 0.4 }}
-        className="group relative bg-paper border border-sand/70 rounded-sm overflow-hidden hover:border-copper/40 transition-all duration-300 flex flex-col lg:flex-row lg:col-span-12 shadow-xs"
+        className="group relative bg-paper border border-sand/70 rounded-xl overflow-hidden hover:border-copper/40 transition-all duration-300 flex flex-col lg:flex-row lg:col-span-12 shadow-xs"
       >
         {/* Large Cinematic Photo Area */}
         <div className="relative w-full lg:w-7/12 aspect-[16/10] lg:aspect-auto overflow-hidden bg-sand/20">
@@ -45,11 +45,11 @@ export const FoodCard: React.FC<FoodCardProps> = ({
         <div className="w-full lg:w-5/12 p-6 sm:p-8 lg:p-10 flex flex-col justify-between bg-paper">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-copper-dark font-semibold">
+              <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
                 {dish.categoryLabel}
               </span>
               <span className="text-sand">•</span>
-              <span className="text-xs text-charcoal/50 font-sans">
+              <span className="text-xs text-charcoal/50 font-sans font-medium">
                 {dish.originNote}
               </span>
             </div>
@@ -89,7 +89,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
               <button
                 type="button"
                 onClick={() => onSelectDish(dish)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm border border-forest/30 hover:bg-sand/30 text-forest text-xs font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-forest/30 hover:bg-sand/30 text-forest text-xs font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-copper cursor-pointer"
               >
                 <span>Hızlı Önizleme</span>
               </button>
@@ -98,7 +98,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenWorkshop(dish.recipeId!)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-600 transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-600 transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper cursor-pointer"
                 >
                   <span>Atölyede Pişir</span>
                   <ArrowRight className="w-3.5 h-3.5 text-copper-light group-hover:translate-x-0.5 transition-transform" />
@@ -119,7 +119,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 15 }}
       transition={{ duration: 0.35 }}
-      className="group relative bg-paper border border-sand/60 rounded-sm overflow-hidden hover:border-copper/40 transition-all duration-300 flex flex-col justify-between shadow-xs"
+      className="group relative bg-paper border border-sand/60 rounded-xl overflow-hidden hover:border-copper/40 transition-all duration-300 flex flex-col justify-between shadow-xs"
     >
       {/* Photo Area (The Visual Hero) */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-sand/20">
@@ -133,7 +133,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
 
         {/* Clean, Non-intrusive Category Label */}
         <div className="absolute top-3 left-3">
-          <span className="text-[10px] font-sans font-semibold tracking-wider uppercase px-2.5 py-1 rounded-sm bg-ivory/95 text-forest shadow-xs">
+          <span className="text-[10px] font-sans font-semibold tracking-wider uppercase px-2.5 py-1 rounded-md bg-ivory/95 text-forest shadow-xs">
             {dish.categoryLabel}
           </span>
         </div>
@@ -142,7 +142,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
       {/* Content Area */}
       <div className="p-5 sm:p-6 flex flex-col justify-between flex-1">
         <div>
-          <span className="text-[10px] font-mono tracking-wider uppercase text-charcoal/50 mb-1 block">
+          <span className="text-[10px] font-sans font-semibold tracking-wider uppercase text-charcoal/50 mb-1 block">
             {dish.originNote}
           </span>
 
@@ -174,14 +174,14 @@ export const FoodCard: React.FC<FoodCardProps> = ({
               <button
                 type="button"
                 onClick={() => onSelectDish(dish)}
-                className="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-sm border border-sand bg-ivory/50 hover:bg-paper text-charcoal text-xs font-semibold uppercase tracking-wider transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border border-sand bg-ivory/50 hover:bg-paper text-charcoal text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
               >
                 <span>Önizle</span>
               </button>
               <button
                 type="button"
                 onClick={() => onOpenWorkshop(dish.recipeId!)}
-                className="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-600 transition-colors shadow-xs"
+                className="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-600 transition-colors shadow-xs cursor-pointer"
               >
                 <span>Atölye</span>
                 <ArrowRight className="w-3 h-3 text-copper-light" />
@@ -191,7 +191,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
             <button
               type="button"
               onClick={() => onSelectDish(dish)}
-              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-sm border border-forest/25 bg-ivory/50 hover:bg-forest hover:text-ivory text-forest text-xs font-semibold uppercase tracking-wider transition-all duration-200 group/btn"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-forest/25 bg-ivory/50 hover:bg-forest hover:text-ivory text-forest text-xs font-semibold uppercase tracking-wider transition-all duration-200 group/btn cursor-pointer"
             >
               <span>Tarifi İncele</span>
               <ArrowRight className="w-3.5 h-3.5 text-copper group-hover/btn:translate-x-0.5 transition-transform" />
@@ -200,7 +200,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({
             <button
               type="button"
               onClick={() => onSelectDish(dish)}
-              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-sm border border-forest/25 bg-ivory/50 hover:bg-forest hover:text-ivory text-forest text-xs font-semibold uppercase tracking-wider transition-all duration-200 group/btn"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-forest/25 bg-ivory/50 hover:bg-forest hover:text-ivory text-forest text-xs font-semibold uppercase tracking-wider transition-all duration-200 group/btn cursor-pointer"
             >
               <span>Lezzet Detayı</span>
               <ArrowRight className="w-3.5 h-3.5 text-copper group-hover/btn:translate-x-0.5 transition-transform" />

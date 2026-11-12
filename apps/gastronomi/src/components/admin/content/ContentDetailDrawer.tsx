@@ -6,6 +6,9 @@ import { StatusBadge } from './StatusBadge';
 import { VerificationBadge } from './VerificationBadge';
 import { ImageWithFallback } from '../../ui/ImageWithFallback';
 import { useContent } from '../../../hooks/useContent';
+import { useAdminRole } from '../../../context/AdminRoleContext';
+import { ActionConfirmModal } from '../common/ActionConfirmModal';
+import { sanitizeUrl } from '../../../utils/security';
 
 interface ContentDetailDrawerProps {
   item: CmsContentItem | null;
@@ -14,6 +17,7 @@ interface ContentDetailDrawerProps {
 
 export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, onClose }) => {
   const navigate = useNavigate();
+  const { canEdit, canDelete, canPublish } = useAdminRole();
   const {
     updatePublicationStatus,
     deleteDish,
@@ -24,11 +28,35 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
     deletePlace,
     deleteAnnouncement,
     deleteEvent,
-    getCulturalStoryById,
+    deleteFilm,
+    deleteMediaItem,
+    deleteAtlasNode,
   } = useContent();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    setStatusMessage(null);
+    setShowDeleteConfirm(false);
+  }, [item?.id, item?.contentType]);
+
+  const formatContentOrigin = (origin?: string) => {
+    switch (origin) {
+      case 'editorial_narrative':
+        return 'Editoryal Mutfak Anlatısı';
+      case 'field_research':
+        return 'Saha & Usta Araştırması';
+      case 'official_registry':
+        return 'Resmî TÜRKPATENT Tescili';
+      case 'community_archive':
+        return 'Yerel Sözlü Bellek Arşivi';
+      case 'representative':
+        return 'Kültürel Arşiv';
+      default:
+        return origin || 'Editoryal Kayıt';
+    }
+  };
 
   useEffect(() => {
     if (item && closeBtnRef.current) {
@@ -37,21 +65,26 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+        } else {
+          onClose();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [item, onClose]);
+  }, [item, onClose, showDeleteConfirm]);
 
   if (!item) return null;
 
   return (
+    <>
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 overflow-hidden bg-charcoal/60 backdrop-blur-xs flex justify-end animate-fade-in"
+      className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-xs flex justify-end animate-fade-in"
       onClick={onClose}
     >
       <div
@@ -63,7 +96,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
           <div className="p-6 border-b border-slate-200 flex items-start justify-between gap-4 bg-slate-50/70">
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2 py-0.5 rounded-xs bg-slate-200 text-slate-700 text-[10px] font-mono font-bold uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700 text-[11px] font-sans font-bold uppercase tracking-wider">
                   {item.contentTypeLabel}
                 </span>
                 <StatusBadge status={item.publicationStatus} />
@@ -85,7 +118,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
               ref={closeBtnRef}
               type="button"
               onClick={onClose}
-              className="p-2 rounded-sm text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
               aria-label="Kapat"
             >
               <X className="w-5 h-5" />
@@ -96,7 +129,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
           <div className="p-6 space-y-6">
             {/* Visual Cover Preview if available */}
             {item.coverImage && (
-              <div className="rounded-sm overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-100 relative">
+              <div className="rounded-xl overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-100 relative">
                 <ImageWithFallback
                   src={item.coverImage}
                   alt={item.title}
@@ -110,55 +143,62 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
             {/* Summary Text */}
             {item.summary && (
               <div>
-                <h3 className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  İÇERİK ÖZETİ
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  İçerik Özeti
                 </h3>
-                <p className="text-sm font-sans text-slate-800 leading-relaxed bg-slate-50 p-4 rounded-sm border border-slate-200">
+                <div className="text-xs sm:text-sm font-sans text-slate-700 leading-relaxed bg-slate-50/80 p-4 rounded-xl border border-slate-200">
                   {item.summary}
-                </p>
+                </div>
               </div>
             )}
 
             {/* Metadata Grid */}
             <div>
-              <h3 className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-3">
-                KÜNYE & SİSTEM BİLGİLERİ
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+                Künye &amp; Sistem Bilgileri
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-sans">
-                <div className="p-3 rounded-sm bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/90">
+                  <span className="text-[11px] font-sans text-slate-500 block mb-1 font-medium">
                     Kategori
                   </span>
-                  <span className="font-semibold text-slate-800">
-                    {item.categoryLabel}
+                  <span className="font-bold text-slate-900 text-xs sm:text-[13px]">
+                    {item.categoryLabel || item.category}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-sm bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/90">
+                  <span className="text-[11px] font-sans text-slate-500 block mb-1 font-medium">
                     Yayın Tarihi
                   </span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-bold text-slate-900 text-xs sm:text-[13px]">
                     {item.formattedDate || item.publishedAt || 'Belirtilmedi'}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-sm bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/90">
+                  <span className="text-[11px] font-sans text-slate-500 block mb-1 font-medium">
                     İçerik Kökeni
                   </span>
-                  <span className="font-semibold text-slate-800 font-mono">
-                    {item.contentOrigin}
+                  <span className="font-bold text-emerald-800 text-xs sm:text-[13px]">
+                    {formatContentOrigin(item.contentOrigin)}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-sm bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">
-                    Temsil Türü
+                <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/90">
+                  <span className="text-[11px] font-sans text-slate-500 block mb-1 font-medium">
+                    Kayıt Türü
                   </span>
-                  <span className="font-semibold text-slate-800">
-                    {item.isDemo ? 'Temsili Demo Modeli' : 'Doğrulanmış Resmî Kayıt'}
+                  <span className="font-bold text-slate-900 text-xs sm:text-[13px] flex items-center gap-1.5">
+                    {item.isDemo ? (
+                      <span className="text-amber-700">Editoryal Ön Kayıt</span>
+                    ) : (
+                      <span className="text-emerald-700 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Doğrulanmış Resmî Kayıt
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -167,42 +207,42 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
             {/* Official Source & Links */}
             {(item.officialSource || item.sourceUrl || item.publicUrl) && (
               <div>
-                <h3 className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  KAYNAK VE ERİŞİM BAĞLANTILARI
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+                  Kaynak ve Erişim Bağlantıları
                 </h3>
 
-                <div className="space-y-2.5 text-xs font-mono">
+                <div className="space-y-2.5 text-xs font-sans">
                   {item.officialSource && (
-                    <div className="p-3 rounded-sm bg-slate-50 border border-slate-200 text-slate-700">
-                      <span className="text-[10px] text-slate-500 block uppercase">Kurum / Yazar Atfı:</span>
-                      <strong>{item.officialSource}</strong>
+                    <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200 text-slate-800">
+                      <span className="text-[11px] text-slate-500 block mb-0.5 font-medium">Kurum / Yazar Atfı:</span>
+                      <strong className="text-slate-900 font-bold text-xs sm:text-[13px]">{item.officialSource}</strong>
                     </div>
                   )}
 
-                  {item.sourceUrl && (
+                  {item.sourceUrl && sanitizeUrl(item.sourceUrl) && (
                     <a
-                      href={item.sourceUrl}
+                      href={sanitizeUrl(item.sourceUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-3 rounded-sm bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between hover:bg-emerald-100 transition-colors"
+                      className="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-800 flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all font-semibold shadow-2xs"
                     >
                       <span>Resmî Kurum / Belge Kaynağını Aç</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
                     </a>
                   )}
 
-                  {item.publicUrl && (
+                  {item.publicUrl && sanitizeUrl(item.publicUrl) && (
                     <a
-                      href={item.publicUrl}
+                      href={sanitizeUrl(item.publicUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-3 rounded-sm bg-forest-50 border border-forest-200 text-forest-800 flex items-center justify-between hover:bg-forest-100 transition-colors font-semibold"
+                      className="p-3.5 rounded-xl bg-white border border-slate-200 text-slate-800 flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all font-semibold shadow-2xs group"
                     >
                       <div className="flex items-center gap-2">
-                        <Globe className="w-3.5 h-3.5" />
+                        <Globe className="w-4 h-4 text-emerald-600" />
                         <span>Ziyaretçi Portalında Görüntüle</span>
                       </div>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-700" />
                     </a>
                   )}
                 </div>
@@ -212,14 +252,14 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
             {/* Tags if available */}
             {item.tags && item.tags.length > 0 && (
               <div>
-                <h3 className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  ETİKETLER
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Etiketler
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {item.tags.map((t) => (
                     <span
                       key={t}
-                      className="px-2 py-0.5 rounded-xs bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-600"
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-xs font-sans font-medium text-slate-700 transition-colors"
                     >
                       #{t}
                     </span>
@@ -230,96 +270,96 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
           </div>
         </div>
 
-        {/* Drawer Action Footer (Sprint 02B Active Management) */}
-        <div className="p-6 border-t border-slate-200 bg-slate-50 space-y-4">
+        {/* Drawer Action Footer (Active Management) */}
+        <div className="p-5 sm:p-6 border-t border-slate-200 bg-slate-50/70 space-y-4 font-sans">
           {statusMessage && (
-            <div className="p-2.5 rounded-sm bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{statusMessage}</span>
             </div>
           )}
 
           {/* Quick Publication Status Switcher */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white border border-slate-200 rounded-sm">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-600 font-semibold">
-              Hızlı Durum Değiştir:
-            </span>
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  updatePublicationStatus(item.id, 'draft');
-                  setStatusMessage('İçerik Taslak durumuna alındı (Ziyaretçiye kapalı).');
-                  setTimeout(() => setStatusMessage(null), 2500);
-                }}
-                className={`px-2.5 py-1 rounded-xs text-[11px] font-mono font-semibold transition-colors ${
-                  item.publicationStatus === 'draft'
-                    ? 'bg-amber-500 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Taslak
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  updatePublicationStatus(item.id, 'in_review');
-                  setStatusMessage('İçerik İncelemede olarak işaretlendi.');
-                  setTimeout(() => setStatusMessage(null), 2500);
-                }}
-                className={`px-2.5 py-1 rounded-xs text-[11px] font-mono font-semibold transition-colors ${
-                  item.publicationStatus === 'in_review'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                İncelemede
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  updatePublicationStatus(item.id, 'published');
-                  setStatusMessage('İçerik Demo Olarak Yayımlandı (Ziyaretçi portalında görünür)!');
-                  setTimeout(() => setStatusMessage(null), 2500);
-                }}
-                className={`px-2.5 py-1 rounded-xs text-[11px] font-mono font-semibold transition-colors ${
-                  item.publicationStatus === 'published'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Yayında
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  updatePublicationStatus(item.id, 'archived');
-                  setStatusMessage('İçerik Arşivlendi (Portalda gizlendi).');
-                  setTimeout(() => setStatusMessage(null), 2500);
-                }}
-                className={`px-2.5 py-1 rounded-xs text-[11px] font-mono font-semibold transition-colors ${
-                  item.publicationStatus === 'archived'
-                    ? 'bg-slate-700 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Arşivde
-              </button>
+          {(canEdit || canPublish) && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+              <span className="text-xs font-sans text-slate-700 font-bold">
+                Hızlı Durum Değiştir:
+              </span>
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    updatePublicationStatus(item.id, item.contentType, 'draft');
+                    setStatusMessage('İçerik Taslak durumuna alındı (Ziyaretçiye kapalı).');
+                    setTimeout(() => setStatusMessage(null), 2500);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition-colors ${
+                    item.publicationStatus === 'draft'
+                      ? 'bg-amber-500 text-white shadow-2xs font-bold'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  } disabled:opacity-45 disabled:cursor-not-allowed`}
+                >
+                  Taslak
+                </button>
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    updatePublicationStatus(item.id, item.contentType, 'in_review');
+                    setStatusMessage('İçerik İncelemede olarak işaretlendi.');
+                    setTimeout(() => setStatusMessage(null), 2500);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition-colors ${
+                    item.publicationStatus === 'in_review'
+                      ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  } disabled:opacity-45 disabled:cursor-not-allowed`}
+                >
+                  İncelemede
+                </button>
+                <button
+                  type="button"
+                  disabled={!canPublish}
+                  title={!canPublish ? 'Yalnızca Yayın Sorumlusu veya Yönetici yayına alabilir' : undefined}
+                  onClick={() => {
+                    updatePublicationStatus(item.id, item.contentType, 'published');
+                    setStatusMessage('İçerik Yayımlandı (Ziyaretçi portalında görünür)!');
+                    setTimeout(() => setStatusMessage(null), 2500);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition-colors ${
+                    item.publicationStatus === 'published'
+                      ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  } disabled:opacity-45 disabled:cursor-not-allowed`}
+                >
+                  Yayında
+                </button>
+                <button
+                  type="button"
+                  disabled={!canPublish}
+                  title={!canPublish ? 'Yalnızca Yayın Sorumlusu veya Yönetici arşivleyebilir' : undefined}
+                  onClick={() => {
+                    updatePublicationStatus(item.id, item.contentType, 'archived');
+                    setStatusMessage('İçerik Arşivlendi (Portalda gizlendi).');
+                    setTimeout(() => setStatusMessage(null), 2500);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-sans font-semibold transition-colors ${
+                    item.publicationStatus === 'archived'
+                      ? 'bg-slate-700 text-white shadow-2xs font-bold'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  } disabled:opacity-45 disabled:cursor-not-allowed`}
+                >
+                  Arşivde
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between gap-3 pt-1">
             {/* Edit button */}
-            {item.contentType === 'dish' ||
-            item.contentType === 'recipe' ||
-            item.contentType === 'news' ||
-            item.contentType === 'editorial_article' ||
-            item.contentType === 'artisan' ||
-            item.contentType === 'place' ||
-            item.contentType === 'announcement' ||
-            item.contentType === 'event' ||
-            item.contentType === 'film' ? (
+            {canEdit ? (
               <button
                 type="button"
                 onClick={() => {
@@ -328,6 +368,8 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
                     navigate(`/yonetim/yemekler/${item.id}/duzenle`);
                   } else if (item.contentType === 'recipe') {
                     navigate(`/yonetim/tarifler/${item.id}/duzenle`);
+                  } else if (item.contentType === 'cultural_story') {
+                    navigate(`/yonetim/kulturel-miras/${item.id}/duzenle`);
                   } else if (item.contentType === 'artisan') {
                     navigate(`/yonetim/ustalar/${item.id}/duzenle`);
                   } else if (item.contentType === 'place') {
@@ -336,43 +378,31 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
                     navigate(`/yonetim/duyurular/${item.id}/duzenle`);
                   } else if (item.contentType === 'event') {
                     navigate(`/yonetim/etkinlikler/${item.id}/duzenle`);
-                  } else if (item.contentType === 'film') {
+                  } else if (item.contentType === 'film' || item.contentType === 'media') {
                     navigate('/yonetim/medya');
-                  } else if (item.contentType === 'editorial_article') {
-                    const isCultural = Boolean(getCulturalStoryById(item.id));
-                    if (isCultural) {
-                      navigate(`/yonetim/kulturel-miras/${item.id}/duzenle`);
-                    } else {
-                      navigate(`/yonetim/haberler/${item.id}/duzenle`);
-                    }
+                  } else if (item.contentType === 'atlas_node') {
+                    navigate('/yonetim/harita?tab=atlas');
                   } else {
                     navigate(`/yonetim/haberler/${item.id}/duzenle`);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-xs"
+                className="h-9 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-colors shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Düzenle</span>
               </button>
             ) : (
-              <span className="text-[11px] text-slate-400 font-mono italic">
-                (Sprint 02C Kapsamı)
+              <span className="text-xs text-slate-400 font-sans italic">
+                Salt okunur önizleme
               </span>
             )}
 
             <div className="flex items-center gap-2">
-              {(item.contentType === 'dish' ||
-                item.contentType === 'recipe' ||
-                item.contentType === 'news' ||
-                item.contentType === 'editorial_article' ||
-                item.contentType === 'artisan' ||
-                item.contentType === 'place' ||
-                item.contentType === 'announcement' ||
-                item.contentType === 'event') && (
+              {canDelete && (
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="p-2 rounded-sm text-rose-600 hover:bg-rose-50 transition-colors border border-transparent hover:border-rose-200"
+                  className="h-9 px-3 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors inline-flex items-center justify-center cursor-pointer"
                   title="Kaydı Sil"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -382,61 +412,42 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({ item, 
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-sm bg-slate-800 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-900 transition-colors"
+                className="h-9 px-4 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-2xs cursor-pointer"
               >
                 Kapat
               </button>
             </div>
           </div>
         </div>
-
-        {/* Delete Confirmation Dialog */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 z-60 bg-charcoal/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-sm border border-slate-200 p-6 max-w-sm w-full shadow-xl space-y-4">
-              <div className="flex items-center gap-2 text-rose-600">
-                <Trash2 className="w-5 h-5" />
-                <h3 className="text-sm font-bold text-slate-900">
-                  İçeriği Silmek İstiyor musunuz?
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed font-sans">
-                <strong>"{item.title}"</strong> kaydı silinecektir. Dilediğinizde ayarlardan fabrika verilerini geri yükleyebilirsiniz.
-              </p>
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="px-3 py-1.5 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Vazgeç
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (item.contentType === 'dish') deleteDish(item.id);
-                    else if (item.contentType === 'recipe') deleteRecipe(item.id);
-                    else if (item.contentType === 'artisan') deleteArtisan(item.id);
-                    else if (item.contentType === 'place') deletePlace(item.id);
-                    else if (item.contentType === 'announcement') deleteAnnouncement(item.id);
-                    else if (item.contentType === 'event') deleteEvent(item.id);
-                    else if (item.contentType === 'editorial_article') {
-                      const isCultural = Boolean(getCulturalStoryById(item.id));
-                      if (isCultural) deleteCulturalStory(item.id);
-                      else deleteArticle(item.id);
-                    } else if (item.contentType === 'news') deleteArticle(item.id);
-                    setShowDeleteConfirm(false);
-                    onClose();
-                  }}
-                  className="px-3 py-1.5 rounded-sm bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
-                >
-                  Evet, Sil
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
+
+    <ActionConfirmModal
+      isOpen={showDeleteConfirm}
+      onClose={() => setShowDeleteConfirm(false)}
+      variant="danger"
+      title="İçeriği Silmek İstiyor musunuz?"
+      message={`"${item.title}" kaydı silinecektir. Dilediğinizde ayarlardan fabrika verilerini geri yükleyebilirsiniz.`}
+      confirmText="Evet, Sil"
+      cancelText="Vazgeç"
+      onConfirm={() => {
+        if (item.contentType === 'dish') deleteDish(item.id);
+        else if (item.contentType === 'recipe') deleteRecipe(item.id);
+        else if (item.contentType === 'cultural_story') deleteCulturalStory(item.id);
+        else if (item.contentType === 'artisan') deleteArtisan(item.id);
+        else if (item.contentType === 'place') deletePlace(item.id);
+        else if (item.contentType === 'announcement') deleteAnnouncement(item.id);
+        else if (item.contentType === 'event') deleteEvent(item.id);
+        else if (item.contentType === 'film') deleteFilm(item.id);
+        else if (item.contentType === 'media') deleteMediaItem(item.id);
+        else if (item.contentType === 'atlas_node') deleteAtlasNode(item.id);
+        else if (item.contentType === 'editorial_article' || item.contentType === 'news') {
+          deleteArticle(item.id);
+        }
+        setShowDeleteConfirm(false);
+        onClose();
+      }}
+    />
+    </>
   );
 };

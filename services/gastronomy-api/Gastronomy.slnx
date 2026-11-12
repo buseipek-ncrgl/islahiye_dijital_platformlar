@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Gastronomy.Api/Gastronomy.Api.csproj" />
+    <Project Path="src/Gastronomy.Application/Gastronomy.Application.csproj" />
+    <Project Path="src/Gastronomy.Domain/Gastronomy.Domain.csproj" />
+    <Project Path="src/Gastronomy.Infrastructure/Gastronomy.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gastronomy.Tests/Gastronomy.Tests.csproj" />
+  </Folder>
+</Solution>
+

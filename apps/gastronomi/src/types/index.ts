@@ -1,7 +1,36 @@
 export type PublicationStatus = 'draft' | 'in_review' | 'published' | 'archived';
 export type VerificationStatus = 'verified' | 'unverified' | 'simulated';
 
-export type DishCategory = 'all' | 'main' | 'pastry' | 'dessert' | 'local_product' | 'cultural_stop';
+export type CategoryScope =
+  | 'dish'
+  | 'place'
+  | 'cultural_story'
+  | 'artisan'
+  | 'article'
+  | 'announcement'
+  | 'event';
+
+export interface CategoryDefinition {
+  id: string;
+  scope: CategoryScope;
+  label: string;
+  shortLabel?: string;
+  description?: string;
+  order: number;
+  isSystem: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type DishCategory =
+  | 'all'
+  | 'main'
+  | 'pastry'
+  | 'dessert'
+  | 'local_product'
+  | 'cultural_stop'
+  | (string & {});
 
 export interface ScalableIngredient {
   id: string;
@@ -26,6 +55,7 @@ export interface RecipeStep {
 export interface Recipe {
   id: string;
   dishId: string;
+  dishCategory?: Exclude<DishCategory, 'all'>;
   title: string;
   subtitle?: string;
   baseServings: number; // default base portion count (e.g. 4)
@@ -89,7 +119,8 @@ export type PlaceCategory =
   | 'cultural_site'
   | 'oven'
   | 'cooperative'
-  | 'other';
+  | 'other'
+  | (string & {});
 
 export type PlaceVerificationStatus =
   | 'verified'
@@ -209,7 +240,7 @@ export interface Artisan {
   businessName?: string;
   profileType?: 'master' | 'producer' | 'cooperative' | 'cook';
   title: string; // Uzmanlık / Unvan
-  craftCategory: 'bakery' | 'agriculture' | 'pastry' | 'craft';
+  craftCategory: 'bakery' | 'agriculture' | 'pastry' | 'craft' | (string & {});
   craftCategoryLabel: string;
   biography: string; // Kısa biyografi
   detailedStory?: string; // Detaylı hikâye
@@ -250,7 +281,7 @@ export interface CulturalHeritageStory {
   slug: string;
   title: string;
   subtitle: string;
-  category: 'tools' | 'cooking_methods' | 'seasons' | 'traditions';
+  category: 'tools' | 'cooking_methods' | 'seasons' | 'traditions' | (string & {});
   categoryLabel: string;
   coverImageUrl: string;
   imageCredit: string;
@@ -321,7 +352,13 @@ export function formatIngredientAmount(
 /**
  * Editorial Publishing & Gazette (Sprint 01F)
  */
-export type ArticleCategory = 'all' | 'gastronomy' | 'heritage' | 'agriculture' | 'culture';
+export type ArticleCategory =
+  | 'all'
+  | 'gastronomy'
+  | 'heritage'
+  | 'agriculture'
+  | 'culture'
+  | (string & {});
 export type ArticleContentType = 'news' | 'editorial_article';
 
 export type ContentOrigin =
@@ -369,7 +406,12 @@ export interface Article {
   relatedArticleSlugs?: string[];
 }
 
-export type AnnouncementCategory = 'gastronomi' | 'egitim' | 'kultur' | 'kurumsal';
+export type AnnouncementCategory =
+  | 'gastronomi'
+  | 'egitim'
+  | 'kultur'
+  | 'kurumsal'
+  | (string & {});
 
 export interface Announcement {
   id: string;
@@ -395,7 +437,7 @@ export interface Announcement {
   updatedAt?: string;
 }
 
-export type EventType = 'workshop' | 'tasting' | 'symposium' | 'festival';
+export type EventType = 'workshop' | 'tasting' | 'symposium' | 'festival' | (string & {});
 export type EventStatus = 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
 export type EventRegistrationStatus = 'open' | 'closed' | 'invite_only';
 

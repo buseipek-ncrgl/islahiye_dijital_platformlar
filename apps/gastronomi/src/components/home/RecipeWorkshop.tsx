@@ -9,15 +9,16 @@ import {
   CheckCircle2,
   Users,
   UtensilsCrossed,
-  Sparkles,
   Flame,
   Leaf,
   Wheat,
   Droplets,
+  Search,
 } from 'lucide-react';
 import { Recipe, formatIngredientAmount } from '../../types';
 import { useContent } from '../../hooks/useContent';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
+import { gastronomyApiClient, ScaledRecipeResponse } from '../../services/api/gastronomyApiClient';
 
 interface RecipeWorkshopProps {
   initialRecipeId?: string;
@@ -28,12 +29,61 @@ type MobileTab = 'ingredients' | 'steps';
 export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
   initialRecipeId = 'recipe-islahiye-tava',
 }) => {
-  const { getRecipes } = useContent();
+  const { getRecipes, getDishes, getCategories } = useContent();
   const allRecipes = getRecipes();
-  // Filter for published or active recipes
+  const allDishes = getDishes();
+  const dishCategories = getCategories('dish', true);
+  // Filter for active published recipes (Visitor Portal strict parity)
   const publishedRecipes = useMemo(() => {
-    return allRecipes.filter((r) => r.publicationStatus !== 'archived');
+    return allRecipes.filter(
+      (r) => (!r.publicationStatus || r.publicationStatus === 'published')
+    );
   }, [allRecipes]);
+
+  const workshopCategories = useMemo(
+    () => [
+      { key: 'all', label: 'Tümü' },
+      ...dishCategories.map((c) => ({
+        key: c.id,
+        label: c.shortLabel || c.label,
+      })),
+    ],
+    [dishCategories]
+  );
+
+  const [recipeSearch, setRecipeSearch] = useState('');
+  const [recipeCategory, setRecipeCategory] = useState<string>('all');
+
+  useEffect(() => {
+    if (recipeCategory !== 'all' && !dishCategories.some((c) => c.id === recipeCategory)) {
+      setRecipeCategory('all');
+    }
+  }, [recipeCategory, dishCategories]);
+
+  const matchesCategory = (r: Recipe, cat: string) => {
+    if (cat === 'all') return true;
+    const dish = allDishes.find((d) => d.id === r.dishId || d.recipeId === r.id);
+    const effectiveCategory = dish?.category || r.dishCategory || 'main';
+    return effectiveCategory === cat;
+  };
+
+  // Filtered recipes for navigation sidebar
+  const filteredRecipes = useMemo(() => {
+    return publishedRecipes.filter((r) => {
+      // 1. Category filter
+      if (!matchesCategory(r, recipeCategory)) return false;
+      // 2. Search query (supports Turkish case-insensitivity)
+      if (recipeSearch.trim()) {
+        const q = recipeSearch.toLocaleLowerCase('tr-TR').trim();
+        const matchTitle = r.title.toLocaleLowerCase('tr-TR').includes(q);
+        const matchSubtitle = (r.subtitle || '').toLocaleLowerCase('tr-TR').includes(q);
+        const matchNotes = (r.notes || '').toLocaleLowerCase('tr-TR').includes(q);
+        const matchIngredient = r.ingredients.some((ing) => ing.name.toLocaleLowerCase('tr-TR').includes(q));
+        if (!matchTitle && !matchSubtitle && !matchNotes && !matchIngredient) return false;
+      }
+      return true;
+    });
+  }, [publishedRecipes, recipeCategory, recipeSearch, allDishes]);
 
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>(initialRecipeId);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
@@ -43,13 +93,19 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('ingredients');
   const [showFullChecklist, setShowFullChecklist] = useState<boolean>(false);
+  const [apiScaledRecipe, setApiScaledRecipe] = useState<ScaledRecipeResponse | null>(null);
 
-  // Sync when initialRecipeId prop updates
+  // Sync ONLY when initialRecipeId prop genuinely changes from the outside parent
+  const lastInitialPropRef = React.useRef<string>(initialRecipeId);
   useEffect(() => {
-    if (initialRecipeId && publishedRecipes.some((r) => r.id === initialRecipeId)) {
+    if (initialRecipeId && initialRecipeId !== lastInitialPropRef.current) {
+      lastInitialPropRef.current = initialRecipeId;
       setSelectedRecipeId(initialRecipeId);
       setCurrentStepIndex(0);
-      setServings(4);
+      const r = publishedRecipes.find((rec) => rec.id === initialRecipeId || rec.dishId === initialRecipeId);
+      if (r?.baseServings) {
+        setServings(r.baseServings);
+      }
       setCheckedIngredients({});
       setCompletedSteps({});
       setIsCompleted(false);
@@ -61,10 +117,11 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
   // Active recipe object
   const currentRecipe: Recipe | undefined = useMemo(() => {
     return (
-      publishedRecipes.find((r) => r.id === selectedRecipeId) ||
+      publishedRecipes.find((r) => r.id === selectedRecipeId || r.dishId === selectedRecipeId) ||
+      filteredRecipes[0] ||
       publishedRecipes[0]
     );
-  }, [publishedRecipes, selectedRecipeId]);
+  }, [publishedRecipes, selectedRecipeId, filteredRecipes]);
 
   // Ensure initial servings matches recipe baseServings if available
   useEffect(() => {
@@ -73,17 +130,56 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
     }
   }, [currentRecipe?.id]);
 
+  // Dynamic backend scaling calculation from ASP.NET Core API
+  useEffect(() => {
+    setApiScaledRecipe(null);
+    if (!currentRecipe) return;
+    let isCurrent = true;
+    gastronomyApiClient.getScaledRecipe(currentRecipe.id, servings).then((scaled) => {
+      if (isCurrent && scaled && scaled.id === currentRecipe.id) {
+        setApiScaledRecipe(scaled);
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentRecipe?.id, servings]);
+
+  // Formatter that prefers backend-calculated amounts with local fallback
+  const getIngredientFormatted = (ing: any) => {
+    if (apiScaledRecipe && apiScaledRecipe.ingredients && apiScaledRecipe.id === currentRecipe?.id) {
+      const found = apiScaledRecipe.ingredients.find(
+        (i) => i.name.toLocaleLowerCase('tr-TR') === ing.name.toLocaleLowerCase('tr-TR') || i.id === ing.id
+      );
+      if (found && found.formattedAmount) {
+        return found.formattedAmount;
+      }
+    }
+    return formatIngredientAmount(ing, servings, currentRecipe?.baseServings || 4);
+  };
+
   // Switch recipe cleanly with complete session reset
   const handleSelectRecipe = (recipeId: string) => {
     setSelectedRecipeId(recipeId);
+    setApiScaledRecipe(null);
     setCurrentStepIndex(0);
-    const r = publishedRecipes.find((rec) => rec.id === recipeId);
+    const r = publishedRecipes.find((rec) => rec.id === recipeId || rec.dishId === recipeId);
     setServings(r?.baseServings || 4);
     setCheckedIngredients({});
     setCompletedSteps({});
     setIsCompleted(false);
     setMobileTab('ingredients');
     setShowFullChecklist(false);
+  };
+
+  const handleCategoryChange = (nextCategory: string) => {
+    setRecipeCategory(nextCategory);
+    if (nextCategory !== 'all' && currentRecipe && !matchesCategory(currentRecipe, nextCategory)) {
+      const nextFirst = publishedRecipes.find((r) => matchesCategory(r, nextCategory));
+      if (nextFirst) {
+        handleSelectRecipe(nextFirst.id);
+      }
+    }
   };
 
   // Toggle ingredient checkbox
@@ -154,12 +250,17 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
     );
   }
 
-  const currentStep = currentRecipe.steps[currentStepIndex] || currentRecipe.steps[0];
   const totalSteps = currentRecipe.steps.length;
+  const safeStepIndex = totalSteps > 0 ? Math.min(currentStepIndex, totalSteps - 1) : 0;
+  const currentStep = totalSteps > 0 ? currentRecipe.steps[safeStepIndex] : undefined;
   const checkedIngredientsCount = Object.values(checkedIngredients).filter(Boolean).length;
+  const navigationRecipes = filteredRecipes.length > 0 ? filteredRecipes : publishedRecipes;
+  const currentNavIndex = navigationRecipes.findIndex((r) => r.id === currentRecipe.id);
+  const safeNavIndex = currentNavIndex >= 0 ? currentNavIndex : 0;
 
   // Authentic cooking step media resolver
   const getStepMedia = () => {
+    if (!currentStep) return null;
     // 1. Direct step image from CMS
     if (currentStep.imageUrl) {
       return {
@@ -170,9 +271,9 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
       };
     }
 
-    const titleLower = currentStep.title.toLowerCase();
-    const instructionLower = currentStep.instruction.toLowerCase();
-    const recipeTitleLower = currentRecipe.title.toLowerCase();
+    const titleLower = (currentStep.title || '').toLocaleLowerCase('tr-TR');
+    const instructionLower = (currentStep.instruction || '').toLocaleLowerCase('tr-TR');
+    const recipeTitleLower = (currentRecipe.title || '').toLocaleLowerCase('tr-TR');
 
     // 2. Sautéing / meat browning in skillet
     if (
@@ -194,7 +295,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
     }
 
     // 3. Final presentation step
-    if (currentStepIndex === totalSteps - 1 && currentRecipe.imageUrl) {
+    if (safeStepIndex === totalSteps - 1 && currentRecipe.imageUrl) {
       return {
         url: currentRecipe.imageUrl,
         alt: `${currentRecipe.title} Sunumu`,
@@ -260,7 +361,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
 
   // Helper icons for step ingredients (Refined Lucide icons, NO emojis)
   const renderIngredientIcon = (name: string) => {
-    const n = name.toLowerCase();
+    const n = name.toLocaleLowerCase('tr-TR');
     if (n.includes('et') || n.includes('kuzu') || n.includes('dana') || n.includes('kuşbaşı') || n.includes('kıyma')) {
       return <UtensilsCrossed className="w-3.5 h-3.5 text-copper-dark" />;
     }
@@ -276,11 +377,11 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
     if (n.includes('sarımsak') || n.includes('domates') || n.includes('soğan') || n.includes('patlıcan') || n.includes('sebze')) {
       return <Leaf className="w-3.5 h-3.5 text-forest" />;
     }
-    return <Sparkles className="w-3.5 h-3.5 text-copper/80" />;
+    return <UtensilsCrossed className="w-3.5 h-3.5 text-copper/80" />;
   };
 
   return (
-    <section id="tarif-atolyesi" className="py-12 md:py-16 scroll-mt-8 bg-ivory border-t border-sand/60 relative">
+    <section id="tarif-atolyesi" className="pt-16 pb-14 md:pt-20 md:pb-20 scroll-mt-28 lg:scroll-mt-32 bg-ivory border-t border-sand/60 relative">
       {/* ============================================================== */}
       {/* ARKA PLAN GRAVÜRLERİ & ŞEMA (Amanos Dağı ve Zeytin Dalı Motifi) */}
       {/* Kutulama olmadan doğrudan sahne arkasında, Hero tarzı şema     */}
@@ -315,8 +416,8 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
           <div>
             <div className="flex items-center gap-2.5 mb-3">
               <span className="w-8 h-px bg-copper" />
-              <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
-                03 / TARİF ATÖLYESİ & PİŞİRME GÜNCESİ
+              <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
+                03 / TARİF ATÖLYESİ &amp; PİŞİRME GÜNCESİ
               </span>
             </div>
 
@@ -351,69 +452,134 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
           {/* A. SOL POPÜLER TARİFLER KARTI (Parchment Bookmark Flap)      */}
           {/* ------------------------------------------------------------ */}
           <aside
-            className="p-5 rounded-xs border border-[#DCCAB2]/70 flex flex-col justify-between min-h-[620px] bg-cover bg-center transition-all"
+            className="p-4 rounded-xs border border-[#DCCAB2]/70 flex flex-col justify-between min-h-[640px] max-h-[760px] bg-cover bg-center transition-all shadow-md relative z-20"
             style={{
               backgroundImage: "url('/images/recipe_sidebar_card_bg.png')",
               filter: 'drop-shadow(0 10px 18px rgba(32, 28, 24, 0.12))',
             }}
           >
-            <div>
+            <div className="flex flex-col min-h-0 flex-1">
               {/* Card Header */}
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-dashed border-[#DCCAB2]/80">
-                <div className="flex items-center gap-2 font-display text-lg font-bold text-[#203B31]">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-dashed border-[#DCCAB2]/80">
+                <div className="flex items-center gap-1.5 font-display text-base font-bold text-[#203B31]">
                   <ChefHat className="w-4 h-4 text-[#BA855E]" />
-                  <span>Popüler Tarifler</span>
+                  <span>Yöresel Tarifler</span>
                 </div>
-                <span className="text-xs font-bold text-[#BA855E]">›</span>
+                <span className="text-[10px] font-sans font-bold px-1.5 py-0.5 rounded-full bg-[#BA855E]/15 text-[#936645]">
+                  {publishedRecipes.length} Tarif
+                </span>
               </div>
 
-              {/* Recipe Vertical Items (Genişletilmiş, 2 satıra izin veren ve kırpılmayan metinler) */}
-              <ul className="space-y-2">
-                {publishedRecipes.map((recipe) => {
-                  const isActive = recipe.id === currentRecipe.id;
-                  return (
-                    <li key={recipe.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectRecipe(recipe.id)}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-xs transition-all text-left cursor-pointer border ${
-                          isActive
-                            ? 'bg-[#FFF9EE] border-[#BA855E] shadow-xs'
-                            : 'bg-[#EDE4D0]/40 border-transparent hover:bg-[#FFF9EE]/70 hover:border-[#BA855E]/40'
-                        }`}
-                      >
-                        <img
-                          src={recipe.imageUrl || '/images/islahiye_tava.jpg'}
-                          alt={recipe.title}
-                          className="w-11 h-11 rounded-xs object-cover shrink-0 border border-[#BA855E]/40"
-                        />
-                        <div className="flex-1 min-w-0 pr-1">
-                          <h4 className="font-display font-bold text-[13px] text-[#203B31] leading-snug line-clamp-2">
-                            {recipe.title}
-                          </h4>
-                        </div>
-                        <span className={`text-xs ${isActive ? 'text-[#BA855E] font-bold translate-x-0.5' : 'text-[#BA855E]/40'} transition-transform`}>
-                          ›
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
+              {/* Arama Alanı */}
+              <div className="relative mb-2">
+                <Search className="w-3.5 h-3.5 text-[#BA855E] absolute left-2 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={recipeSearch}
+                  onChange={(e) => setRecipeSearch(e.target.value)}
+                  placeholder="Tarif veya malzeme ara..."
+                  className="w-full pl-7 pr-5 py-1 text-xs bg-[#FFFDF8]/85 border border-[#DCCAB2] rounded-xs font-sans text-[#203B31] placeholder-[#936645]/60 focus:outline-none focus:border-[#BA855E] transition-colors"
+                />
+                {recipeSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setRecipeSearch('')}
+                    aria-label="Aramayı temizle"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-[#936645] hover:text-[#203B31]"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Kategori Filtre Butonları */}
+              <div className="flex flex-wrap gap-1 mb-2 pb-1.5 border-b border-dashed border-[#DCCAB2]/60 text-[9.5px] font-sans">
+                {workshopCategories.map((cat) => (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat.key)}
+                    className={`px-1.5 py-0.5 rounded-2xs font-semibold transition-all cursor-pointer ${
+                      recipeCategory === cat.key
+                        ? 'bg-[#203B31] text-[#FFF9EE] shadow-2xs'
+                        : 'bg-[#EDE4D0]/60 text-[#555f55] hover:bg-[#FFF9EE]'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Kaydırılabilir Tarif Listesi (Tüm 30 Tarif Eksiksiz Listelenir) */}
+              <ul className="space-y-1.5 overflow-y-auto max-h-[460px] pr-1 scrollbar-thin scrollbar-thumb-[#BA855E]/40 flex-1">
+                {filteredRecipes.length === 0 ? (
+                  <li className="py-6 text-center text-xs text-[#786a59] font-sans">
+                    Aramanıza uygun tarif bulunamadı.
+                  </li>
+                ) : (
+                  filteredRecipes.map((recipe) => {
+                    const isActive = recipe.id === currentRecipe.id;
+                    return (
+                      <li key={recipe.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectRecipe(recipe.id)}
+                          className={`w-full flex items-center gap-2 p-1.5 rounded-xs transition-all text-left cursor-pointer border ${
+                            isActive
+                              ? 'bg-[#FFF9EE] border-[#BA855E] shadow-xs'
+                              : 'bg-[#EDE4D0]/35 border-transparent hover:bg-[#FFF9EE]/70 hover:border-[#BA855E]/40'
+                          }`}
+                        >
+                          <img
+                            src={recipe.imageUrl || '/images/islahiye_tava.jpg'}
+                            alt={recipe.title}
+                            className="w-10 h-10 rounded-xs object-cover shrink-0 border border-[#BA855E]/40"
+                          />
+                          <div className="flex-1 min-w-0 pr-1">
+                            <div className="flex items-center gap-1">
+                              <h4 className="font-display font-bold text-[12px] text-[#203B31] leading-snug line-clamp-1">
+                                {recipe.title}
+                              </h4>
+                              {(recipe.id.includes('custom') || recipe.id.includes('dish-') || recipe.publicationStatus === 'draft') && (
+                                <span className="text-[8px] font-sans font-bold px-1 py-0.2 rounded bg-[#BA855E]/20 text-[#936645] shrink-0">
+                                  Yeni
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-[#936645] font-sans flex items-center gap-1.5 mt-0.5">
+                              <span>{recipe.prepTime}</span>
+                              <span>•</span>
+                              <span>{recipe.difficulty}</span>
+                            </span>
+                          </div>
+                          <span className={`text-xs ${isActive ? 'text-[#BA855E] font-bold translate-x-0.5' : 'text-[#BA855E]/30'} transition-transform`}>
+                            ›
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
               </ul>
             </div>
 
             {/* Bottom Link */}
-            <div className="pt-3 border-t border-dashed border-[#DCCAB2]/70">
+            <div className="pt-2 mt-2 border-t border-dashed border-[#DCCAB2]/70 flex items-center justify-between">
+              <span className="text-[10px] text-[#786a59] font-sans">
+                {navigationRecipes.length > 0 ? safeNavIndex + 1 : 0} / {navigationRecipes.length}
+              </span>
               <button
                 type="button"
                 onClick={() => {
-                  const nextIndex = (publishedRecipes.findIndex((r) => r.id === currentRecipe.id) + 1) % publishedRecipes.length;
-                  handleSelectRecipe(publishedRecipes[nextIndex].id);
+                  if (navigationRecipes.length === 0) return;
+                  const nextIndex =
+                    currentNavIndex >= 0 ? (currentNavIndex + 1) % navigationRecipes.length : 0;
+                  handleSelectRecipe(navigationRecipes[nextIndex].id);
                 }}
-                className="inline-flex items-center gap-1.5 font-display text-sm font-bold text-[#936645] hover:text-[#203B31] underline cursor-pointer transition-colors"
+                className="inline-flex items-center gap-1.5 font-display text-xs font-bold text-[#936645] hover:text-[#203B31] underline cursor-pointer transition-colors"
               >
                 <span>Sıradaki Tarif</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-3 h-3" />
               </button>
             </div>
           </aside>
@@ -423,7 +589,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
           {/* Kesilmemiş doğal gölgeler ve orantılı iç sayfa tasarımı       */}
           {/* ------------------------------------------------------------ */}
           <section
-            className="grid grid-cols-2 min-h-[620px] bg-cover bg-center select-text relative z-10"
+            className="grid grid-cols-2 min-h-[640px] bg-cover bg-center select-text relative z-10"
             style={{
               backgroundImage: "url('/images/recipe_book_isolated_shell.png')",
               filter: 'drop-shadow(0 20px 30px rgba(32, 28, 24, 0.18)) drop-shadow(0 4px 10px rgba(32, 28, 24, 0.1))',
@@ -461,7 +627,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                   <div className="flex items-center gap-1.5">
                     <UtensilsCrossed className="w-3.5 h-3.5 text-[#BA855E] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-mono text-[8.5px] uppercase tracking-wider text-[#936645] font-semibold">
+                      <span className="font-sans text-[8.5px] uppercase tracking-wider text-[#936645] font-semibold">
                         Hazırlık
                       </span>
                       <span className="font-bold text-[#203B31] text-[11.5px]">
@@ -473,7 +639,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                   <div className="flex items-center gap-1.5 border-l border-[#BA855E]/25 pl-2.5">
                     <Clock className="w-3.5 h-3.5 text-[#BA855E] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-mono text-[8.5px] uppercase tracking-wider text-[#936645] font-semibold">
+                      <span className="font-sans text-[8.5px] uppercase tracking-wider text-[#936645] font-semibold">
                         Pişirme
                       </span>
                       <span className="font-bold text-[#203B31] text-[11.5px]">
@@ -485,7 +651,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                   <div className="flex items-center gap-1.5 border-l border-[#BA855E]/25 pl-2.5">
                     <Users className="w-3.5 h-3.5 text-[#BA855E] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-mono text-[8.5px] uppercase tracking-wider text-[#936645] font-semibold">
+                      <span className="font-sans text-[8.5px] uppercase tracking-wider text-[#936645] font-semibold">
                         Porsiyon
                       </span>
                       <span className="font-bold text-[#203B31] text-[11.5px]">
@@ -499,10 +665,10 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
               {/* Portion Selector at Bottom (Zarif Dairesel Mühür Butonları, Beyaz Plastik Kutu Yok) */}
               <div className="pt-2.5 border-t border-[#BA855E]/30 relative z-20">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-[#936645] font-bold">
+                  <span className="font-sans text-[10px] uppercase tracking-wider text-[#936645] font-bold">
                     Porsiyon Seçimi
                   </span>
-                  <span className="font-mono text-[9px] text-[#786a59]">
+                  <span className="font-sans text-[9px] text-[#786a59]">
                     (Kişi başı gramajlar güncellenir)
                   </span>
                 </div>
@@ -515,7 +681,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                         key={p}
                         type="button"
                         onClick={() => setServings(p)}
-                        className={`w-8 h-8 rounded-full font-mono font-bold text-xs transition-all cursor-pointer border flex items-center justify-center ${
+                        className={`w-8 h-8 rounded-full font-sans font-bold text-xs transition-all cursor-pointer border flex items-center justify-center ${
                           isSelected
                             ? 'bg-[#203B31] text-[#F6F2E9] border-[#203B31] shadow-xs ring-2 ring-[#BA855E]/40 scale-105'
                             : 'bg-[#EDE4D0]/40 text-[#203B31] border-[#BA855E]/35 hover:bg-[#EDE4D0]/80 hover:border-[#BA855E]'
@@ -533,111 +699,117 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
             {/* ======================================================== */}
             {/* SAĞ SAYFA: PİŞİRME ADIMI, RESİM, NOT & MALZEMELER       */}
             {/* ======================================================== */}
-            <article className="p-7 pl-7 pr-12 flex flex-col justify-between relative z-10">
+            <article className="pt-7 pl-7 pr-16 xl:pr-20 pb-14 xl:pb-16 flex flex-col justify-between relative z-10">
               {!isCompleted ? (
                 <>
-                  <div>
-                    {/* Stepper Header (Adım X / Y + Noktalar + Butonlar) */}
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#DCCAB2]/50">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-[#936645] font-bold">
-                          Adım {currentStepIndex + 1} / {totalSteps}
-                        </span>
+                  {currentStep ? (
+                    <div>
+                      {/* Stepper Header (Adım X / Y + Noktalar + Butonlar) */}
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#DCCAB2]/50">
+                        <div className="flex items-center gap-3">
+                          <span className="font-sans text-[10px] uppercase tracking-wider text-[#936645] font-bold">
+                            Adım {safeStepIndex + 1} / {totalSteps}
+                          </span>
 
-                        {/* Connected Stepper Dots */}
-                        <div className="flex items-center gap-1">
-                          {currentRecipe.steps.map((_, idx) => {
-                            const isCurrent = idx === currentStepIndex;
-                            const isDone = !!completedSteps[idx];
-                            return (
-                              <React.Fragment key={idx}>
-                                <div
-                                  className={`rounded-full transition-all ${
-                                    isCurrent
-                                      ? 'w-2.5 h-2.5 bg-[#203B31] ring-2 ring-[#203B31]/20'
-                                      : isDone
-                                      ? 'w-2 h-2 bg-[#BA855E]'
-                                      : 'w-1.5 h-1.5 bg-[#DCCAB2]'
-                                  }`}
-                                />
-                                {idx < totalSteps - 1 && (
-                                  <div className="w-2 h-px bg-[#DCCAB2]" />
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Dairesel Navigasyon Butonları (Parşömenle Bütünleşik) */}
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={handlePrevStep}
-                          disabled={currentStepIndex === 0}
-                          title="Önceki Adım"
-                          className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs transition-all cursor-pointer ${
-                            currentStepIndex === 0
-                              ? 'border-[#BA855E]/20 text-[#242724]/30 cursor-not-allowed'
-                              : 'border-[#BA855E]/50 bg-[#EDE4D0]/50 text-[#203B31] hover:bg-[#203B31] hover:text-[#F6F2E9]'
-                          }`}
-                        >
-                          <ArrowLeft className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleCompleteCurrentStepAndNext}
-                          title="Sonraki Adım"
-                          className="w-7 h-7 rounded-full border border-[#BA855E]/60 bg-[#EDE4D0]/60 text-[#203B31] hover:bg-[#203B31] hover:text-[#F6F2E9] flex items-center justify-center text-xs transition-all cursor-pointer shadow-2xs"
-                        >
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Step Title & Instruction */}
-                    <h4 className="font-display font-bold text-xl xl:text-[22px] text-[#203B31] leading-tight mb-1">
-                      {currentStep.title}
-                    </h4>
-
-                    <p className="font-sans text-xs xl:text-[13px] text-[#242724]/85 leading-relaxed mb-2.5 line-clamp-3">
-                      {currentStep.instruction}
-                    </p>
-
-                    {/* Step Photo */}
-                    {stepMedia && (
-                      <div className="w-full h-[145px] rounded-xs overflow-hidden border border-[#BA855E]/40 shadow-xs mb-2.5 bg-sand/20">
-                        <ImageWithFallback
-                          src={stepMedia.url}
-                          alt={stepMedia.alt}
-                          fallbackText={stepMedia.alt}
-                          containerClassName="w-full h-full"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-
-                    {/* Chef Tip Box (Ustanın Notu - Parşömen Üstü Doğal İntikal) */}
-                    {currentStep.tip && (
-                      <div className="flex items-start gap-2.5 py-2 px-3 bg-[#BA855E]/8 border-l-2 border-[#BA855E] rounded-2xs mb-2.5 text-xs leading-relaxed">
-                        <ChefHat className="w-3.5 h-3.5 text-[#BA855E] shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-mono text-[9px] uppercase tracking-wider text-[#936645] font-bold">
-                            Ustanın Notu
+                          {/* Connected Stepper Dots */}
+                          <div className="flex items-center gap-1">
+                            {currentRecipe.steps.map((_, idx) => {
+                              const isCurrent = idx === safeStepIndex;
+                              const isDone = !!completedSteps[idx];
+                              return (
+                                <React.Fragment key={idx}>
+                                  <div
+                                    className={`rounded-full transition-all ${
+                                      isCurrent
+                                        ? 'w-2.5 h-2.5 bg-[#203B31] ring-2 ring-[#203B31]/20'
+                                        : isDone
+                                        ? 'w-2 h-2 bg-[#BA855E]'
+                                        : 'w-1.5 h-1.5 bg-[#DCCAB2]'
+                                    }`}
+                                  />
+                                  {idx < totalSteps - 1 && (
+                                    <div className="w-2 h-px bg-[#DCCAB2]" />
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
                           </div>
-                          <p className="font-serif italic text-xs text-[#242724]/90 leading-snug">
-                            “{currentStep.tip}”
-                          </p>
+                        </div>
+
+                        {/* Dairesel Navigasyon Butonları (Parşömenle Bütünleşik) */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handlePrevStep}
+                            disabled={safeStepIndex === 0}
+                            title="Önceki Adım"
+                            className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs transition-all cursor-pointer ${
+                              safeStepIndex === 0
+                                ? 'border-[#BA855E]/20 text-[#242724]/30 cursor-not-allowed'
+                                : 'border-[#BA855E]/50 bg-[#EDE4D0]/50 text-[#203B31] hover:bg-[#203B31] hover:text-[#F6F2E9]'
+                            }`}
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleCompleteCurrentStepAndNext}
+                            title="Sonraki Adım"
+                            className="w-7 h-7 rounded-full border border-[#BA855E]/60 bg-[#EDE4D0]/60 text-[#203B31] hover:bg-[#203B31] hover:text-[#F6F2E9] flex items-center justify-center text-xs transition-all cursor-pointer shadow-2xs"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Step Title & Instruction */}
+                      <h4 className="font-display font-bold text-xl xl:text-[22px] text-[#203B31] leading-tight mb-1">
+                        {currentStep.title}
+                      </h4>
+
+                      <p className="font-sans text-xs xl:text-[13px] text-[#242724]/85 leading-relaxed mb-2.5 line-clamp-3">
+                        {currentStep.instruction}
+                      </p>
+
+                      {/* Step Photo */}
+                      {stepMedia && (
+                        <div className="w-full h-[145px] rounded-xs overflow-hidden border border-[#BA855E]/40 shadow-xs mb-2.5 bg-sand/20">
+                          <ImageWithFallback
+                            src={stepMedia.url}
+                            alt={stepMedia.alt}
+                            fallbackText={stepMedia.alt}
+                            containerClassName="w-full h-full"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+
+                      {/* Chef Tip Box (Ustanın Notu - Parşömen Üstü Doğal İntikal) */}
+                      {currentStep.tip && (
+                        <div className="flex items-start gap-2.5 py-2 px-3 bg-[#BA855E]/8 border-l-2 border-[#BA855E] rounded-2xs mb-2.5 text-xs leading-relaxed">
+                          <ChefHat className="w-3.5 h-3.5 text-[#BA855E] shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-sans text-[9px] uppercase tracking-wider text-[#936645] font-bold">
+                              Ustanın Notu
+                            </div>
+                            <p className="font-serif italic text-xs text-[#242724]/90 leading-snug">
+                              “{currentStep.tip}”
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-xs text-[#786a59] font-sans">
+                      Bu tarif için tanımlanmış pişirme adımı bulunmamaktadır.
+                    </div>
+                  )}
 
                   {/* Bu Adımda Kullanılan Malzemeler (Temiz İkonlu Kartlar, Emojisiz) */}
-                  <div className="pt-2 border-t border-[#DCCAB2]/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-[#936645] font-bold">
+                  <div className="pt-2 border-t border-[#DCCAB2]/50 pr-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <span className="font-sans text-[9px] uppercase tracking-wider text-[#936645] font-bold">
                         Bu Adımda Kullanılan Malzemeler
                       </span>
                       <div className="flex items-center gap-2">
@@ -645,7 +817,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                           <button
                             type="button"
                             onClick={toggleAllIngredients}
-                            className="font-mono text-[9px] uppercase text-[#BA855E] hover:text-[#203B31] font-semibold cursor-pointer"
+                            className="font-sans text-[9px] uppercase text-[#BA855E] hover:text-[#203B31] font-semibold cursor-pointer"
                           >
                             {checkedIngredientsCount === currentRecipe.ingredients.length
                               ? 'Temizle'
@@ -655,7 +827,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                         <button
                           type="button"
                           onClick={() => setShowFullChecklist(!showFullChecklist)}
-                          className="font-mono text-[9px] uppercase text-[#936645] hover:text-[#203B31] underline font-semibold cursor-pointer"
+                          className="font-sans text-[9px] uppercase text-[#936645] hover:text-[#203B31] underline font-semibold cursor-pointer"
                         >
                           {showFullChecklist
                             ? 'Kartlara Dön'
@@ -668,11 +840,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                       /* Mini 5-Card Grid with Lucide Icons (Parşömene İşlenmiş Doğal Kartlar) */
                       <div className="grid grid-cols-5 gap-1.5">
                         {currentRecipe.ingredients.slice(0, 5).map((ing) => {
-                          const formattedAmount = formatIngredientAmount(
-                            ing,
-                            servings,
-                            currentRecipe.baseServings
-                          );
+                          const formattedAmount = getIngredientFormatted(ing);
                           const isChecked = !!checkedIngredients[ing.id];
                           return (
                             <button
@@ -694,7 +862,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                               >
                                 {ing.name}
                               </span>
-                              <span className="font-mono text-[8.5px] font-bold text-[#936645] bg-[#BA855E]/10 px-1 rounded-2xs">
+                              <span className="font-sans text-[8.5px] font-bold text-[#936645] bg-[#BA855E]/10 px-1 rounded-2xs">
                                 {formattedAmount}
                               </span>
                             </button>
@@ -706,11 +874,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                       <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1">
                         {currentRecipe.ingredients.map((ing) => {
                           const isChecked = !!checkedIngredients[ing.id];
-                          const formattedAmount = formatIngredientAmount(
-                            ing,
-                            servings,
-                            currentRecipe.baseServings
-                          );
+                          const formattedAmount = getIngredientFormatted(ing);
                           return (
                             <button
                               key={ing.id}
@@ -728,7 +892,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                                 </span>
                                 <span>{ing.name}</span>
                               </div>
-                              <span className="font-mono text-[10px] font-bold text-[#936645]">
+                              <span className="font-sans text-[10px] font-bold text-[#936645]">
                                 {formattedAmount}
                               </span>
                             </button>
@@ -753,7 +917,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
 
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-[#936645] font-bold">
+                    <span className="font-sans text-[10px] uppercase tracking-widest text-[#936645] font-bold">
                       PİŞİRME TAMAMLANDI
                     </span>
 
@@ -779,8 +943,10 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const nextIndex = (publishedRecipes.findIndex((r) => r.id === currentRecipe.id) + 1) % publishedRecipes.length;
-                        handleSelectRecipe(publishedRecipes[nextIndex].id);
+                        if (navigationRecipes.length === 0) return;
+                        const nextIndex =
+                          currentNavIndex >= 0 ? (currentNavIndex + 1) % navigationRecipes.length : 0;
+                        handleSelectRecipe(navigationRecipes[nextIndex].id);
                       }}
                       className="px-5 py-2 rounded-xs bg-[#203B31] text-[#F6F2E9] text-xs font-bold uppercase tracking-wider hover:bg-[#162721] transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                     >
@@ -800,9 +966,49 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
         {/* ============================================================== */}
         <div className="block lg:hidden bg-[#FBF8F1] rounded-sm border border-sand/70 shadow-sm overflow-hidden">
           
+          {/* Mobile Search & Category Filter */}
+          <div className="p-3 bg-[#FFFCF7] border-b border-sand/60 space-y-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[#BA855E] absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={recipeSearch}
+                onChange={(e) => setRecipeSearch(e.target.value)}
+                placeholder="Tarif veya malzeme ara..."
+                className="w-full pl-8 pr-6 py-1.5 text-xs bg-[#F6F2E9] border border-[#DCCAB2] rounded-xs font-sans text-[#203B31] placeholder-[#936645]/60 focus:outline-none focus:border-[#BA855E]"
+              />
+              {recipeSearch && (
+                <button
+                  type="button"
+                  onClick={() => setRecipeSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#936645] hover:text-[#203B31]"
+                  aria-label="Aramayı temizle"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[10px] font-sans">
+              {workshopCategories.map((cat) => (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => handleCategoryChange(cat.key)}
+                  className={`px-2 py-1 rounded-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    recipeCategory === cat.key
+                      ? 'bg-[#203B31] text-[#FFF9EE]'
+                      : 'bg-[#EDE4D0]/70 text-[#555f55]'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Mobile Recipe Horizontal Pill Selector */}
           <div className="p-3 bg-[#F6F2E9] border-b border-sand/60 overflow-x-auto scrollbar-none flex items-center gap-2">
-            {publishedRecipes.map((r) => (
+            {(filteredRecipes.length > 0 ? filteredRecipes : publishedRecipes).map((r) => (
               <button
                 key={r.id}
                 type="button"
@@ -826,7 +1032,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#162721] via-[#162721]/50 to-transparent flex flex-col justify-end p-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-[#DCCAB2]">
+              <span className="font-sans text-[9px] uppercase tracking-widest text-[#DCCAB2]">
                 EDİTORYAL REÇETE
               </span>
               <h3 className="font-display font-bold text-2xl text-white leading-tight">
@@ -836,7 +1042,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
           </div>
 
           {/* Segmented Tab Controls */}
-          <div className="grid grid-cols-2 p-1 bg-sand/30 border-b border-sand/60 text-xs font-mono">
+          <div className="grid grid-cols-2 p-1 bg-sand/30 border-b border-sand/60 text-xs font-sans">
             <button
               type="button"
               onClick={() => setMobileTab('ingredients')}
@@ -858,7 +1064,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                   : 'text-[#242724]/70'
               }`}
             >
-              Adımlar ({currentStepIndex + 1}/{totalSteps})
+              Adımlar ({totalSteps > 0 ? safeStepIndex + 1 : 0}/{totalSteps})
             </button>
           </div>
 
@@ -869,21 +1075,21 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                 {/* Metadata Row */}
                 <div className="grid grid-cols-3 gap-2 p-2 bg-[#F6F2E9] border border-sand/70 rounded-xs text-xs text-center">
                   <div className="flex flex-col items-center">
-                    <span className="font-mono text-[8px] uppercase text-[#242724]/50 mb-0.5">Hazırlık</span>
+                    <span className="font-sans text-[8px] uppercase text-[#242724]/50 mb-0.5">Hazırlık</span>
                     <span className="font-bold text-[#203B31] text-xs flex items-center gap-1">
                       <Clock className="w-3 h-3 text-[#BA855E]" />
                       {currentRecipe.prepTime}
                     </span>
                   </div>
                   <div className="border-l border-sand/70 flex flex-col items-center">
-                    <span className="font-mono text-[8px] uppercase text-[#242724]/50 mb-0.5">Pişirme</span>
+                    <span className="font-sans text-[8px] uppercase text-[#242724]/50 mb-0.5">Pişirme</span>
                     <span className="font-bold text-[#203B31] text-xs flex items-center gap-1">
                       <Flame className="w-3 h-3 text-[#BA855E]" />
                       {currentRecipe.cookTime}
                     </span>
                   </div>
                   <div className="border-l border-sand/70 flex flex-col items-center">
-                    <span className="font-mono text-[8px] uppercase text-[#242724]/50 mb-0.5">Zorluk</span>
+                    <span className="font-sans text-[8px] uppercase text-[#242724]/50 mb-0.5">Zorluk</span>
                     <span className="font-bold text-[#203B31] text-xs flex items-center gap-1">
                       <ChefHat className="w-3 h-3 text-[#BA855E]" />
                       {currentRecipe.difficulty}
@@ -893,7 +1099,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
 
                 {/* Portion Scaler */}
                 <div className="flex items-center justify-between py-2 border-b border-sand/50">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-[#936645] font-bold">
+                  <span className="font-sans text-[10px] uppercase tracking-wider text-[#936645] font-bold">
                     Porsiyon (Kişi):
                   </span>
                   <div className="flex gap-1.5">
@@ -902,7 +1108,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                         key={p}
                         type="button"
                         onClick={() => setServings(p)}
-                        className={`w-7 h-7 font-mono text-xs font-bold rounded-xs cursor-pointer ${
+                        className={`w-7 h-7 font-sans text-xs font-bold rounded-xs cursor-pointer ${
                           servings === p
                             ? 'bg-[#203B31] text-white'
                             : 'bg-white border border-sand/70 text-[#242724]'
@@ -916,13 +1122,13 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
 
                 {/* Checklist */}
                 <div className="flex items-center justify-between text-xs py-1">
-                  <span className="font-mono text-[9px] uppercase text-[#936645] font-semibold">
+                  <span className="font-sans text-[9px] uppercase text-[#936645] font-semibold">
                     Malzeme Kontrolü ({checkedIngredientsCount}/{currentRecipe.ingredients.length})
                   </span>
                   <button
                     type="button"
                     onClick={toggleAllIngredients}
-                    className="font-mono text-[9px] uppercase text-[#BA855E] hover:text-[#203B31] underline cursor-pointer"
+                    className="font-sans text-[9px] uppercase text-[#BA855E] hover:text-[#203B31] underline cursor-pointer"
                   >
                     {checkedIngredientsCount === currentRecipe.ingredients.length
                       ? 'Temizle'
@@ -932,30 +1138,28 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                 <ul className="space-y-1.5">
                   {currentRecipe.ingredients.map((ing) => {
                     const isChecked = !!checkedIngredients[ing.id];
-                    const formattedAmount = formatIngredientAmount(
-                      ing,
-                      servings,
-                      currentRecipe.baseServings
-                    );
+                    const formattedAmount = getIngredientFormatted(ing);
                     return (
-                      <li
-                        key={ing.id}
-                        onClick={() => toggleIngredient(ing.id)}
-                        className={`flex items-center justify-between p-2 rounded-xs border text-xs cursor-pointer transition-all ${
-                          isChecked
-                            ? 'bg-[#203B31]/5 border-[#203B31]/20 line-through text-[#242724]/40'
-                            : 'bg-white border-sand/60 text-[#242724]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`w-3.5 h-3.5 rounded-xs border flex items-center justify-center text-[9px] ${isChecked ? 'bg-[#203B31] text-white border-[#203B31]' : 'border-[#BA855E]'}`}>
-                            {isChecked && '✓'}
+                      <li key={ing.id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleIngredient(ing.id)}
+                          className={`w-full text-left flex items-center justify-between p-2 rounded-xs border text-xs cursor-pointer transition-all ${
+                            isChecked
+                              ? 'bg-[#203B31]/5 border-[#203B31]/20 line-through text-[#242724]/40'
+                              : 'bg-white border-sand/60 text-[#242724]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-3.5 h-3.5 rounded-xs border flex items-center justify-center text-[9px] ${isChecked ? 'bg-[#203B31] text-white border-[#203B31]' : 'border-[#BA855E]'}`}>
+                              {isChecked && '✓'}
+                            </span>
+                            <span className="font-medium">{ing.name}</span>
+                          </div>
+                          <span className="font-sans font-bold text-[#936645]">
+                            {formattedAmount}
                           </span>
-                          <span className="font-medium">{ing.name}</span>
-                        </div>
-                        <span className="font-mono font-bold text-[#936645]">
-                          {formattedAmount}
-                        </span>
+                        </button>
                       </li>
                     );
                   })}
@@ -971,7 +1175,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                 <button
                   type="button"
                   onClick={() => setMobileTab('steps')}
-                  className="w-full py-3 bg-[#203B31] text-[#F6F2E9] font-mono text-xs font-bold uppercase tracking-wider rounded-xs flex items-center justify-center gap-2 hover:bg-[#162721] cursor-pointer shadow-xs mt-2"
+                  className="w-full py-3 bg-[#203B31] text-[#F6F2E9] font-sans text-xs font-bold uppercase tracking-wider rounded-xs flex items-center justify-center gap-2 hover:bg-[#162721] cursor-pointer shadow-xs mt-2"
                 >
                   <span>Pişirme Adımlarına Başla</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -981,13 +1185,14 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
               <>
                 {/* Steps View */}
                 {!isCompleted ? (
+                  currentStep ? (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-[#936645] font-bold">
-                        Aşama {currentStepIndex + 1} / {totalSteps}
+                      <span className="font-sans text-[10px] uppercase tracking-wider text-[#936645] font-bold">
+                        Aşama {safeStepIndex + 1} / {totalSteps}
                       </span>
-                      <span className="font-mono text-[10px] text-[#242724]/50">
-                        {currentStepIndex + 1} of {totalSteps}
+                      <span className="font-sans text-[10px] text-[#242724]/50">
+                        %{Math.round(((safeStepIndex + 1) / Math.max(totalSteps, 1)) * 100)}
                       </span>
                     </div>
 
@@ -1011,7 +1216,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
 
                     {currentStep.tip && (
                       <div className="p-2 bg-[#F6F2E9] border-l-2 border-[#BA855E] rounded-xs text-xs">
-                        <span className="font-mono text-[9px] uppercase font-bold text-[#936645] block">
+                        <span className="font-sans text-[9px] uppercase font-bold text-[#936645] block">
                           Ustanın Notu
                         </span>
                         <p className="font-serif italic text-xs text-[#242724]/90 mt-0.5">
@@ -1024,9 +1229,9 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                       <button
                         type="button"
                         onClick={handlePrevStep}
-                        disabled={currentStepIndex === 0}
-                        className={`flex-1 py-2.5 rounded-xs border text-xs font-mono font-bold uppercase tracking-wider ${
-                          currentStepIndex === 0
+                        disabled={safeStepIndex === 0}
+                        className={`flex-1 py-2.5 rounded-xs border text-xs font-sans font-bold uppercase tracking-wider ${
+                          safeStepIndex === 0
                             ? 'opacity-40 border-sand text-[#242724]/40 cursor-not-allowed'
                             : 'border-sand bg-white text-[#203B31] cursor-pointer'
                         }`}
@@ -1037,10 +1242,10 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                       <button
                         type="button"
                         onClick={handleCompleteCurrentStepAndNext}
-                        className="flex-2 py-2.5 bg-[#203B31] text-[#F6F2E9] font-mono text-xs font-bold uppercase tracking-wider rounded-xs flex items-center justify-center gap-1.5 hover:bg-[#162721] cursor-pointer shadow-xs"
+                        className="flex-2 py-2.5 bg-[#203B31] text-[#F6F2E9] font-sans text-xs font-bold uppercase tracking-wider rounded-xs flex items-center justify-center gap-1.5 hover:bg-[#162721] cursor-pointer shadow-xs"
                       >
                         <span>
-                          {currentStepIndex === totalSteps - 1
+                          {safeStepIndex === totalSteps - 1
                             ? 'Tamamla'
                             : 'Tamamla & İlerle'}
                         </span>
@@ -1048,6 +1253,11 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                       </button>
                     </div>
                   </>
+                  ) : (
+                    <div className="py-6 text-center text-xs text-[#786a59]">
+                      Bu tarif için tanımlanmış pişirme adımı bulunmamaktadır.
+                    </div>
+                  )
                 ) : (
                   <div className="py-6 text-center">
                     <CheckCircle2 className="w-10 h-10 text-[#BA855E] mx-auto mb-2" />
@@ -1060,7 +1270,7 @@ export const RecipeWorkshop: React.FC<RecipeWorkshopProps> = ({
                     <button
                       type="button"
                       onClick={handleResetSession}
-                      className="px-4 py-2 bg-[#203B31] text-white font-mono text-xs font-bold uppercase rounded-xs cursor-pointer"
+                      className="px-4 py-2 bg-[#203B31] text-white font-sans text-xs font-bold uppercase rounded-xs cursor-pointer"
                     >
                       Tarifi Başa Al
                     </button>

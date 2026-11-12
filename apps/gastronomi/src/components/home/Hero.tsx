@@ -79,7 +79,7 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
   return (
     <section 
       id="kesfet" 
-      className="relative w-full bg-[#F6F2E9] overflow-hidden border-b border-[#DCCBB3]/60 select-none"
+      className="relative w-full scroll-mt-24 bg-[#F6F2E9] overflow-hidden border-b border-[#DCCBB3]/60 select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -131,17 +131,18 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
           })}
         </div>
 
-        {/* 3. SOL EDİTORYAL YAZI ALANI (%38 - %42) */}
+        {/* 3. SOL EDİTORYAL YAZI ALANI (%38 - %48) */}
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="relative z-20 w-[46%] xl:w-[42%] 2xl:w-[39%] h-full flex flex-col justify-center pl-32 xl:pl-40 2xl:pl-44 pr-4 py-3"
+          className="relative z-20 w-[54%] xl:w-[46%] 2xl:w-[40%] h-full flex flex-col justify-center pl-14 lg:pl-20 xl:pl-36 2xl:pl-44 pr-4 py-3"
         >
           {/* Eyebrow / Provenance Stamp */}
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] xl:text-[11px] font-mono font-bold uppercase tracking-[0.22em] text-[#936645]">
-              İSLAHİYE • TOPRAĞIN HAFIZASI
+            <span className="w-6 h-px bg-[#BA855E]" />
+            <span className="text-[10px] xl:text-[11px] font-sans font-bold uppercase tracking-[0.22em] text-[#936645]">
+              01 / İSLAHİYE • TOPRAĞIN HAFIZASI
             </span>
           </div>
 
@@ -158,11 +159,11 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
           </p>
 
           {/* Side-by-Side CTAs */}
-          <div className="flex flex-row items-center gap-3 mb-4 whitespace-nowrap">
+          <div className="flex flex-wrap items-center gap-2.5 xl:gap-3 mb-4">
             <button
               type="button"
               onClick={onExploreDishes}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xs bg-[#203B31] text-[#F6F2E9] text-xs font-semibold tracking-widest uppercase hover:bg-[#162721] active:scale-[0.99] transition-all shadow-xs cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#BA855E]"
+              className="inline-flex items-center justify-center gap-2 px-5 xl:px-6 py-2.5 xl:py-3 rounded-xl bg-[#203B31] text-[#F6F2E9] text-xs font-sans font-bold tracking-widest uppercase whitespace-nowrap hover:bg-[#162721] active:scale-[0.99] transition-all shadow-xs cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#BA855E]"
             >
               <span>LEZZETLERİ KEŞFET</span>
               <span className="text-sm">→</span>
@@ -171,7 +172,7 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
             <button
               type="button"
               onClick={onExploreMap}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xs border border-[#BA855E]/70 bg-[#FAF6EE]/90 text-[#203B31] text-xs font-semibold tracking-widest uppercase hover:bg-[#F2ECE0] hover:border-[#BA855E] active:scale-[0.99] transition-all shadow-xs cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#BA855E]"
+              className="inline-flex items-center justify-center gap-2 px-4 xl:px-5 py-2.5 xl:py-3 rounded-xl border border-[#BA855E]/70 bg-[#FAF6EE]/90 text-[#203B31] text-xs font-sans font-bold tracking-widest uppercase whitespace-nowrap hover:bg-[#F2ECE0] hover:border-[#BA855E] active:scale-[0.99] transition-all shadow-xs cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#BA855E]"
             >
               <span>GASTRONOMİ HARİTASI</span>
               <span className="text-[#BA855E] font-serif text-sm">⊕</span>
@@ -180,10 +181,10 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
         </motion.div>
 
         {/* 4. SAĞ ALT SİNEMATİK EDİTORYAL KONTROL KAPSÜLÜ */}
-        <div className="absolute bottom-5 right-6 z-20 flex items-center gap-3 bg-[#1B382B]/90 backdrop-blur-md px-3.5 py-2 rounded-xs border border-[#BA855E]/50 text-[#F6F2E9] shadow-lg">
+        <div className="absolute bottom-5 right-6 z-20 flex items-center gap-3 bg-[#1B382B]/90 backdrop-blur-md px-4 py-2.5 rounded-xl border border-[#BA855E]/50 text-[#F6F2E9] shadow-lg">
           {/* Aktif Slayt Başlığı */}
           <div className="text-right pr-3 border-r border-[#BA855E]/30 hidden sm:block">
-            <span className="block text-[9.5px] font-mono tracking-widest text-[#BA855E] uppercase font-bold">
+            <span className="block text-[9.5px] font-sans tracking-[0.18em] text-[#BA855E] uppercase font-bold">
               {HERO_SLIDES[activeSlide].badge}
             </span>
             <span className="font-display text-xs text-white tracking-wide">
@@ -247,8 +248,9 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
         <div className="relative z-10">
           {/* Eyebrow */}
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#936645]">
-              İSLAHİYE • TOPRAĞIN HAFIZASI
+            <span className="w-5 h-px bg-[#BA855E]" />
+            <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-[#936645]">
+              01 / İSLAHİYE • TOPRAĞIN HAFIZASI
             </span>
           </div>
 
@@ -265,7 +267,7 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
 
           {/* Central Animated Food Photo Slider */}
           <div 
-            className="relative w-full aspect-[16/10] sm:aspect-[16/9] mb-4 overflow-hidden rounded-xs border border-[#BA855E]/30 shadow-md"
+            className="relative w-full aspect-[16/10] sm:aspect-[16/9] mb-4 overflow-hidden rounded-xl border border-[#BA855E]/30 shadow-md"
           >
             {HERO_SLIDES.map((slide, index) => {
               const isActive = activeSlide === index;
@@ -284,7 +286,7 @@ export const Hero: React.FC<HeroProps> = ({ onExploreDishes, onExploreMap }) => 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
                   <div className="absolute bottom-2.5 left-3 right-3 text-white">
-                    <span className="text-[9px] font-mono text-[#BA855E] uppercase tracking-wider block font-bold">
+                    <span className="text-[9px] font-sans text-[#BA855E] uppercase tracking-wider block font-bold">
                       {slide.badge}
                     </span>
                     <span className="font-display text-sm font-medium">

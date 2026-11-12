@@ -1,24 +1,45 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Dish } from '../types';
 import { Header } from '../components/layout/Header';
 import { Hero } from '../components/home/Hero';
 import { DiscoveryRibbon } from '../components/home/DiscoveryRibbon';
 import { HomeMapTeaser } from '../components/home/HomeMapTeaser';
 import { FeaturedDishes } from '../components/home/FeaturedDishes';
+import { EditorialAgendaShowcase } from '../components/home/EditorialAgendaShowcase';
 import { DiscoverDistrictSection } from '../components/home/DiscoverDistrictSection';
 import { InstagramFeedSection } from '../components/home/InstagramFeedSection';
 import { Footer } from '../components/layout/Footer';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleScrollTo = (sectionId: string) => {
+  const handleScrollTo = useCallback((sectionId: string) => {
     const el = document.querySelector(sectionId);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+      const headerEl = document.querySelector('header');
+      const headerOffset = headerEl ? headerEl.getBoundingClientRect().height + 16 : 96;
+      const y = el.getBoundingClientRect().top + window.scrollY - headerOffset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const navState = location.state as { recipeId?: string } | null;
+    if (navState?.recipeId) {
+      navigate(`/yemekler?view=book&recipe=${encodeURIComponent(navState.recipeId)}`, {
+        replace: true,
+      });
+      return;
+    }
+    if (location.hash) {
+      const timer = setTimeout(() => {
+        handleScrollTo(location.hash);
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [location.hash, location.state, handleScrollTo, navigate]);
 
   const handleDishSelect = (dish: Dish) => {
     navigate(`/yemekler/${dish.id}`);
@@ -29,7 +50,7 @@ export const HomePage: React.FC = () => {
       {/* Header */}
       <Header onNavigate={handleScrollTo} />
 
-      {/* Main 5-Section Editorial Flow */}
+      {/* Main 6-Section Editorial Flow */}
       <main>
         {/* 01. İslahiye'ye Hoş Geldiniz — Karşılama */}
         <Hero
@@ -55,10 +76,13 @@ export const HomePage: React.FC = () => {
           onSelectDish={handleDishSelect}
         />
 
-        {/* 04. İslahiye'yi Keşfet — İlçe Tanıtımı */}
+        {/* 04. Mutfak Kültürü Gazetesi & Gündem */}
+        <EditorialAgendaShowcase />
+
+        {/* 05. İslahiye'yi Keşfet — İlçe Tanıtımı */}
         <DiscoverDistrictSection />
 
-        {/* 05. İslahiye'den Kareler — Güncellik (İTO Resmî Instagram) */}
+        {/* 06. İslahiye'den Kareler — Güncellik (İTO Resmî Instagram) */}
         <InstagramFeedSection />
       </main>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Users, ChefHat, Check, BookOpen, ArrowRight } from 'lucide-react';
+import { X, Clock, Users, ChefHat, Check, BookOpen, ArrowRight, Lightbulb } from 'lucide-react';
 import { Dish, Recipe } from '../../types';
 import { useContent } from '../../hooks/useContent';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
@@ -15,7 +15,7 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
   onClose,
   onOpenInWorkshop,
 }) => {
-  const { getRecipeById } = useContent();
+  const { getRecipeById, getRecipes } = useContent();
   const [checkedIngredients, setCheckedIngredients] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -43,9 +43,9 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
   if (!dish) return null;
 
   // Single source of truth lookup from reactive contentStore
-  const linkedRecipe: Recipe | undefined = dish.recipeId
-    ? getRecipeById(dish.recipeId)
-    : undefined;
+  const linkedRecipe: Recipe | undefined =
+    (dish.recipeId ? getRecipeById(dish.recipeId) : undefined) ||
+    getRecipes(true).find((r) => r.dishId === dish.id);
 
   const toggleIngredient = (name: string) => {
     setCheckedIngredients((prev) => ({
@@ -71,7 +71,7 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
       />
 
       {/* Modal Dialog Card */}
-      <div className="relative w-full max-w-3xl bg-ivory rounded-sm shadow-2xl border border-sand overflow-hidden z-10 max-h-[90vh] flex flex-col my-auto">
+      <div className="relative w-full max-w-3xl bg-ivory rounded-2xl shadow-2xl border border-sand overflow-hidden z-10 max-h-[90vh] flex flex-col my-auto">
         {/* Modal Top Visual Header */}
         <div className="relative h-48 sm:h-64 w-full shrink-0 overflow-hidden bg-forest">
           <ImageWithFallback
@@ -87,7 +87,7 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 w-9 h-9 rounded-sm bg-charcoal/60 hover:bg-charcoal text-ivory flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+            className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-charcoal/60 hover:bg-charcoal text-ivory flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
             aria-label="Tarif önizlemesini kapat"
           >
             <X className="w-5 h-5" />
@@ -96,11 +96,15 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
           {/* Dish Header Overlay Info */}
           <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 right-14 text-ivory">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-xs bg-copper text-ivory">
+              <span className="text-[11px] font-sans font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg bg-copper text-ivory">
                 {dish.categoryLabel}
               </span>
-              <span className="text-[10px] font-mono tracking-wide uppercase px-2 py-0.5 rounded-xs bg-charcoal/70 text-sand border border-sand/30">
-                {dish.giStatusNote || 'Yöresel Mutfak Mirası'}
+              <span className="text-[10px] font-sans font-bold tracking-wide uppercase px-2 py-0.5 rounded-lg bg-charcoal/70 text-sand border border-sand/30">
+                {dish.id === 'islahiye-biberi'
+                  ? dish.giStatusNote || 'Coğrafi İşaret Tescil No: 991'
+                  : dish.giStatusNote && !dish.giStatusNote.includes('991')
+                  ? dish.giStatusNote
+                  : 'Yöresel Mutfak Mirası'}
               </span>
             </div>
             <h3 className="text-2xl sm:text-3xl font-display font-bold leading-tight">
@@ -149,7 +153,7 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
               <h4 className="text-base font-display font-bold text-forest">
                 Gerekli Malzemeler
               </h4>
-              <span className="text-[11px] text-charcoal/50 font-mono">
+              <span className="text-[11px] text-charcoal/60 font-sans font-medium">
                 (İşaretleyerek kontrol edebilirsiniz)
               </span>
             </div>
@@ -164,7 +168,7 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
                     key={ing.name}
                     type="button"
                     onClick={() => toggleIngredient(ing.name)}
-                    className={`flex items-center justify-between p-3 rounded-sm border text-left transition-all ${
+                    className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
                       isChecked
                         ? 'bg-forest/5 border-forest/30 text-charcoal/50 line-through'
                         : 'bg-paper border-sand/70 hover:border-copper/50 text-charcoal'
@@ -172,11 +176,11 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
                   >
                     <span className="text-xs sm:text-sm font-medium">{ing.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-copper-dark font-semibold">
+                      <span className="text-xs font-sans tabular-nums text-copper-dark font-bold">
                         {amountDisplay}
                       </span>
                       <div
-                        className={`w-4 h-4 rounded-xs border flex items-center justify-center transition-colors ${
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
                           isChecked
                             ? 'bg-forest border-forest text-ivory'
                             : 'border-sand bg-ivory'
@@ -206,10 +210,10 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
                 return (
                   <div
                     key={step.stepNumber}
-                    className="p-4 rounded-sm bg-paper border border-sand/70 flex items-start gap-4"
+                    className="p-4 rounded-xl bg-paper border border-sand/70 flex items-start gap-4"
                   >
-                    <div className="w-7 h-7 rounded-sm bg-forest text-ivory font-mono text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      0{step.stepNumber}
+                    <div className="w-7 h-7 rounded-lg bg-forest text-ivory font-sans tabular-nums text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {String(step.stepNumber).padStart(2, '0')}
                     </div>
                     <div className="flex-1">
                       {stepTitle && (
@@ -221,8 +225,11 @@ export const RecipePreviewModal: React.FC<RecipePreviewModalProps> = ({
                         {step.instruction}
                       </p>
                       {step.tip && (
-                        <div className="mt-2 text-[11px] sm:text-xs text-copper-dark bg-copper/10 px-3 py-1.5 rounded-xs inline-block font-medium">
-                          💡 <strong>Püf Noktası:</strong> {step.tip}
+                        <div className="mt-2 inline-flex items-start gap-1.5 text-[11px] sm:text-xs text-copper-dark bg-copper/10 px-3 py-1.5 rounded-lg font-medium">
+                          <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Püf Noktası:</strong> {step.tip}
+                          </span>
                         </div>
                       )}
                     </div>

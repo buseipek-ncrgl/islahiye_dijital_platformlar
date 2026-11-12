@@ -15,21 +15,20 @@ export const MapPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlMode = searchParams.get('mode');
 
-  const { getDishes } = useContent();
+  const { getDishes, getAtlasNodes } = useContent();
   const liveDishes = getDishes(true);
+  const liveAtlasNodes = getAtlasNodes(true);
 
   const [activeMode, setActiveMode] = useState<CanvasMode>(
-    urlMode === 'real_map' || urlMode === 'verified_places' || urlMode === 'sokak'
-      ? 'verified_places'
-      : 'cultural'
+    urlMode === 'cultural' ? 'cultural' : 'verified_places'
   );
 
   // Senkronize URL mode
   useEffect(() => {
-    if (urlMode === 'real_map' || urlMode === 'verified_places' || urlMode === 'sokak') {
-      setActiveMode('verified_places');
-    } else if (urlMode === 'cultural') {
+    if (urlMode === 'cultural') {
       setActiveMode('cultural');
+    } else {
+      setActiveMode('verified_places');
     }
   }, [urlMode]);
 
@@ -43,9 +42,9 @@ export const MapPage: React.FC = () => {
     'islahiye-tava',
     'firik-pilavi',
     'islahiye-biberi',
-    'semsek-boregi',
+    'islahiye-semsegi',
     'incir-tatlisi',
-    'islahiye-kombesi',
+    'bayram-kombesi',
   ];
 
   const travelogueDishes = useMemo(() => {
@@ -91,13 +90,7 @@ export const MapPage: React.FC = () => {
   };
 
   const handleOpenWorkshop = (recipeId: string) => {
-    navigate('/', { state: { recipeId } });
-    setTimeout(() => {
-      const el = document.querySelector('#tarif-atolyesi');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
+    navigate(`/yemekler?view=book&recipe=${encodeURIComponent(recipeId)}#tarif-atolyesi`);
   };
 
   return (
@@ -112,7 +105,7 @@ export const MapPage: React.FC = () => {
         <section className="px-4 sm:px-6 lg:px-10 pt-6 pb-3">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
             <div>
-              <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-[0.22em] text-[#936645] uppercase block mb-1">
+              <span className="text-[10px] sm:text-[11px] font-sans font-bold tracking-[0.22em] text-[#936645] uppercase block mb-1">
                 KÜLTÜREL COĞRAFYA &amp; SOKAK HARİTASI / 04
               </span>
               <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-normal leading-[1.1] text-[#1b3a2d]">
@@ -177,6 +170,7 @@ export const MapPage: React.FC = () => {
                     onSwitchMode={handleModeChange}
                     onSwitchToCulturalMode={() => handleModeChange('cultural')}
                     dishes={liveDishes}
+                    nodes={liveAtlasNodes}
                     selectedDishId={selectedDish?.id || null}
                     onSelectDish={(dish) => setSelectedDish(dish)}
                   />
@@ -203,7 +197,8 @@ export const MapPage: React.FC = () => {
               >
                 <RealStreetMapView
                   onSwitchToCulturalMode={() => handleModeChange('cultural')}
-                  initialDishId={selectedDish?.id || null}
+                  initialSelectedPlaceId={searchParams.get('placeId') || null}
+                  initialDishId={searchParams.get('dish') || null}
                   onPreviewDish={(d) => setModalDish(d)}
                 />
               </section>
@@ -223,16 +218,16 @@ export const MapPage: React.FC = () => {
           {/* Başlık ve Sağ Bağlantı (Image 2 Birebir Uyum) */}
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2.5">
-              <span className="text-[11px] font-mono font-bold tracking-[0.22em] text-[#936645] uppercase">
+              <span className="text-[11px] font-sans font-bold tracking-[0.22em] text-[#936645] uppercase">
                 BU LEZZET COĞRAFYASINDA KEŞFEDİN
               </span>
-              <span className="text-[11px] font-mono text-[#8d765e] tracking-wider ml-1">
+              <span className="text-[11px] font-sans font-semibold text-[#8d765e] tracking-wider ml-1">
                 6 ÖZGÜN TAT
               </span>
             </div>
 
             <Link
-              to="/yoresel-lezzetler"
+              to="/yemekler"
               className="text-[11px] font-bold font-sans text-[#8d765e] hover:text-[#203b31] flex items-center gap-1.5 transition-colors uppercase tracking-wider"
             >
               <span>Tüm Lezzetler</span>
@@ -251,7 +246,7 @@ export const MapPage: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedDish(d)}
                   aria-pressed={isSelected}
-                  className={`group relative p-3 sm:p-3.5 rounded-xs border text-left transition-all duration-200 flex flex-col justify-between min-h-[148px] ${
+                  className={`group relative p-3 sm:p-3.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between min-h-[148px] ${
                     isSelected
                       ? 'bg-[#f4ece0] border-2 border-[#ba855e] shadow-xs'
                       : 'bg-[#fffdf8] border border-[#dccbb3] hover:border-[#ba855e] hover:bg-[#faf4ea]'
@@ -259,10 +254,10 @@ export const MapPage: React.FC = () => {
                 >
                   {/* Üst Sıra: Numara & Kategori Rozeti */}
                   <div className="flex items-center justify-between w-full mb-2">
-                    <span className="text-[11px] font-mono font-bold text-[#936645]">
+                    <span className="text-[11px] font-sans tabular-nums font-bold text-[#936645]">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
-                    <span className="text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded-2xs bg-[#eee6d7] text-[#7a7161] tracking-wider truncate max-w-[95px]">
+                    <span className="text-[9px] font-sans font-bold uppercase px-2 py-0.5 rounded-md bg-[#eee6d7] text-[#7a7161] tracking-wider truncate max-w-[95px]">
                       {d.categoryLabel}
                     </span>
                   </div>

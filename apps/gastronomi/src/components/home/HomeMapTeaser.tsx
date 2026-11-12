@@ -16,28 +16,38 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
   onSelectDish,
 }) => {
   const navigate = useNavigate();
-  const { getDishes, getAtlasNodes } = useContent();
+  const { getDishes, getAtlasNodes, getCategories } = useContent();
   const liveDishes = getDishes(true);
   const liveAtlasNodes = getAtlasNodes(true);
+  const dishCategories = getCategories('dish', true);
 
-  const [teaserMode, setTeaserMode] = useState<'cultural' | 'real_map'>('cultural');
+  const [teaserMode, setTeaserMode] = useState<'cultural' | 'real_map'>('real_map');
   const [selectedCategory, setSelectedCategory] = useState<DishCategory>('all');
   const [selectedDish, setSelectedDish] = useState<Dish | null>(liveDishes[0] || null);
 
-  const categories: { key: DishCategory; label: string }[] = [
-    { key: 'all', label: 'Tümü' },
-    { key: 'main', label: 'Ana Yemekler' },
-    { key: 'pastry', label: 'Hamur İşleri' },
-    { key: 'local_product', label: 'Yöresel Ürünler' },
-    { key: 'dessert', label: 'Tatlılar' },
-  ];
+  const categories: { key: DishCategory; label: string }[] = React.useMemo(
+    () => [
+      { key: 'all', label: 'Tümü' },
+      ...dishCategories.map((cat) => ({
+        key: cat.id as DishCategory,
+        label: cat.label,
+      })),
+    ],
+    [dishCategories]
+  );
 
-  const filteredDishes =
-    selectedCategory === 'all'
-      ? liveDishes
-      : liveDishes.filter((d) => d.category === selectedCategory);
+  const filteredDishes = React.useMemo(
+    () =>
+      selectedCategory === 'all'
+        ? liveDishes
+        : liveDishes.filter((d) => d.category === selectedCategory),
+    [liveDishes, selectedCategory]
+  );
 
-  const filteredDishIds = filteredDishes.map((d) => d.id);
+  const filteredDishIds = React.useMemo(
+    () => filteredDishes.map((d) => d.id),
+    [filteredDishes]
+  );
 
   // Sync selected dish with filtered dishes
   React.useEffect(() => {
@@ -56,7 +66,7 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
           <div>
             <div className="inline-flex items-center gap-2 mb-3">
               <span className="w-8 h-px bg-copper" />
-              <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
+              <span className="text-[11px] font-sans uppercase tracking-[0.25em] text-copper-dark font-bold">
                 02 / COĞRAFİ &amp; KÜLTÜREL ATLAS
               </span>
             </div>
@@ -132,7 +142,7 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
             {/* Category Selector Chips */}
             <div className="mb-8 overflow-x-auto pb-2 scrollbar-none">
               <div className="flex items-center gap-2 min-w-max">
-                <span className="text-xs font-mono uppercase tracking-wider text-charcoal/50 mr-2">
+                <span className="text-xs font-sans uppercase tracking-[0.2em] text-charcoal/60 mr-2 font-bold">
                   Havza / Kategori:
                 </span>
                 {categories.map((cat) => {
@@ -142,7 +152,7 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
                       key={cat.key}
                       type="button"
                       onClick={() => setSelectedCategory(cat.key)}
-                      className={`px-4 py-2 rounded-sm text-xs font-semibold tracking-wider transition-colors ${
+                      className={`px-4 py-2 rounded-xl text-xs font-sans font-bold tracking-wider transition-colors ${
                         isActive
                           ? 'bg-forest text-ivory shadow-xs'
                           : 'bg-paper text-charcoal/70 border border-sand/70 hover:border-copper/50'
@@ -169,11 +179,11 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
               </div>
 
           {/* Quick Interactive Dish Snapshot (4 cols) */}
-          <div className="lg:col-span-4 bg-[#FAF6EE] border-2 border-sand/80 rounded-sm p-6 sm:p-7 flex flex-col justify-between shadow-xs">
+          <div className="lg:col-span-4 bg-[#FAF6EE] border-2 border-sand/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between shadow-xs">
             {selectedDish ? (
               <>
                 <div>
-                  <div className="relative aspect-[16/10] w-full rounded-sm overflow-hidden mb-4 bg-sand/20 border border-sand/60">
+                  <div className="relative aspect-[16/10] w-full rounded-xl overflow-hidden mb-4 bg-sand/20 border border-sand/60">
                     <ImageWithFallback
                       src={selectedDish.imageUrl}
                       alt={selectedDish.imageAlt}
@@ -182,13 +192,13 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-2.5 left-2.5">
-                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded-xs bg-forest text-ivory">
+                      <span className="text-[10px] font-sans font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-forest text-ivory">
                         {selectedDish.categoryLabel}
                       </span>
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-mono tracking-wider uppercase text-copper-dark font-semibold block mb-1">
+                  <span className="text-[10px] font-sans tracking-[0.2em] uppercase text-copper-dark font-bold block mb-1">
                     {selectedDish.originNote || 'İslahiye Kültürel Havzası'}
                   </span>
 
@@ -217,7 +227,7 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
                         navigate(`/yemekler/${selectedDish.id}`);
                       }
                     }}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xs bg-[#203B31] text-[#F6F2E9] text-xs font-semibold uppercase tracking-wider hover:bg-[#203B31]/90 transition-all shadow-xs"
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#203B31] text-[#F6F2E9] text-xs font-sans font-bold uppercase tracking-wider hover:bg-[#203B31]/90 transition-all shadow-xs"
                   >
                     <span>Yemek Detayını &amp; Tarifi İncele</span>
                     <ArrowRight className="w-3.5 h-3.5 text-[#BA855E]" />
@@ -226,7 +236,7 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
                   <button
                     type="button"
                     onClick={() => navigate('/lezzet-haritasi')}
-                    className="w-full text-center text-xs text-copper-dark hover:text-forest font-semibold pt-1 transition-colors block"
+                    className="w-full text-center text-xs text-copper-dark hover:text-forest font-sans font-bold pt-1 transition-colors block"
                   >
                     Tüm Seyahatname Atlasını ve Ziyaret Duraklarını İncele →
                   </button>
@@ -243,7 +253,7 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
         {/* Atlas V2 6'lı Lezzet Keşif Şeridi */}
         <div className="mt-10 border-t border-sand/70 pt-6">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-copper-dark font-bold">
+            <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
               Lezzetleri Keşfedin
             </span>
             <span className="text-xs text-charcoal/50 font-sans">
@@ -259,13 +269,13 @@ export const HomeMapTeaser: React.FC<HomeMapTeaserProps> = ({
                   type="button"
                   onClick={() => setSelectedDish(d)}
                   aria-pressed={isSelected}
-                  className={`p-3 rounded-xs border text-left transition-all ${
+                  className={`p-3 rounded-xl border text-left transition-all ${
                     isSelected
                       ? 'bg-[#e9e0cf] border-copper text-[#1d4233] shadow-xs'
                       : 'bg-paper border-sand/70 hover:border-copper/60 text-[#2b4034]'
                   }`}
                 >
-                  <span className="text-[10px] font-mono font-bold text-[#af7958] block">
+                  <span className="text-[10px] font-sans tabular-nums font-bold text-[#af7958] block">
                     {String(idx + 1).padStart(2, '0')} / 06
                   </span>
                   <strong className="font-display text-sm font-normal line-clamp-1 block mt-0.5">

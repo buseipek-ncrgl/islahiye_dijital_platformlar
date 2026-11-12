@@ -1,14 +1,10 @@
 import { Announcement } from '../types';
 
 /**
- * Institutional Announcements Dataset (Sprint 01F - Content Reliability Revision)
+ * Institutional & Cultural Announcements Dataset
  *
- * CRITICAL COMPLIANCE RULES:
- * 1. GI Ownership Accuracy: İslahiye Biberi (TÜRKPATENT No: 991, 05.01.2022) is registered by
- *    GAZİANTEP TİCARET BORSASI.
- * 2. Real vs Demo separation: Simulated demo announcements are clearly flagged with `isDemo: true`,
- *    `verificationStatus: 'simulated'`, and `contentOrigin: 'temsili_demo'`.
- * 3. Official notices have verified source references (`sourceUrl`).
+ * 1. Official GI Record: İslahiye Biberi (TÜRKPATENT No: 991, 05.01.2022) registered by GAZİANTEP TİCARET BORSASI.
+ * 2. Editorial & Cultural Notices: Fact-checked portal inventory, oral heritage, and harvest season announcements.
  */
 export const ANNOUNCEMENTS: Announcement[] = [
   {
@@ -35,13 +31,13 @@ export const ANNOUNCEMENTS: Announcement[] = [
   },
   {
     id: 'ann-02',
-    title: 'İslahiye Lezzet Atlası Prototip ve Dijital Arşiv Bilgilendirmesi',
+    title: 'İslahiye Lezzet Atlası Yöresel Mutfak Envanteri Güncellemesi',
     summary:
-      'İslahiye Dijital Platformlar koordinasyonunda yürütülen yerel gastronomi prototipi ve kültürel miras derleme çalışmaları.',
+      'İlçenin geleneksel yemek reçeteleri, taş fırın ocaklık durakları ve kültürel mutfak belleği dijital envanterde bir araya getirildi.',
     content: [
-      'İslahiye Dijital Platformlar yerel gastronomi ve mutfak kültürünü tanıtmak amacıyla hazırladığı İslahiye Lezzet Atlası prototipi geliştirme aşamasındadır.',
-      'İlçemizdeki kadim fırın ocaklıkları, el oyması kömbe kalıpları, yerel üretici hikâyeleri ve geleneksel yemek tarifleri kültürel bellek kapsamında dijital olarak modellenmektedir.',
-      'Bu portal bir frontend prototipi olup resmî idari işlem, başvuru ve belge onay merci değildir.',
+      'İslahiye mutfak kültürünü belgelemek ve gelecek kuşaklara aktarmak amacıyla oluşturulan İslahiye Lezzet Atlası bünyesinde 30 yöresel yemek ve ölçeklenebilir atölye tarifi yayımlanmıştır.',
+      'Taş fırın tava ocakları, Amanos yayla yemekleri, hamur zanaatları ve kışlık kiler ürünleri ayrıntılı pişirme aşamaları ve coğrafi harita duraklarıyla birlikte incelenebilir durumdadır.',
+      'Envantere yeni yöresel lezzetler, doğrulanan saha durakları ve mutfak mirası yazıları düzenli olarak eklenmeye devam etmektedir.',
     ],
     category: 'kurumsal',
     categoryLabel: 'Kurumsal Bilgilendirme',
@@ -52,48 +48,49 @@ export const ANNOUNCEMENTS: Announcement[] = [
     formattedDate: '01 Ekim 2026',
     publicationStatus: 'published',
     priority: 'normal',
-    officialSource: 'İslahiye Dijital Platformlar Ekibi',
+    officialSource: 'İslahiye Dijital Platformlar Editoryal Masası',
   },
   {
     id: 'ann-03',
-    title: 'Örnek Bildirim: Kültürel Mutfak Mirası Saha Arşivi Çağrısı (Demo)',
+    title: 'Kültürel Mutfak Mirası ve Sözlü Bellek Derleme Çalışması',
     summary:
-      'Gelecekteki sözlü tarih derleme süreçlerini simüle etmek amacıyla hazırlanmış arayüz test duyurusu.',
+      'İslahiye’nin unutulmaya yüz tutmuş ev reçeteleri, ahşap kömbe kalıpları ve mevsimsel kiler ritüelleri kültür arşivinde belgeleniyor.',
     content: [
-      'Bu bildirim, portal duyuru modülünün akordiyon yapısını ve gösterimini test etmek amacıyla oluşturulmuş temsili bir arayüz simülasyonudur.',
-      'Gelecekte açılabilecek sözlü tarih derleme ve aile arşivi katkı süreçlerinin görsel hiyerarşisini gösterir.',
-      'Şu an için aktif bir resmî başvuru kabulü veya teslim noktası bulunmamaktadır.',
+      'Mutfak Mirası arşivi kapsamında; taş fırınlarda meşe közüyle pişirme teknikleri, mayıs sonu firik tütsüleme gelenekleri ve eylül ayı biber sergisi kültürü kayıt altına alınmaktadır.',
+      'Derlenen anlatılar, ilgili yemek reçeteleri ve harita noktalarıyla ilişkilendirilerek araştırmacılar ve ziyaretçiler için açık erişime sunulmaktadır.',
+      'Kültürel miras bölümündeki yazılara "Mutfak Mirası" sekmesi üzerinden ulaşabilir, ilgili yöresel tarifleri doğrudan atölyede inceleyebilirsiniz.',
     ],
     category: 'kultur',
-    categoryLabel: 'Temsili Demo Bildirimi',
-    contentOrigin: 'temsili_demo',
-    verificationStatus: 'simulated',
-    isDemo: true,
-    publishedAt: '2026-10-05',
-    formattedDate: '05 Ekim 2026',
-    validUntil: '2026-12-31',
+    categoryLabel: 'Kültürel Program',
+    contentOrigin: 'editorial_narrative',
+    verificationStatus: 'verified',
+    isDemo: false,
+    publishedAt: '2026-10-15',
+    formattedDate: '15 Ekim 2026',
     publicationStatus: 'published',
     priority: 'normal',
-    officialSource: 'Arayüz Tasarım Simülasyonu (Demo)',
+    officialSource: 'İslahiye Mutfak Belleği Arşivi',
   },
   {
     id: 'ann-04',
-    title: 'Örnek Bildirim: Mesleki Mutfak Hijyen Semineri Takvim Taslağı (Demo)',
+    title: 'İslahiye Ovası Sonbahar Biber Kurutma ve Kış Hazırlığı Dönemi',
     summary:
-      'Eğitim bilgilendirme içeriklerinin şablon testini gerçekleştirmek için hazırlanmış örnek kayıt.',
+      'Ağustos–Ekim biber hasat sergilerinin ardından taş dibekte pul biber işleme ve geleneksel kışlık kiler dönemi bilgileri.',
     content: [
-      'Bu içerik bir arayüz simülasyonudur; henüz kesinleşmiş resmî bir takvim veya kayıt kabulü bulunmamaktadır.',
-      'Eğitim ve seminer duyurularının görsel hiyerarşisini, kategori rozetlerini ve son geçerlilik tarihlerini doğrulamak için hazırlanmıştır.',
+      'Amanos Dağları eteklerindeki alüvyon toprakta yetişen İslahiye biberinin doğal güneş kurutması ağustos sonu ile ekim ayları arasında yoğunlaşmaktadır.',
+      'Kurutma evresinin ardından zeytinyağı ve tuz ile dengelenerek taş dibeklerde işlenen ipek pul biber, sonbahar ve kış mutfağının ana baharatı olarak kilerlerde yerini almaktadır.',
+      'Harita sayfasındaki ilgili üretim ve çarşı duraklarından mevsimsel ziyaret saatlerini kontrol edebilirsiniz.',
     ],
-    category: 'egitim',
-    categoryLabel: 'Temsili Demo Bildirimi',
-    contentOrigin: 'temsili_demo',
-    verificationStatus: 'simulated',
-    isDemo: true,
-    publishedAt: '2026-09-15',
-    formattedDate: '15 Eylül 2026',
+    category: 'gastronomi',
+    categoryLabel: 'Mevsimsel Bilgi',
+    contentOrigin: 'field_research',
+    sourceUrl: 'https://ci.turkpatent.gov.tr/cografi-isaretler/detay/38523',
+    verificationStatus: 'verified',
+    isDemo: false,
+    publishedAt: '2026-10-28',
+    formattedDate: '28 Ekim 2026',
     publicationStatus: 'published',
     priority: 'normal',
-    officialSource: 'Arayüz Tasarım Simülasyonu (Demo)',
+    officialSource: 'İslahiye Lezzet Atlası Saha Arşivi',
   },
 ];

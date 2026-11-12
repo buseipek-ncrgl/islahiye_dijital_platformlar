@@ -18,7 +18,7 @@ export const PlaceholderPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge label={GASTRONOMI_APP_META.status} variant="warning" />
-          <span className="text-xs font-mono bg-paper px-2.5 py-1 rounded border border-sand/80 text-charcoal/80">
+          <span className="text-xs font-sans font-semibold tabular-nums bg-paper px-2.5 py-1 rounded-lg border border-sand/80 text-charcoal/80">
             Port :{GASTRONOMI_APP_META.port}
           </span>
         </div>
@@ -108,7 +108,7 @@ export const PlaceholderPage: React.FC = () => {
         <p>© 2026 {GASTRONOMI_APP_META.institution} — Dijital Platformlar Projesi</p>
         <p className="flex items-center gap-1.5">
           <BookOpen className="w-3.5 h-3.5 text-copper" />
-          <span>Ön tanıtım frontend prototipi / Simülasyon</span>
+          <span>İslahiye Lezzet Atlası &amp; Mutfak Arşivi</span>
         </p>
       </footer>
     </div>

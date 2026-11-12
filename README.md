@@ -8,15 +8,18 @@
 
 ## 1. Proje Mimarisi ve Ürünler
 
-Bu depoda tek bir npm workspace çatısı altında çalışan, ancak kullanıcı kitlesi, iş kuralları, veri modelleri ve görsel kimlikleri birbirinden tamamen bağımsız iki ayrı React uygulaması bulunmaktadır:
+Bu depoda tek bir npm workspace çatısı altında çalışan iki bağımsız React/TypeScript frontend uygulaması ve bunlara hizmet veren iki bağımsız .NET 9 C# Web API arka uç servisi bulunmaktadır:
 
 ```
 islahiye-dijital-platformlar/
 ├── .github/
 │   └── workflows/          # GitHub Actions sürekli entegrasyon (CI) iş akışları
 ├── apps/
-│   ├── gastronomi/         # 1. Ürün: İslahiye Lezzet Atlası (Kültür & Gastronomi Portalı + CMS)
-│   └── egitim/             # 2. Ürün: İslahiye Ticaret Odası Eğitim Portalı (Akademi & Kursiyer Yönetimi)
+│   ├── gastronomi/         # 1. Frontend: İslahiye Lezzet Atlası (Kültür & Gastronomi Portalı + CMS)
+│   └── egitim/             # 2. Frontend: İslahiye Ticaret Odası Eğitim Portalı (Akademi & Kursiyer Yönetimi)
+├── services/
+│   ├── gastronomy-api/     # 1. Backend: İslahiye Lezzet Atlası .NET 9 Web API (Clean Architecture)
+│   └── education-api/      # 2. Backend: İslahiye Eğitim Portalı .NET 9 Web API & SQL Server (Idempotent API)
 ├── packages/
 │   └── ui/                 # Paylaşımlı nötr bileşenler (opsiyonel ortak alan)
 ├── package.json            # Monorepo çalışma alanı (npm workspaces) yapılandırması
@@ -59,8 +62,9 @@ islahiye-dijital-platformlar/
 
 ## 3. Teknoloji Yığını
 
-Her iki uygulama da modern frontend teknolojileri üzerine bağımsız olarak inşa edilmiştir:
+Platformlar, modern frontend ve kurumsal backend teknolojileri üzerine Clean Architecture prensipleriyle inşa edilmiştir:
 
+### Frontend
 | Teknoloji | Versiyon | Kullanım Alanı |
 |---|---|---|
 | **React** | `^18.3.1` | Kullanıcı arayüzü kütüphanesi (Fonksiyonel bileşenler & Hooks) |
@@ -73,6 +77,16 @@ Her iki uygulama da modern frontend teknolojileri üzerine bağımsız olarak in
 | **Framer Motion** | `^14.3.0` | Yalnızca Gastronomi: Akıcı editoryal mikro animasyonlar |
 | **QRCode & PNGjs** | `^1.5.4` | Yalnızca Eğitim: İstemci taraflı dinamik belge doğrulama karekodu |
 
+### Backend (Mikro/Modüler Servisler)
+| Teknoloji | Versiyon | Kullanım Alanı |
+|---|---|---|
+| **.NET / C#** | `9.0` | Yüksek performanslı kurumsal Web API çekirdeği |
+| **ASP.NET Core** | `9.0` | REST API Controller'lar, Swagger/OpenAPI ve Minimal API |
+| **Entity Framework Core** | `9.0` | ORM, Code-First Migration'lar ve LINQ sorgu altyapısı |
+| **SQL Server / SQLite** | `Enterprise / Local` | İlişkisel veritabanı, Idempotency kütüğü ve denetim izleri |
+| **Clean Architecture** | — | Domain, Application, Infrastructure ve API katmanlı ayrım |
+| **xUnit & FluentAssertions** | `2.8+` | Kapsamlı birim ve kabul entegrasyon testleri |
+
 ---
 
 ## 4. Kurulum ve Çalıştırma
@@ -80,6 +94,7 @@ Her iki uygulama da modern frontend teknolojileri üzerine bağımsız olarak in
 ### Gereksinimler
 - **Node.js:** `v18.0.0` veya üzeri (LTS sürümü önerilir)
 - **npm:** `v9.0.0` veya üzeri
+- **.NET SDK:** `9.0` veya üzeri (Backend servisleri için)
 
 ### 4.1. Bağımlılıkların Kurulması
 Monorepo kök dizininde tek bir komut ile tüm çalışma alanlarının bağımlılıkları kurulur:
@@ -88,9 +103,7 @@ Monorepo kök dizininde tek bir komut ile tüm çalışma alanlarının bağıml
 npm install
 ```
 
-### 4.2. Uygulamaları Geliştirme Ortamında Çalıştırma
-
-Uygulamaları kök dizinden tek komutla başlatabilirsiniz:
+### 4.2. Frontend Uygulamalarını Çalıştırma
 
 ```bash
 # İslahiye Lezzet Atlası uygulamasını başlat (Port 5173)
@@ -100,31 +113,27 @@ npm run dev:gastronomi
 npm run dev:egitim
 ```
 
-Doğrudan ilgili uygulama klasörüne giderek çalıştırmak için:
+### 4.3. Backend C# API Servislerini Çalıştırma
 
 ```bash
-# Gastronomi için
-cd apps/gastronomi
-npm run dev
+# Gastronomi Web API'sini başlat (Port 5235)
+npm run dev:api:gastronomi
 
-# Eğitim için
-cd apps/egitim
-npm run dev
+# Eğitim Portalı Web API'sini başlat (Port 5234)
+npm run dev:api:egitim
 ```
 
-### 4.3. Derleme (Production Build) Kontrolü
-
-Uygulamaların TypeScript derlemesini ve üretim paketini oluşturmak için:
+### 4.4. Derleme ve Test Kontrolleri
 
 ```bash
-# Tüm monorepo uygulamalarını birlikte derle
+# Tüm frontend uygulamalarını derle
 npm run build
 
-# Yalnızca Gastronomi uygulamasını derle
-npm run build:gastronomi
+# Gastronomi C# API projesini derle
+npm run build:api:gastronomi
 
-# Yalnızca Eğitim Portalı uygulamasını derle
-npm run build:egitim
+# Gastronomi C# testlerini çalıştır
+npm run test:api:gastronomi
 ```
 
 ---
@@ -152,23 +161,20 @@ Proje, kurumsal yazılım standartları doğrultusunda **GitHub Actions** tabanl
 
 ---
 
-## 7. Mevcut Geliştirme Durumu ve Üretim Ortamı Gereksinimleri
+## 7. Mevcut Geliştirme Durumu ve Mimari Olgunluk
 
-### Mevcut Durum (Frontend Prototip Aşaması)
-- Bu aşamada her iki ürün **tam etkileşimli, zengin arayüzlü ve senaryo doğrulamalı bir frontend prototipi** olarak geliştirilmiştir.
-- Kullanıcı rolleri prototip seçicilerle simüle edilmekte olup, tarayıcı yerel saklama alanı (`localStorage`) üzerinde durum takibi yapılmaktadır.
-- Belge üretimleri istemci taraflı (canvas/PDF blob) simüle edilmektedir.
+### Mevcut Durum (Frontend & Backend Çözümü)
+- **Frontend Katmanı:** Her iki ürün (`apps/gastronomi` ve `apps/egitim`) tam etkileşimli, zengin arayüzlü, responsive ve WCAG uyumlu birer bağımsız uygulama olarak tamamlanmıştır.
+- **Backend Katmanı:** `services/education-api` ve `services/gastronomy-api` projelerinde .NET 9, Clean Architecture, Entity Framework Core ve SQL Server/SQLite altyapısıyla uçtan uca REST API'ler geliştirilmiştir.
+- **Güvenlik & Doğrulama:** Admin paneli erişim kalkanları, XSS ve URL sanitizasyonu, kriptografik oturum imzaları ve WORM denetim kütükleri mevcuttur.
 
-### Üretim Sürümü (Production Roadmap) Eksikleri
-Canlı kurumsal operasyona geçiş için backend geliştirme aşamasında şu altyapılar entegre edilecektir:
-1. **Merkezi Sunucu & API:** ASP.NET Core veya Node.js tabanlı güvenli REST/GraphQL API mimarisi.
-2. **İlişkisel Veritabanı:** SQL Server veya PostgreSQL veritabanı şeması ve migration süreçleri.
-3. **Kimlik Doğrulama & Yetkilendirme:** OAuth2 / OpenID Connect / JWT tabanlı oturum yönetimi, güvenli parola hashleme (Argon2/bcrypt) ve 2FA desteği.
-4. **Resmî Servis Entegrasyonları:**
-   - TÜRKPATENT coğrafi işaret veri tabanı senkronizasyonu.
-   - SMS ve e-posta bildirim sağlayıcıları (Netgsm/Turkcell, SendGrid/SMTP).
+### Canlı Canlıya Alma (Deployment Roadmap) Adımları
+1. **Canlı Sunucu Yayını:** Docker / Azure App Service üzerinde .NET API ve Nginx frontend container'larının ayağa kaldırılması.
+2. **Resmî Servis Entegrasyonları:**
+   - Canlı SMS ve e-posta bildirim sağlayıcıları (Netgsm/Turkcell, SendGrid/SMTP).
+   - Canlı TÜRKPATENT coğrafi işaret veri tabanı senkronizasyonu.
    - e-Devlet Kapısı üzerinden kimlik ve ikametgah doğrulama.
-5. **Bulut Medya ve Belge Depolama:** S3 veya Azure Blob Storage üzerinde imzalı (presigned) dosya saklama ve CDN dağıtımı.
+3. **Bulut Medya Saklama:** S3 veya Azure Blob Storage üzerinde imzalı (presigned) dosya saklama ve CDN dağıtımı.
 
 ---
 

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Clock, ArrowLeft, Share2, Check, Tag, Utensils, BookOpen, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Clock, ArrowLeft, Share2, Check, Tag, Utensils, BookOpen, ShieldCheck, ExternalLink, Lightbulb } from 'lucide-react';
 import { useContent } from '../hooks/useContent';
 import { Dish, ArticleParagraph } from '../types';
 import { ImageWithFallback } from '../components/ui/ImageWithFallback';
+import { Header } from '../components/layout/Header';
+import { Footer } from '../components/layout/Footer';
+import { sanitizeUrl } from '../utils/security';
 
 export const NewsDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
-  const { getArticleBySlug, getArticles, getDishes } = useContent();
+  const { getArticleBySlug, getArticles, getDishes, getRecipeById, getRecipes } = useContent();
 
   // Find article from reactive contentStore
   const article = slug ? getArticleBySlug(slug) : undefined;
@@ -17,8 +20,9 @@ export const NewsDetailPage: React.FC = () => {
   // Fallback if not found or not published (drafts/archived not visible to public)
   if (!article || article.publicationStatus !== 'published') {
     return (
-      <div className="min-h-screen bg-ivory text-charcoal pt-32 pb-24">
-        <div className="max-w-2xl mx-auto px-4 text-center">
+      <div className="min-h-screen bg-ivory text-charcoal font-sans flex flex-col justify-between selection:bg-copper selection:text-ivory">
+        <Header />
+        <main className="max-w-2xl mx-auto px-4 py-24 text-center">
           <BookOpen className="w-12 h-12 text-copper mx-auto mb-4" />
           <h1 className="text-3xl font-display font-bold text-forest mb-3">
             Yazı Bulunamadı veya Yayında Değil
@@ -33,7 +37,8 @@ export const NewsDetailPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
             <span>Tüm Yazılara Dön</span>
           </Link>
-        </div>
+        </main>
+        <Footer />
       </div>
     );
   }
@@ -48,6 +53,7 @@ export const NewsDetailPage: React.FC = () => {
 
   // Related dishes (only published)
   const publishedDishes = getDishes(true);
+  const publishedRecipes = getRecipes(true);
   const relatedDishes = publishedDishes.filter((d) =>
     article.relatedDishIds?.includes(d.id)
   );
@@ -62,28 +68,30 @@ export const NewsDetailPage: React.FC = () => {
   };
 
   return (
-    <article className="min-h-screen bg-ivory text-charcoal pt-24 pb-28">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Link and Share Bar */}
-        <div className="mb-10 flex items-center justify-between border-b border-sand/60 pb-4">
-          <Link
-            to="/haberler"
-            className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-copper hover:text-forest transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Tüm Yazılara Dön</span>
-          </Link>
+    <div className="min-h-screen bg-ivory text-charcoal font-sans flex flex-col justify-between selection:bg-copper selection:text-ivory">
+      <Header />
+      <main className="flex-1 py-10 sm:py-16">
+        <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Back Link and Share Bar */}
+          <div className="mb-10 flex items-center justify-between border-b border-sand/60 pb-4">
+            <Link
+              to="/haberler"
+              className="inline-flex items-center gap-2 text-xs font-sans uppercase tracking-wider text-copper hover:text-forest transition-colors font-bold"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Tüm Yazılara Dön</span>
+            </Link>
 
           <button
             type="button"
             onClick={handleShare}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-sm bg-paper border border-sand/70 text-xs font-mono text-charcoal/75 hover:border-copper/60 hover:text-forest transition-colors shadow-xs"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-paper border border-sand/70 text-xs font-sans font-bold text-charcoal/75 hover:border-copper/60 hover:text-forest transition-colors shadow-xs"
             aria-label="Yazı bağlantısını kopyala"
           >
             {copied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-copper" />
-                <span className="text-copper font-semibold">Bağlantı Kopyalandı</span>
+                <span className="text-copper font-bold">Bağlantı Kopyalandı</span>
               </>
             ) : (
               <>
@@ -96,8 +104,8 @@ export const NewsDetailPage: React.FC = () => {
 
         {/* Article Masthead Header */}
         <header className="mb-10">
-          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-copper-dark uppercase tracking-wider mb-4">
-            <span className="font-semibold text-copper-dark">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-sans text-copper-dark uppercase tracking-wider mb-4 font-semibold">
+            <span className="font-bold text-copper-dark">
               {article.categoryLabel}
             </span>
             <span className="text-charcoal/30">•</span>
@@ -121,10 +129,10 @@ export const NewsDetailPage: React.FC = () => {
         </header>
 
         {/* Official Source Callout if available */}
-        {article.sourceUrl && (
-          <div className="mb-10 p-4 sm:p-5 rounded-sm bg-sand/20 border border-sand/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono">
+        {article.sourceUrl && sanitizeUrl(article.sourceUrl) && (
+          <div className="mb-10 p-4 sm:p-5 rounded-xl bg-sand/20 border border-sand/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-sans">
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-forest font-semibold">
+              <div className="flex items-center gap-2 text-forest font-bold">
                 <ShieldCheck className="w-4 h-4 text-copper shrink-0" />
                 <span>Doğrulanmış Dış Kaynak Referansı</span>
               </div>
@@ -133,19 +141,23 @@ export const NewsDetailPage: React.FC = () => {
               </p>
             </div>
             <a
-              href={article.sourceUrl}
+              href={sanitizeUrl(article.sourceUrl)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs bg-forest text-ivory hover:bg-forest-800 font-semibold transition-colors shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forest text-ivory hover:bg-forest-800 font-bold transition-colors shrink-0"
             >
-              <span>Resmî TÜRKPATENT Kaydını Gör</span>
+              <span>
+                {article.sourceUrl.includes('turkpatent.gov.tr')
+                  ? 'Resmî TÜRKPATENT Kaydını Gör'
+                  : 'Dış Kaynağı İncele'}
+              </span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         )}
 
         {/* Cinematic Cover Image */}
-        <div className="mb-12 rounded-sm overflow-hidden border border-sand/70 bg-sand/15 shadow-sm">
+        <div className="mb-12 rounded-2xl overflow-hidden border border-sand/70 bg-sand/15 shadow-sm">
           <div className="relative aspect-[16/9] w-full">
             <ImageWithFallback
               src={article.coverImage}
@@ -158,7 +170,7 @@ export const NewsDetailPage: React.FC = () => {
           {article.imageCaption && (
             <div className="p-3.5 bg-paper border-t border-sand/50 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-charcoal/65 font-sans gap-2">
               <span>{article.imageCaption}</span>
-              <span className="font-mono text-[11px] text-charcoal/45 shrink-0">
+              <span className="font-sans text-[11px] text-charcoal/50 shrink-0 font-medium">
                 {article.imageCredit}
               </span>
             </div>
@@ -195,8 +207,9 @@ export const NewsDetailPage: React.FC = () => {
                 )}
 
                 {para.highlightText && (
-                  <div className="p-4 rounded-sm bg-sand/20 border border-sand/70 text-xs sm:text-sm font-mono text-copper-dark leading-relaxed">
-                    💡 {para.highlightText}
+                  <div className="p-4 rounded-xl bg-sand/20 border border-sand/70 text-xs sm:text-sm font-sans text-copper-dark leading-relaxed font-medium flex items-start gap-2.5">
+                    <Lightbulb className="w-4 h-4 text-copper shrink-0 mt-0.5" />
+                    <span>{para.highlightText}</span>
                   </div>
                 )}
               </div>
@@ -206,7 +219,7 @@ export const NewsDetailPage: React.FC = () => {
           {/* Author Footnote & Tags */}
           <div className="mt-14 pt-8 border-t border-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div>
-              <div className="text-xs font-mono text-charcoal/50 uppercase tracking-wider mb-1">
+              <div className="text-xs font-sans text-charcoal/50 uppercase tracking-wider mb-1 font-bold">
                 Editoryal Künye & Kaynak
               </div>
               <div className="text-sm font-display font-bold text-forest">
@@ -223,7 +236,7 @@ export const NewsDetailPage: React.FC = () => {
                 {article.tags.map((tag: string) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 text-[11px] font-mono text-charcoal/65 bg-paper px-2.5 py-1 rounded-xs border border-sand/70"
+                    className="inline-flex items-center gap-1 text-[11px] font-sans text-charcoal/70 bg-paper px-2.5 py-1 rounded-md border border-sand/70 font-medium"
                   >
                     <Tag className="w-3 h-3 text-copper" />
                     {tag}
@@ -236,8 +249,8 @@ export const NewsDetailPage: React.FC = () => {
 
         {/* Related Dishes Bridge */}
         {relatedDishes.length > 0 && (
-          <div className="mt-16 p-6 sm:p-8 rounded-sm bg-paper border border-sand/80 shadow-xs">
-            <div className="flex items-center gap-2 text-xs font-mono text-copper-dark uppercase tracking-wider mb-2">
+          <div className="mt-16 p-6 sm:p-8 rounded-2xl bg-paper border border-sand/80 shadow-xs">
+            <div className="flex items-center gap-2 text-xs font-sans text-copper-dark uppercase tracking-wider mb-2 font-bold">
               <Utensils className="w-4 h-4 text-copper" />
               <span>Bu Yazıyla İlgili Yöresel Lezzetler</span>
             </div>
@@ -247,42 +260,54 @@ export const NewsDetailPage: React.FC = () => {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {relatedDishes.map((dish: Dish) => (
-                <div
-                  key={dish.id}
-                  className="p-4 rounded-sm bg-ivory border border-sand/70 flex items-center justify-between gap-4"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-14 h-14 rounded-sm overflow-hidden bg-sand/30 shrink-0">
-                      <ImageWithFallback
-                        src={dish.imageUrl}
-                        alt={dish.name}
-                        fallbackText={dish.name}
-                        containerClassName="w-full h-full"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-display font-bold text-forest truncate">
-                        {dish.name}
-                      </div>
-                      <div className="text-xs font-mono text-copper truncate">
-                        {dish.categoryLabel || dish.category}
-                      </div>
-                    </div>
-                  </div>
+              {relatedDishes.map((dish: Dish) => {
+                const dishRecipe =
+                  (dish.recipeId ? getRecipeById(dish.recipeId) : undefined) ||
+                  publishedRecipes.find((r) => r.dishId === dish.id);
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigate('/', { state: { recipeId: dish.recipeId || `recipe-${dish.id}` } });
-                    }}
-                    className="px-3.5 py-1.5 rounded-xs bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-800 transition-colors shrink-0"
+                return (
+                  <div
+                    key={dish.id}
+                    className="p-4 rounded-xl bg-ivory border border-sand/70 flex items-center justify-between gap-4"
                   >
-                    Atölyede Pişir
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-sand/30 shrink-0">
+                        <ImageWithFallback
+                          src={dish.imageUrl}
+                          alt={dish.name}
+                          fallbackText={dish.name}
+                          containerClassName="w-full h-full"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-display font-bold text-forest truncate">
+                          {dish.name}
+                        </div>
+                        <div className="text-xs font-sans text-copper truncate font-semibold">
+                          {dish.categoryLabel || dish.category}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (dishRecipe) {
+                          navigate(
+                            `/yemekler?view=book&recipe=${encodeURIComponent(dishRecipe.id)}#tarif-atolyesi`
+                          );
+                        } else {
+                          navigate(`/yemekler/${dish.id}`);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 rounded-lg bg-forest text-ivory text-xs font-sans font-bold uppercase tracking-wider hover:bg-forest-800 transition-colors shrink-0"
+                    >
+                      {dishRecipe ? 'Atölyede Pişir' : 'Detayı Gör'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -299,7 +324,7 @@ export const NewsDetailPage: React.FC = () => {
                 <Link
                   key={rel.id}
                   to={`/haberler/${rel.slug}`}
-                  className="group bg-paper border border-sand/80 rounded-sm overflow-hidden shadow-xs hover:border-copper/50 transition-all flex flex-col justify-between"
+                  className="group bg-paper border border-sand/80 rounded-2xl overflow-hidden shadow-xs hover:border-copper/50 transition-all flex flex-col justify-between"
                 >
                   <div className="relative aspect-[16/10] bg-sand/20 overflow-hidden">
                     <ImageWithFallback
@@ -313,7 +338,7 @@ export const NewsDetailPage: React.FC = () => {
 
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="text-[11px] font-mono text-copper-dark uppercase tracking-wider mb-2">
+                      <div className="text-[11px] font-sans text-copper-dark uppercase tracking-wider mb-2 font-bold">
                         {rel.categoryLabel} • {rel.readingTime}
                       </div>
 
@@ -326,8 +351,8 @@ export const NewsDetailPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="pt-4 border-t border-sand/40 mt-3 flex items-center justify-between text-xs font-mono text-copper">
-                      <span>{rel.formattedDate}</span>
+                    <div className="pt-4 border-t border-sand/40 mt-3 flex items-center justify-between text-xs font-sans text-copper">
+                      <span className="font-semibold">{rel.formattedDate}</span>
                       <span className="font-semibold group-hover:translate-x-1 transition-transform">→</span>
                     </div>
                   </div>
@@ -336,7 +361,9 @@ export const NewsDetailPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
-    </article>
+        </article>
+      </main>
+      <Footer />
+    </div>
   );
 };

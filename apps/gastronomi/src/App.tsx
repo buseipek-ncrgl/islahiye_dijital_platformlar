@@ -8,6 +8,7 @@ import { NewsPage } from './pages/NewsPage';
 import { NewsDetailPage } from './pages/NewsDetailPage';
 import { EventsPage } from './pages/EventsPage';
 import { AnnouncementsPage } from './pages/AnnouncementsPage';
+import { FilmsPage } from './pages/FilmsPage';
 import { DishesCatalogPage } from './pages/DishesCatalogPage';
 import { DishDetailPage } from './pages/DishDetailPage';
 import { AdminLayout } from './components/admin/layout/AdminLayout';
@@ -25,6 +26,7 @@ import { PlaceFormPage } from './pages/admin/PlaceFormPage';
 import { AnnouncementFormPage } from './pages/admin/AnnouncementFormPage';
 import { EventFormPage } from './pages/admin/EventFormPage';
 import { CentralPublicationPage } from './pages/admin/CentralPublicationPage';
+import { CategoryManagementPage } from './pages/admin/CategoryManagementPage';
 
 export const App: React.FC = () => {
   return (
@@ -36,13 +38,16 @@ export const App: React.FC = () => {
         <Route path="/yemekler/:slug" element={<DishDetailPage />} />
         <Route path="/tarifler" element={<DishesCatalogPage />} />
         <Route path="/tarifler/:slug" element={<DishDetailPage />} />
+        <Route path="/yoresel-lezzetler" element={<DishesCatalogPage />} />
         <Route path="/lezzet-haritasi" element={<MapPage />} />
+        <Route path="/harita" element={<MapPage />} />
         <Route path="/mutfak-mirasi" element={<HeritagePage />} />
         <Route path="/mutfak-mirasi/:slug" element={<HeritageStoryDetailPage />} />
         <Route path="/haberler" element={<NewsPage />} />
         <Route path="/haberler/:slug" element={<NewsDetailPage />} />
         <Route path="/etkinlikler" element={<EventsPage />} />
         <Route path="/duyurular" element={<AnnouncementsPage />} />
+        <Route path="/filmler" element={<FilmsPage />} />
 
         {/* CMS Administration Routes (Sprint 02A - 02C) */}
         <Route path="/yonetim" element={<AdminLayout />}>
@@ -75,6 +80,8 @@ export const App: React.FC = () => {
             path="urunler"
             element={
               <AdminContentListPage
+                forcedType="dish"
+                categoryFilter="local_product"
                 forcedTitle="Yerel Ürünler & Coğrafi İşaretler"
                 forcedDescription="TÜRKPATENT tescilli ürün kayıtları, şartname belgeleri ve menşe bilgileri."
               />
@@ -99,7 +106,7 @@ export const App: React.FC = () => {
             path="kulturel-miras"
             element={
               <AdminContentListPage
-                forcedType="editorial_article"
+                forcedType="cultural_story"
                 forcedTitle="Mutfak Mirası & Bellek Yazıları"
                 forcedDescription="Ocaklık ritüelleri, mevsimsel hasat anlatıları ve sözlü tarih kayıtları."
               />
@@ -112,6 +119,7 @@ export const App: React.FC = () => {
             path="haberler"
             element={
               <AdminContentListPage
+                forcedType="articles_all"
                 forcedTitle="Haberler & Editoryal Gazete"
                 forcedDescription="Resmî bülten haberleri ve mutfak kültürü araştırma makaleleri."
               />
@@ -144,6 +152,7 @@ export const App: React.FC = () => {
           <Route path="etkinlikler/yeni" element={<EventFormPage />} />
           <Route path="etkinlikler/:id/duzenle" element={<EventFormPage />} />
           <Route path="yayin-yonetimi" element={<CentralPublicationPage />} />
+          <Route path="kategoriler" element={<CategoryManagementPage />} />
           <Route path="ayarlar" element={<AdminSettingsPage />} />
         </Route>
 

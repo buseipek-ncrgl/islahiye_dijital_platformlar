@@ -14,6 +14,7 @@ export type CmsContentType =
   | 'film'
   | 'news'
   | 'editorial_article'
+  | 'cultural_story'
   | 'announcement'
   | 'event'
   | 'media'

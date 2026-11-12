@@ -26,12 +26,16 @@ export const CulturalAtlasCanvas: React.FC<CulturalAtlasCanvasProps> = ({
   dishes = [],
   selectedDishId,
   onSelectDish,
+  filteredDishIds,
   nodes = ATLAS_DISH_NODES,
 }) => {
-  // Map dish nodes to CMS dish objects
+  // Map dish nodes to CMS dish objects (applying optional category/filter list)
   const interactiveNodes = React.useMemo(() => {
     return nodes
       .map((node) => {
+        if (filteredDishIds && !filteredDishIds.includes(node.dishId)) {
+          return null;
+        }
         const dish = dishes.find((d) => d.id === node.dishId);
         if (!dish) return null;
         return {
@@ -40,7 +44,7 @@ export const CulturalAtlasCanvas: React.FC<CulturalAtlasCanvasProps> = ({
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [nodes, dishes]);
+  }, [nodes, dishes, filteredDishIds]);
 
   return (
     <div className="relative w-full bg-[#f6f2e9] overflow-hidden select-none">
@@ -126,7 +130,7 @@ export const CulturalAtlasCanvas: React.FC<CulturalAtlasCanvasProps> = ({
 
                   {/* Vurgu Notu (Hover) */}
                   {accentNote && (
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none absolute -bottom-7 text-[9px] font-mono font-medium text-[#786a59] bg-[#fffdf8]/95 px-2 py-0.5 rounded-xs border border-[#dccbb3] shadow-xs">
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none absolute -bottom-7 text-[9px] font-sans font-medium text-[#786a59] bg-[#fffdf8]/95 px-2 py-0.5 rounded-xs border border-[#dccbb3] shadow-xs">
                       {accentNote}
                     </span>
                   )}
@@ -138,7 +142,7 @@ export const CulturalAtlasCanvas: React.FC<CulturalAtlasCanvasProps> = ({
           {/* Alt Bilgi Şeridi */}
           <div className="absolute bottom-2.5 left-3 sm:left-4 flex items-center gap-2 text-[10px] text-[#6d6b5f] font-sans pointer-events-none z-10 bg-[#f7f2e7]/90 backdrop-blur-xs px-2.5 py-1 rounded-2xs border border-[#dfd2be]/70">
             <Info className="w-3.5 h-3.5 text-[#936645] shrink-0" />
-            <span>Coğrafyadan esinlenen temsili kültürel atlas. Ölçekli veya yön bulma amaçlı harita değildir.</span>
+            <span>Coğrafi havzalardan esinlenen kültürel lezzet atlası. Fiziksel mekânlar için 'Gerçek Sokak Haritası' modunu kullanabilirsiniz.</span>
           </div>
         </div>
       )}
@@ -152,7 +156,7 @@ export const CulturalAtlasCanvas: React.FC<CulturalAtlasCanvasProps> = ({
           </div>
           <div className="flex justify-between items-start gap-4 mb-3 px-1 sm:px-3">
             <div>
-              <span className="text-[10px] font-mono font-bold tracking-[0.2em] text-[#936645] uppercase block mb-1">
+              <span className="text-[10px] font-sans font-bold tracking-[0.2em] text-[#936645] uppercase block mb-1">
                 WGS84 KADASTRO &amp; İDARİ GEOMETRİ
               </span>
               <h3 className="font-display text-forest text-xl sm:text-2xl font-normal leading-tight">

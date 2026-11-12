@@ -19,25 +19,25 @@ export const ARTISAN_PROJECT_INFO = {
   subtitle:
     'İslahiye mutfak kültürünü şekillendiren fırın ritüelleri, bereketli ova üretimi ve geleneksel el becerilerinin kültürel anlatımı.',
   description:
-    "Bu bölüm, İslahiye'nin mutfak zanaatlarını tanıtan temsili bir kültürel içerik alanıdır. Gerçek usta ve üretici profilleri, doğrulanmış bilgiler ve gerekli yayın izinleri sağlandığında eklenebilir.",
+    "İslahiye mutfak kültürünü yaşatan taş fırın ocaklıkları, kırmızı biber sergileri ve geleneksel hamur zanaatı arşivi. İzinli usta ve üretici kayıtları Yönetim Panelinden eklenebilir.",
   craftCategories: [
     {
       id: 'bakery',
       title: 'Taş Fırın & Ocaklık Kültürü',
       desc: 'Sabahın ilk meşe ateşini yakan, bakır tepsilerde İslahiye tavasını demlendiren ve tırnaklı pideyi kürekle alevle buluşturan çarşı ocaklığı geleneği.',
-      fieldCountLabel: 'Temsili Kültürel Anlatı',
+      fieldCountLabel: 'Kültürel Zanaat Anlatısı',
     },
     {
       id: 'agriculture',
       title: 'Toprak & Biber Üretimi',
       desc: 'İslahiye Ovası’nın alüvyon toprağında tescilli biberi yetiştiren, eylül sergilerinde güneşte kurutan ve taş dibeklerde işleyen ova emektarları.',
-      fieldCountLabel: 'Temsili Kültürel Anlatı',
+      fieldCountLabel: 'Kültürel Zanaat Anlatısı',
     },
     {
       id: 'pastry',
       title: 'Geleneksel Hamur Zanaatı',
       desc: 'Ahşap oymalı kalıplarla bayram kömbesini desenleyen ve sac üzerinde peynirli semsek böreği yufkası açan mutfak ustaları.',
-      fieldCountLabel: 'Temsili Kültürel Anlatı',
+      fieldCountLabel: 'Kültürel Zanaat Anlatısı',
     },
   ],
 };

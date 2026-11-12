@@ -1,16 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Clock,
   ChefHat,
   Users,
   Search,
   ArrowRight,
-  ArrowLeft,
   Award,
   UtensilsCrossed,
   LayoutGrid,
   BookOpen,
+  MapPin,
 } from 'lucide-react';
 import { useContent } from '../hooks/useContent';
 import { DishCategory } from '../types';
@@ -20,38 +20,72 @@ import { ImageWithFallback } from '../components/ui/ImageWithFallback';
 import { RecipeWorkshop } from '../components/home/RecipeWorkshop';
 
 export const DishesCatalogPage: React.FC = () => {
-  const { getDishes } = useContent();
+  const { getDishes, getCategories } = useContent();
   const allDishes = getDishes(true);
+  const dishCategories = getCategories('dish', true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+
+  const urlView =
+    searchParams.get('view') === 'book' || Boolean(searchParams.get('recipe')) ? 'book' : 'grid';
+  const initialBookRecipeId = searchParams.get('recipe') || 'recipe-islahiye-tava';
 
   const [activeCategory, setActiveCategory] = useState<DishCategory>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'grid' | 'book'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'book'>(urlView);
+
+  useEffect(() => {
+    setViewMode(urlView);
+  }, [urlView]);
+
+  useEffect(() => {
+    if (
+      viewMode === 'book' &&
+      (Boolean(searchParams.get('recipe')) ||
+        location.hash === '#tarif-atolyesi' ||
+        location.hash === '#ustayla-pisir')
+    ) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('tarif-atolyesi');
+        if (el) {
+          const headerEl = document.querySelector('header');
+          const offset = headerEl ? headerEl.getBoundingClientRect().height + 16 : 96;
+          const y = el.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [viewMode, searchParams, location.hash]);
+
+  const handleViewModeChange = (mode: 'grid' | 'book') => {
+    setViewMode(mode);
+    const next = new URLSearchParams(searchParams);
+    if (mode === 'book') {
+      next.set('view', 'book');
+    } else {
+      next.delete('view');
+      next.delete('recipe');
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const categories: { key: DishCategory; label: string; count: number }[] = useMemo(() => {
     return [
       { key: 'all', label: 'Tüm Lezzetler', count: allDishes.length },
-      {
-        key: 'main',
-        label: 'Ana Yemekler',
-        count: allDishes.filter((d) => d.category === 'main').length,
-      },
-      {
-        key: 'pastry',
-        label: 'Hamur İşleri',
-        count: allDishes.filter((d) => d.category === 'pastry').length,
-      },
-      {
-        key: 'local_product',
-        label: 'Yöresel Ürünler',
-        count: allDishes.filter((d) => d.category === 'local_product').length,
-      },
-      {
-        key: 'dessert',
-        label: 'Tatlılar',
-        count: allDishes.filter((d) => d.category === 'dessert').length,
-      },
+      ...dishCategories.map((cat) => ({
+        key: cat.id as DishCategory,
+        label: cat.label,
+        count: allDishes.filter((d) => d.category === cat.id).length,
+      })),
     ];
-  }, [allDishes]);
+  }, [allDishes, dishCategories]);
+
+  useEffect(() => {
+    if (activeCategory !== 'all' && !dishCategories.some((c) => c.id === activeCategory)) {
+      setActiveCategory('all');
+    }
+  }, [activeCategory, dishCategories]);
 
   // Filtered dishes
   const filteredDishes = useMemo(() => {
@@ -62,12 +96,12 @@ export const DishesCatalogPage: React.FC = () => {
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+      const q = searchQuery.toLocaleLowerCase('tr-TR').trim();
       result = result.filter(
         (d) =>
-          d.name.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          d.ingredients.some((ing) => ing.name.toLowerCase().includes(q))
+          d.name.toLocaleLowerCase('tr-TR').includes(q) ||
+          d.description.toLocaleLowerCase('tr-TR').includes(q) ||
+          d.ingredients.some((ing) => ing.name.toLocaleLowerCase('tr-TR').includes(q))
       );
     }
 
@@ -93,11 +127,11 @@ export const DishesCatalogPage: React.FC = () => {
             </div>
 
             <Link
-              to="/#lezzet-haritasi"
+              to="/lezzet-haritasi"
               className="inline-flex items-center gap-1.5 text-xs text-[#203B31] font-semibold hover:text-[#BA855E] transition-colors"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Haritaya Git</span>
+              <MapPin className="w-3.5 h-3.5 text-[#BA855E]" />
+              <span>Lezzet Haritasına Git</span>
             </Link>
           </div>
         </div>
@@ -109,7 +143,7 @@ export const DishesCatalogPage: React.FC = () => {
               <div className="max-w-3xl">
                 <div className="inline-flex items-center gap-2 mb-3">
                   <span className="w-8 h-px bg-[#BA855E]" />
-                  <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-[#936645] font-semibold">
+                  <span className="text-[11px] font-sans uppercase tracking-[0.25em] text-[#936645] font-bold">
                     İSLAHİYE LEZZET ARŞİVİ &amp; REÇETE DERLEMESİ
                   </span>
                 </div>
@@ -124,11 +158,11 @@ export const DishesCatalogPage: React.FC = () => {
               </div>
 
               {/* View Mode Switcher: Grid vs Open Book */}
-              <div className="flex items-center p-1 bg-[#F6F2E9] rounded-xs border border-[#DCCAB2] shrink-0 self-start md:self-auto shadow-2xs">
+              <div className="flex items-center p-1 bg-[#F6F2E9] rounded-xl border border-[#DCCAB2] shrink-0 self-start md:self-auto shadow-2xs">
                 <button
                   type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xs text-xs font-semibold uppercase tracking-wider transition-all ${
+                  onClick={() => handleViewModeChange('grid')}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all ${
                     viewMode === 'grid'
                       ? 'bg-[#203B31] text-[#F6F2E9] shadow-xs'
                       : 'text-[#242724]/70 hover:text-[#203B31]'
@@ -140,8 +174,8 @@ export const DishesCatalogPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => setViewMode('book')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xs text-xs font-semibold uppercase tracking-wider transition-all ${
+                  onClick={() => handleViewModeChange('book')}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all ${
                     viewMode === 'book'
                       ? 'bg-[#203B31] text-[#F6F2E9] shadow-xs'
                       : 'text-[#242724]/70 hover:text-[#203B31]'
@@ -165,14 +199,14 @@ export const DishesCatalogPage: React.FC = () => {
                         key={cat.key}
                         type="button"
                         onClick={() => setActiveCategory(cat.key)}
-                        className={`px-4 py-2 rounded-xs text-xs font-semibold whitespace-nowrap transition-all ${
+                        className={`px-4 py-2 rounded-xl text-xs font-sans font-bold whitespace-nowrap transition-all ${
                           isActive
                             ? 'bg-[#203B31] text-[#F6F2E9] shadow-xs'
                             : 'bg-[#F6F2E9] text-[#242724]/70 border border-[#DCCAB2] hover:border-[#BA855E]'
                         }`}
                       >
                         <span>{cat.label}</span>
-                        <span className="ml-1.5 opacity-60 text-[10px] font-mono">
+                        <span className="ml-1.5 opacity-70 text-[10px] font-sans tabular-nums font-semibold">
                           ({cat.count})
                         </span>
                       </button>
@@ -188,7 +222,7 @@ export const DishesCatalogPage: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Yemek veya malzeme ara..."
-                    className="w-full pl-9 pr-4 py-2 rounded-xs bg-[#F6F2E9] border border-[#DCCAB2] text-xs text-[#242724] placeholder-[#242724]/40 focus:outline-none focus:border-[#BA855E] focus:bg-[#FFFCF7]"
+                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#F6F2E9] border border-[#DCCAB2] text-xs font-sans text-[#242724] placeholder-[#242724]/40 focus:outline-none focus:border-[#BA855E] focus:bg-[#FFFCF7]"
                   />
                 </div>
               </div>
@@ -200,14 +234,14 @@ export const DishesCatalogPage: React.FC = () => {
         {viewMode === 'book' ? (
           /* AÇIK TARİF KİTABI TEZGÂHI (FOTOGERÇEKÇİ KİTAP GÖRÜNÜMÜ) */
           <div className="border-t border-[#DCCAB2]/60">
-            <RecipeWorkshop initialRecipeId="recipe-islahiye-tava" />
+            <RecipeWorkshop initialRecipeId={initialBookRecipeId} />
           </div>
         ) : (
           /* KART IZGARASI GÖRÜNÜMÜ */
           <section className="py-12 md:py-16">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               {filteredDishes.length === 0 ? (
-                <div className="py-20 text-center bg-[#FFFCF7] rounded-xs border border-[#DCCAB2] p-8">
+                <div className="py-20 text-center bg-[#FFFCF7] rounded-2xl border border-[#DCCAB2] p-8">
                   <UtensilsCrossed className="w-10 h-10 text-[#BA855E] mx-auto mb-3 opacity-60" />
                   <h3 className="text-xl font-display font-medium text-[#203B31] mb-2">
                     Aramanıza Uygun Lezzet Bulunamadı
@@ -221,7 +255,7 @@ export const DishesCatalogPage: React.FC = () => {
                       setSearchQuery('');
                       setActiveCategory('all');
                     }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xs bg-[#203B31] text-[#F6F2E9] text-xs font-semibold uppercase"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#203B31] text-[#F6F2E9] text-xs font-sans font-bold uppercase"
                   >
                     Filtreleri Temizle
                   </button>
@@ -231,7 +265,7 @@ export const DishesCatalogPage: React.FC = () => {
                   {filteredDishes.map((dish) => (
                     <article
                       key={dish.id}
-                      className="bg-[#FFFCF7] rounded-xs border border-[#DCCAB2] overflow-hidden flex flex-col justify-between shadow-xs hover:border-[#BA855E] transition-all group"
+                      className="bg-[#FFFCF7] rounded-2xl border border-[#DCCAB2] overflow-hidden flex flex-col justify-between shadow-xs hover:border-[#BA855E] transition-all group"
                     >
                       <div>
                         {/* Photo Container */}
@@ -247,21 +281,23 @@ export const DishesCatalogPage: React.FC = () => {
 
                           {/* Top Badges */}
                           <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                            <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded-2xs bg-[#203B31] text-[#F6F2E9]">
+                            <span className="text-[10px] font-sans font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#203B31] text-[#F6F2E9]">
                               {dish.categoryLabel}
                             </span>
                           </div>
 
                           {dish.isRegisteredGeographicalIndication && (
                             <div className="absolute top-2.5 right-2.5">
-                              <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-2xs bg-[#BA855E] text-[#FFFCF7] shadow-xs">
+                              <span className="inline-flex items-center gap-1 text-[9px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#BA855E] text-[#FFFCF7] shadow-xs">
                                 <Award className="w-3 h-3" />
-                                Tescil 991
+                                {dish.id === 'islahiye-biberi'
+                                  ? dish.giStatusNote || 'Tescil 991'
+                                  : dish.giStatusNote || 'Coğrafi İşaret Kaydı'}
                               </span>
                             </div>
                           )}
 
-                          <div className="absolute bottom-2.5 left-2.5 text-white/90 text-[11px] font-sans">
+                          <div className="absolute bottom-2.5 left-2.5 text-white/90 text-[11px] font-sans font-medium">
                             {dish.originNote}
                           </div>
                         </div>
@@ -279,7 +315,7 @@ export const DishesCatalogPage: React.FC = () => {
                           </p>
 
                           {/* Metrics */}
-                          <div className="flex items-center gap-4 text-xs text-[#242724]/70 pt-3 border-t border-[#DCCAB2]/60">
+                          <div className="flex items-center gap-4 text-xs text-[#242724]/70 pt-3 border-t border-[#DCCAB2]/60 font-sans">
                             <div className="flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5 text-[#BA855E]" />
                               <span>{dish.cookTime}</span>
@@ -300,7 +336,7 @@ export const DishesCatalogPage: React.FC = () => {
                       <div className="p-6 pt-0">
                         <Link
                           to={`/yemekler/${dish.id}`}
-                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xs bg-[#F6F2E9] border border-[#DCCAB2] text-[#203B31] text-xs font-semibold uppercase tracking-wider group-hover:bg-[#203B31] group-hover:text-[#F6F2E9] group-hover:border-[#203B31] transition-all"
+                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#F6F2E9] border border-[#DCCAB2] text-[#203B31] text-xs font-sans font-bold uppercase tracking-wider group-hover:bg-[#203B31] group-hover:text-[#F6F2E9] group-hover:border-[#203B31] transition-all"
                         >
                           <span>Tarifi &amp; Pişirme Güncesini İncele</span>
                           <ArrowRight className="w-3.5 h-3.5 text-[#BA855E] group-hover:text-[#F6F2E9]" />

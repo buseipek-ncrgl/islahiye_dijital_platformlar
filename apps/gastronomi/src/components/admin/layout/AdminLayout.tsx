@@ -1,30 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopbar } from './AdminTopbar';
+import { BackendOfflineBanner } from '../common/BackendOfflineBanner';
+import { AdminRoleProvider } from '../../../context/AdminRoleContext';
+import { AdminAuthProvider } from '../../../context/AdminAuthContext';
+import { AdminAuthGuard } from '../auth/AdminAuthGuard';
+import { BackendConnectionProvider, useBackendConnection } from '../../../context/BackendConnectionContext';
 
-export const AdminLayout: React.FC = () => {
+const AdminShell: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { isOnline } = useBackendConnection();
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   // Get dynamic page title based on path
   const getPageInfo = () => {
     const p = location.pathname;
     if (p === '/yonetim') {
       return {
-        title: 'Kurumsal CMS Genel Bakış',
-        subtitle: 'İslahiye Lezzet Atlası içerik envanteri, yayın durumu ve güvenilirlik metrikleri.',
+        title: 'Gastronomi Yönetim Portalı Genel Bakış',
+        subtitle: 'İslahiye Lezzet Atlası içerik envanteri, yayın durumu ve envanter metrikleri.',
       };
     }
     if (p.includes('/yemekler')) {
       return {
-        title: 'Yöresel Yemek Envanteri',
+        title: 'Yöresel Yemekler Envanteri',
         subtitle: 'Tescilli ve geleneksel İslahiye yemekleri, kategori ve malzeme tanımları.',
       };
     }
     if (p.includes('/tarifler')) {
       return {
-        title: 'Tarif Atölyesi Yönetimi',
+        title: 'Geleneksel Tarifler Envanteri',
         subtitle: 'Porsiyon ölçekli tarif adımları, usta ipuçları ve ocaklık hazırlıkları.',
       };
     }
@@ -42,7 +52,7 @@ export const AdminLayout: React.FC = () => {
     }
     if (p.includes('/harita')) {
       return {
-        title: 'Gastronomi Haritası Noktaları',
+        title: 'Gastronomi Haritası & Lezzet Durakları',
         subtitle: 'Kültürel keşif atlası ve doğrulanmış fiziksel ziyaret noktaları yönetimi.',
       };
     }
@@ -66,7 +76,7 @@ export const AdminLayout: React.FC = () => {
     }
     if (p.includes('/duyurular')) {
       return {
-        title: 'Kurumsal Duyurular',
+        title: 'Kurumsal Duyurular Masası',
         subtitle: 'Resmî bilgilendirmeler, program çağrıları ve faaliyet takvimi.',
       };
     }
@@ -78,13 +88,13 @@ export const AdminLayout: React.FC = () => {
     }
     if (p.includes('/yayin-yonetimi')) {
       return {
-        title: 'Yayın ve Doğrulama Denetimi',
+        title: 'Merkezi Yayın & Doğrulama Masası',
         subtitle: 'Yayındaki ve taslaktaki içeriklerin güvenilirlik ve kaynak denetimi.',
       };
     }
     if (p.includes('/ayarlar')) {
       return {
-        title: 'Sistem Ayarları & Rol Simülasyonu',
+        title: 'Sistem Ayarları & Rol Yönetimi',
         subtitle: 'CMS konfigürasyonu, erişim yetkileri ve kurumsal veri ilkeleri.',
       };
     }
@@ -97,7 +107,7 @@ export const AdminLayout: React.FC = () => {
   const { title, subtitle } = getPageInfo();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-charcoal font-sans antialiased">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased admin-cms">
       {/* Sidebar */}
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -112,19 +122,38 @@ export const AdminLayout: React.FC = () => {
 
         {/* Dynamic Page Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          <BackendOfflineBanner />
           <Outlet />
         </main>
 
         {/* CMS Subtle Footer */}
-        <footer className="h-12 border-t border-slate-200 px-6 flex items-center justify-between text-[11px] font-mono text-slate-500 bg-white">
-          <div>
-            İslahiye Dijital Platformlar — Gastronomi CMS v0.2.0 (Demo)
+        <footer className="h-12 border-t border-slate-200 px-6 flex items-center justify-between text-xs text-slate-500 bg-white">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700">İslahiye Dijital Platformlar</span>
+            <span>—</span>
+            <span>Gastronomi CMS Portalı</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span>Sprint 02A: Salt Okunur Yönetim Arayüzü</span>
+          <div className="flex items-center gap-4 text-[11px] text-slate-500">
+            <span>
+              {isOnline ? 'Bağlantı: Sunucu API Aktif' : 'Depo: Yerel Tarayıcı Belleği'}
+            </span>
           </div>
         </footer>
       </div>
     </div>
+  );
+};
+
+export const AdminLayout: React.FC = () => {
+  return (
+    <AdminAuthProvider>
+      <AdminAuthGuard>
+        <BackendConnectionProvider>
+          <AdminRoleProvider>
+            <AdminShell />
+          </AdminRoleProvider>
+        </BackendConnectionProvider>
+      </AdminAuthGuard>
+    </AdminAuthProvider>
   );
 };

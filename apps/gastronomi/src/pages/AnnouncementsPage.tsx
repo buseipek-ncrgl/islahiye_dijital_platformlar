@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,14 +11,9 @@ import {
 } from 'lucide-react';
 import { useContent } from '../hooks/useContent';
 import { Announcement, AnnouncementCategory } from '../types';
-
-const CATEGORIES: { id: AnnouncementCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'Tüm Duyurular' },
-  { id: 'gastronomi', label: 'Resmî Coğrafi İşaret' },
-  { id: 'kurumsal', label: 'Kurumsal Bilgilendirme' },
-  { id: 'kultur', label: 'Kültürel Program' },
-  { id: 'egitim', label: 'Eğitim & Gelişim' },
-];
+import { Header } from '../components/layout/Header';
+import { Footer } from '../components/layout/Footer';
+import { sanitizeUrl } from '../utils/security';
 
 function isAnnouncementActive(ann: Announcement): boolean {
   if (!ann.validUntil) return true;
@@ -36,11 +31,29 @@ function isAnnouncementActive(ann: Announcement): boolean {
 }
 
 export const AnnouncementsPage: React.FC = () => {
-  const { getAnnouncements } = useContent();
+  const { getAnnouncements, getCategories } = useContent();
   const publishedAnnouncements = getAnnouncements(true);
+  const announcementCategories = getCategories('announcement', true);
 
   const [selectedCategory, setSelectedCategory] = useState<AnnouncementCategory | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(publishedAnnouncements[0]?.id || null);
+
+  const CATEGORIES = useMemo(
+    () => [
+      { id: 'all' as AnnouncementCategory | 'all', label: 'Tüm Duyurular' },
+      ...announcementCategories.map((c) => ({
+        id: c.id as AnnouncementCategory | 'all',
+        label: c.label,
+      })),
+    ],
+    [announcementCategories]
+  );
+
+  useEffect(() => {
+    if (selectedCategory !== 'all' && !announcementCategories.some((c) => c.id === selectedCategory)) {
+      setSelectedCategory('all');
+    }
+  }, [selectedCategory, announcementCategories]);
 
   const filteredAnnouncements = useMemo(() => {
     return publishedAnnouncements.filter((ann) => {
@@ -49,24 +62,26 @@ export const AnnouncementsPage: React.FC = () => {
   }, [publishedAnnouncements, selectedCategory]);
 
   return (
-    <div className="min-h-screen bg-ivory text-charcoal pt-24 pb-24">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Navigation Breadcrumb */}
-        <div className="mb-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-copper hover:text-forest transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Ana Sayfaya Dön</span>
-          </Link>
-        </div>
+    <div className="min-h-screen bg-ivory text-charcoal font-sans selection:bg-copper selection:text-ivory flex flex-col justify-between">
+      <Header />
+      <main className="flex-1 pt-24 pb-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Navigation Breadcrumb */}
+          <div className="mb-6">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 text-xs font-sans uppercase tracking-wider text-copper hover:text-forest transition-colors font-bold"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Ana Sayfaya Dön</span>
+            </Link>
+          </div>
 
         {/* Page Masthead Header */}
         <div className="mb-10 border-b border-sand/70 pb-8">
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="w-8 h-px bg-copper" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
+            <span className="text-[11px] font-sans uppercase tracking-[0.25em] text-copper-dark font-bold">
               İSLAHİYE TİCARET ODASI • KURUMSAL BÜLTEN & BİLDİRİMLER
             </span>
           </div>
@@ -76,8 +91,8 @@ export const AnnouncementsPage: React.FC = () => {
           </h1>
 
           <p className="text-sm sm:text-base text-charcoal/75 max-w-2xl font-sans leading-relaxed">
-            İslahiye yöresel değerleri, TÜRKPATENT tescilli ürün kayıtları ve gastronomi platformu
-            geliştirme sürecine ilişkin resmî ve editoryal bilgilendirme envanteri.
+            İslahiye yöresel lezzetleri, TÜRKPATENT tescilli ürün kayıtları ve kurumsal faaliyetlere
+            ilişkin resmî ve editoryal bilgilendirme arşivi.
           </p>
 
           {/* Category Tabs */}
@@ -118,7 +133,7 @@ export const AnnouncementsPage: React.FC = () => {
               return (
                 <article
                   key={ann.id}
-                  className={`bg-paper border rounded-sm overflow-hidden transition-all duration-300 ${
+                  className={`bg-paper border rounded-2xl overflow-hidden transition-all duration-300 ${
                     isExpanded
                       ? 'border-copper/60 shadow-xs'
                       : 'border-sand/80 hover:border-copper/40'
@@ -134,28 +149,28 @@ export const AnnouncementsPage: React.FC = () => {
                   >
                     <div className="flex-1 min-w-0">
                       {/* Meta Kicker Line */}
-                      <div className="flex flex-wrap items-center gap-2.5 mb-2.5 text-xs font-mono">
+                      <div className="flex flex-wrap items-center gap-2.5 mb-2.5 text-xs font-sans">
                         {!isActive ? (
-                          <span className="text-[10px] uppercase font-semibold text-charcoal/45 bg-sand/30 px-2 py-0.5 rounded-xs border border-sand/60">
+                          <span className="text-[10px] uppercase font-semibold text-charcoal/45 bg-sand/30 px-2 py-0.5 rounded-md border border-sand/60">
                             Geçerlilik Süresi Sona Ermiştir (Arşiv)
                           </span>
-                        ) : ann.isDemo ? (
-                          <span className="text-[10px] uppercase font-semibold text-copper-dark bg-copper/10 px-2 py-0.5 rounded-xs border border-copper/20">
-                            Temsili Demo Bildirimi
+                        ) : ann.sourceUrl ? (
+                          <span className="text-[10px] uppercase font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-md border border-forest/20">
+                            Resmî Tescil Kaydı
                           </span>
                         ) : (
-                          <span className="text-[10px] uppercase font-bold text-forest bg-forest/10 px-2 py-0.5 rounded-xs border border-forest/20">
-                            Doğrulanmış Resmî Kayıt
+                          <span className="text-[10px] uppercase font-bold text-copper-dark bg-copper/10 px-2.5 py-0.5 rounded-md border border-copper/20">
+                            Kurumsal Bilgilendirme
                           </span>
                         )}
 
-                        <span className="text-copper-dark font-semibold uppercase">
+                        <span className="text-copper-dark font-bold uppercase">
                           {ann.categoryLabel}
                         </span>
 
                         <span className="text-charcoal/30">•</span>
 
-                        <span className="flex items-center gap-1 text-charcoal/50">
+                        <span className="flex items-center gap-1 text-charcoal/60 font-medium">
                           <Calendar className="w-3.5 h-3.5" />
                           {ann.formattedDate}
                         </span>
@@ -193,18 +208,18 @@ export const AnnouncementsPage: React.FC = () => {
                         ))}
                       </div>
 
-                      <div className="pt-4 border-t border-sand/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono text-charcoal/65">
-                        <div className="flex items-center gap-1.5">
+                      <div className="pt-4 border-t border-sand/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-sans text-charcoal/65">
+                        <div className="flex items-center gap-1.5 font-medium">
                           <Building className="w-3.5 h-3.5 text-copper shrink-0" />
                           <span>Kaynak: {ann.officialSource}</span>
                         </div>
 
-                        {ann.sourceUrl && (
+                        {ann.sourceUrl && sanitizeUrl(ann.sourceUrl) && (
                           <a
-                            href={ann.sourceUrl}
+                            href={sanitizeUrl(ann.sourceUrl)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-copper hover:text-forest font-semibold transition-colors shrink-0"
+                            className="inline-flex items-center gap-1.5 text-copper hover:text-forest font-bold transition-colors shrink-0"
                           >
                             <span>Resmî TÜRKPATENT Kaydını Gör</span>
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -229,12 +244,14 @@ export const AnnouncementsPage: React.FC = () => {
             <p className="leading-relaxed">
               Bu sayfada yer alan bilgiler; TÜRKPATENT nezdinde 991 numarasıyla tescilli İslahiye Biberi'ne
               (Tescil Ettiren: Gaziantep Ticaret Borsası, Tescil Tarihi: 05.01.2022) ilişkin resmî kayıtları ve
-              İslahiye Dijital Platformlar koordinasyonunda geliştirilen dijital platform prototipine ait bildirimleri kapsar.
-              Arayüz tasarımı amacıyla kurgulanmış örnek bildirimler açıkça "Temsili Demo Bildirimi" olarak etiketlenmiştir.
+              İslahiye Lezzet Atlası koordinasyonunda yürütülen kültürel envanter bildirimlerini kapsar.
+              Kurumsal bildirimler ile tescil ilanları resmî kayıt kaynaklarıyla doğrulanarak sunulmaktadır.
             </p>
           </div>
         </div>
-      </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 };

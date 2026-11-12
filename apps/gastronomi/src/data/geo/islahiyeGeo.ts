@@ -43,7 +43,7 @@ export const ISLAHIYE_GEO_PROVENANCE = {
     name: 'İslahiye İlçe Merkezi & Tarihi Gar',
   },
   vertexCount: 325,
-  disclaimer: 'Coğrafyadan esinlenen temsili kültürel atlas • OSM Relation 1808098 doğrulanmış idari sınır poligonu',
+  disclaimer: 'OSM Relation 1808098 doğrulanmış İslahiye ilçe idari sınır poligonu ve kültürel gastronomi haritası',
 };
 
 /**

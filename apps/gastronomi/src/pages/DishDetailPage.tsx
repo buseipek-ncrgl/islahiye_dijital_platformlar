@@ -22,7 +22,7 @@ import { RecipeWorkshop } from '../components/home/RecipeWorkshop';
 export const DishDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { getDishes, getDishById, getPlaces } = useContent();
+  const { getDishes, getDishById, getPlaces, getRecipeById, getRecipes } = useContent();
 
   const allDishes = getDishes(true);
 
@@ -81,8 +81,16 @@ export const DishDetailPage: React.FC = () => {
     );
   }
 
-  // Determine initial recipe id for the workshop
-  const workshopRecipeId = dish.recipeId || (dish.id.startsWith('recipe-') ? dish.id : `recipe-${dish.id}`);
+  // Determine initial recipe id for the workshop via reactive store
+  const linkedRecipe = useMemo(() => {
+    if (!dish) return undefined;
+    if (dish.recipeId) {
+      const direct = getRecipeById(dish.recipeId);
+      if (direct) return direct;
+    }
+    return getRecipes(true).find((r) => r.dishId === dish.id);
+  }, [dish, getRecipeById, getRecipes]);
+  const workshopRecipeId = linkedRecipe?.id;
 
   return (
     <div className="min-h-screen bg-[#F6F2E9] text-[#242724] font-sans selection:bg-[#BA855E] selection:text-[#F6F2E9]">
@@ -97,7 +105,7 @@ export const DishDetailPage: React.FC = () => {
                 Ana Sayfa
               </Link>
               <span>/</span>
-              <Link to="/#lezzet-haritasi" className="hover:text-[#203B31] transition-colors">
+              <Link to="/lezzet-haritasi" className="hover:text-[#203B31] transition-colors">
                 Lezzet Haritası
               </Link>
               <span>/</span>
@@ -114,7 +122,7 @@ export const DishDetailPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleShare}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xs border border-[#DCCAB2] bg-[#F6F2E9] text-[#203B31] text-[11px] font-semibold hover:border-[#BA855E] transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#DCCAB2] bg-[#F6F2E9] text-[#203B31] text-[11px] font-sans font-bold hover:border-[#BA855E] transition-colors"
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-[#BA855E]" />}
                 <span>{copiedLink ? 'Bağlantı Kopyalandı' : 'Paylaş'}</span>
@@ -123,7 +131,7 @@ export const DishDetailPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/yemekler')}
-                className="inline-flex items-center gap-1.5 text-xs text-[#203B31] font-semibold hover:text-[#BA855E] transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-[#203B31] font-sans font-bold hover:text-[#BA855E] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Kataloğa Dön</span>
@@ -140,16 +148,16 @@ export const DishDetailPage: React.FC = () => {
               <div className="lg:col-span-7">
                 {/* Provenance & Category Badges */}
                 <div className="flex flex-wrap items-center gap-2.5 mb-4">
-                  <span className="text-[11px] font-mono font-semibold uppercase tracking-[0.2em] px-3 py-1 rounded-2xs bg-[#203B31] text-[#F6F2E9]">
+                  <span className="text-[11px] font-sans font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-md bg-[#203B31] text-[#F6F2E9]">
                     {dish.categoryLabel}
                   </span>
 
-                  <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#936645] px-2.5 py-1 rounded-2xs bg-[#F6F2E9] border border-[#DCCAB2]">
+                  <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-[#936645] px-2.5 py-1 rounded-md bg-[#F6F2E9] border border-[#DCCAB2]">
                     {dish.originNote}
                   </span>
 
-                  {dish.isRegisteredGeographicalIndication && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold uppercase tracking-wider text-[#BA855E] px-2.5 py-1 rounded-2xs bg-[#BA855E]/10 border border-[#BA855E]/40">
+                  {dish.id === 'islahiye-biberi' && dish.isRegisteredGeographicalIndication && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-sans font-bold uppercase tracking-wider text-[#BA855E] px-2.5 py-1 rounded-md bg-[#BA855E]/10 border border-[#BA855E]/40">
                       <Award className="w-3.5 h-3.5" />
                       TÜRKPATENT TESCİLLİ • NO: 991
                     </span>
@@ -173,8 +181,8 @@ export const DishDetailPage: React.FC = () => {
 
                 {/* Cultural Note Box */}
                 {dish.culturalNote && (
-                  <div className="p-4 sm:p-5 rounded-xs bg-[#F6F2E9] border-l-3 border-[#BA855E] mb-8">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-[#936645] font-semibold block mb-1">
+                  <div className="p-4 sm:p-5 rounded-xl bg-[#F6F2E9] border-l-4 border-[#BA855E] mb-8">
+                    <span className="text-[10px] font-sans uppercase tracking-[0.2em] text-[#936645] font-bold block mb-1">
                       OCAKLIK &amp; GELENEK NOTU
                     </span>
                     <p className="text-xs sm:text-sm text-[#242724]/80 font-sans leading-relaxed">
@@ -185,32 +193,32 @@ export const DishDetailPage: React.FC = () => {
 
                 {/* Quick Cooking Metrics */}
                 <div className="grid grid-cols-3 gap-3 pt-6 border-t border-[#DCCAB2]/60">
-                  <div className="p-3 rounded-xs bg-[#F6F2E9] border border-[#DCCAB2]/60">
+                  <div className="p-3.5 rounded-xl bg-[#F6F2E9] border border-[#DCCAB2]/60">
                     <div className="flex items-center gap-1.5 text-xs text-[#242724]/60 mb-1">
                       <Clock className="w-3.5 h-3.5 text-[#BA855E]" />
                       <span>Hazırlık &amp; Pişirme</span>
                     </div>
-                    <span className="text-sm font-semibold text-[#203B31] font-sans">
+                    <span className="text-sm font-bold text-[#203B31] font-sans tabular-nums">
                       {dish.prepTime} + {dish.cookTime}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-xs bg-[#F6F2E9] border border-[#DCCAB2]/60">
+                  <div className="p-3.5 rounded-xl bg-[#F6F2E9] border border-[#DCCAB2]/60">
                     <div className="flex items-center gap-1.5 text-xs text-[#242724]/60 mb-1">
                       <ChefHat className="w-3.5 h-3.5 text-[#BA855E]" />
                       <span>Zorluk Seviyesi</span>
                     </div>
-                    <span className="text-sm font-semibold text-[#203B31] font-sans">
+                    <span className="text-sm font-bold text-[#203B31] font-sans">
                       {dish.difficulty}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-xs bg-[#F6F2E9] border border-[#DCCAB2]/60">
+                  <div className="p-3.5 rounded-xl bg-[#F6F2E9] border border-[#DCCAB2]/60">
                     <div className="flex items-center gap-1.5 text-xs text-[#242724]/60 mb-1">
                       <Users className="w-3.5 h-3.5 text-[#BA855E]" />
                       <span>Temel Porsiyon</span>
                     </div>
-                    <span className="text-sm font-semibold text-[#203B31] font-sans">
+                    <span className="text-sm font-bold text-[#203B31] font-sans tabular-nums">
                       {dish.servings}
                     </span>
                   </div>
@@ -219,7 +227,7 @@ export const DishDetailPage: React.FC = () => {
 
               {/* Right Column: Hero Dish Photography (5 cols) */}
               <div className="lg:col-span-5">
-                <div className="relative aspect-[4/3] sm:aspect-square rounded-xs overflow-hidden shadow-md border-2 border-[#DCCAB2] bg-[#203B31]">
+                <div className="relative aspect-[4/3] sm:aspect-square rounded-2xl overflow-hidden shadow-md border-2 border-[#DCCAB2] bg-[#203B31]">
                   <ImageWithFallback
                     src={dish.imageUrl}
                     alt={dish.imageAlt}
@@ -231,22 +239,22 @@ export const DishDetailPage: React.FC = () => {
 
                   <div className="absolute bottom-3 left-3 right-3 text-white/90 text-[11px] font-sans flex items-center justify-between">
                     <span>{dish.imageCredit || 'İslahiye Gastronomi Arşivi'}</span>
-                    <span className="font-mono text-[10px] bg-black/40 px-2 py-0.5 rounded-2xs">
-                      Gerçek Saha Çekimi
+                    <span className="font-sans font-bold text-[10px] bg-black/50 px-2.5 py-0.5 rounded-md">
+                      İslahiye Lezzet Arşivi
                     </span>
                   </div>
                 </div>
 
                 {/* Linked physical place teaser if available */}
                 {linkedPlace && (
-                  <div className="mt-4 p-4 rounded-xs bg-[#F6F2E9] border border-[#DCCAB2] flex items-center justify-between gap-4">
+                  <div className="mt-4 p-4 rounded-xl bg-[#F6F2E9] border border-[#DCCAB2] flex items-center justify-between gap-4">
                     <div className="flex items-start gap-2.5">
                       <MapPin className="w-4 h-4 text-[#BA855E] shrink-0 mt-0.5" />
                       <div>
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#936645] font-semibold block">
+                        <span className="text-[10px] font-sans uppercase tracking-[0.2em] text-[#936645] font-bold block">
                           DOĞRULANMIŞ ÇARŞI DURAĞI
                         </span>
-                        <h4 className="text-xs font-semibold text-[#203B31]">
+                        <h4 className="text-xs font-bold text-[#203B31]">
                           {linkedPlace.name}
                         </h4>
                         <p className="text-[11px] text-[#242724]/70">
@@ -257,7 +265,7 @@ export const DishDetailPage: React.FC = () => {
 
                     <Link
                       to={`/lezzet-haritasi?placeId=${linkedPlace.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-[#BA855E] font-semibold hover:text-[#203B31] transition-colors shrink-0"
+                      className="inline-flex items-center gap-1 text-xs text-[#BA855E] font-bold hover:text-[#203B31] transition-colors shrink-0"
                     >
                       <span>Haritada Gör</span>
                       <ArrowRight className="w-3 h-3" />
@@ -270,7 +278,7 @@ export const DishDetailPage: React.FC = () => {
         </section>
 
         {/* 3. USTAYLA PİŞİR: FOTOGERÇEKÇİ AÇIK YEMEK KİTABI TEZGÂHI */}
-        <section id="ustayla-pisir" className="border-t border-[#DCCAB2]/60">
+        <section id="ustayla-pisir" className="border-t border-[#DCCAB2]/60 scroll-mt-24">
           <RecipeWorkshop initialRecipeId={workshopRecipeId} />
         </section>
 
@@ -280,7 +288,7 @@ export const DishDetailPage: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-[#936645] font-semibold block mb-1">
+                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] text-[#936645] font-bold block mb-1">
                     GELENEKSEL LEZZETLERİMİZ
                   </span>
                   <h3 className="text-2xl font-display font-medium text-[#203B31]">
@@ -290,7 +298,7 @@ export const DishDetailPage: React.FC = () => {
 
                 <Link
                   to="/yemekler"
-                  className="inline-flex items-center gap-1 text-xs text-[#203B31] font-semibold hover:text-[#BA855E] transition-colors"
+                  className="inline-flex items-center gap-1 text-xs text-[#203B31] font-bold hover:text-[#BA855E] transition-colors"
                 >
                   <span>Tüm Kataloğu Gör</span>
                   <ArrowRight className="w-3.5 h-3.5 text-[#BA855E]" />
@@ -302,24 +310,26 @@ export const DishDetailPage: React.FC = () => {
                   <Link
                     key={other.id}
                     to={`/yemekler/${other.id}`}
-                    className="bg-[#F6F2E9] rounded-xs border border-[#DCCAB2]/80 overflow-hidden group hover:border-[#BA855E]/60 transition-all flex flex-col justify-between"
+                    className="bg-[#F6F2E9] rounded-2xl border border-[#DCCAB2]/80 overflow-hidden group hover:border-[#BA855E]/60 transition-all flex flex-col justify-between"
                   >
                     <div>
                       <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#203B31]">
-                        <img
+                        <ImageWithFallback
                           src={other.imageUrl}
                           alt={other.imageAlt}
+                          fallbackText={other.name}
+                          containerClassName="w-full h-full"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 filter saturate-[1.05]"
                         />
                         <div className="absolute top-2 left-2">
-                          <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded-2xs bg-[#203B31] text-[#F6F2E9]">
+                          <span className="text-[9px] font-sans font-bold uppercase px-2 py-0.5 rounded-md bg-[#203B31] text-[#F6F2E9]">
                             {other.categoryLabel}
                           </span>
                         </div>
                       </div>
 
                       <div className="p-4">
-                        <span className="text-[10px] font-mono text-[#936645] font-semibold block mb-1">
+                        <span className="text-[10px] font-sans text-[#936645] font-bold block mb-1 uppercase tracking-wider">
                           {other.originNote}
                         </span>
                         <h4 className="text-base font-display font-medium text-[#203B31] group-hover:text-[#BA855E] transition-colors mb-1.5">
@@ -332,10 +342,10 @@ export const DishDetailPage: React.FC = () => {
                     </div>
 
                     <div className="px-4 pb-4 pt-2 border-t border-[#DCCAB2]/40 flex items-center justify-between text-xs">
-                      <span className="text-[#242724]/60 font-mono text-[11px]">
+                      <span className="text-[#242724]/60 font-sans tabular-nums text-[11px] font-medium">
                         {other.cookTime}
                       </span>
-                      <span className="text-[#203B31] font-semibold group-hover:text-[#BA855E] inline-flex items-center gap-1 transition-colors">
+                      <span className="text-[#203B31] font-bold group-hover:text-[#BA855E] inline-flex items-center gap-1 transition-colors">
                         Reçeteyi İncele →
                       </span>
                     </div>

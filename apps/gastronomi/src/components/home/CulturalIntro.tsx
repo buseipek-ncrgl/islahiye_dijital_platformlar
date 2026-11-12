@@ -1,16 +1,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Compass } from 'lucide-react';
+import { Flame, Compass } from 'lucide-react';
 
 export const CulturalIntro: React.FC = () => {
   return (
-    <section id="kultur-mirasi" className="py-20 md:py-28 bg-paper border-y border-sand/70 relative">
+    <section id="mirasin-izinde" className="py-20 md:py-28 bg-paper border-y border-sand/70 relative scroll-mt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="max-w-3xl mb-12 md:mb-16">
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="w-8 h-px bg-copper" />
-            <span className="text-xs font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
+            <span className="text-xs font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
               01 / MİRASIN İZİNDE
             </span>
           </div>
@@ -32,7 +32,7 @@ export const CulturalIntro: React.FC = () => {
           >
             <div>
               <div className="flex items-center gap-2 text-copper font-medium text-xs uppercase tracking-wider mb-4">
-                <Sparkles className="w-4 h-4 text-copper" />
+                <Flame className="w-4 h-4 text-copper" />
                 <span>Akdeniz & Mezopotamya Kesişimi</span>
               </div>
 
@@ -48,7 +48,7 @@ export const CulturalIntro: React.FC = () => {
             </div>
 
             <div className="pt-6 mt-8 border-t border-sand/50 flex items-center justify-between text-xs text-charcoal/60">
-              <span className="font-mono uppercase tracking-wider">İslahiye Mutfak Kayıtları</span>
+              <span className="font-sans font-semibold uppercase tracking-wider">İslahiye Mutfak Kayıtları</span>
               <Compass className="w-4 h-4 text-copper" />
             </div>
           </motion.div>
@@ -63,11 +63,11 @@ export const CulturalIntro: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="bg-ivory/40 border border-sand/70 rounded-2xl p-6 sm:p-7 hover:border-copper/40 transition-colors"
             >
-              <span className="text-[10px] font-mono uppercase tracking-widest text-copper-dark font-semibold">
+              <span className="text-[10px] font-sans uppercase tracking-widest text-copper-dark font-bold">
                 01 / Coğrafi Karakter
               </span>
               <h3 className="text-xl font-display font-bold text-forest mt-1 mb-2">
-                Toprak & Güneş
+                Toprak &amp; Güneş
               </h3>
               <p className="text-xs sm:text-sm text-charcoal/75 leading-relaxed font-sans">
                 Ovanın mikrokliması biberin etli ve meyvemsi aromasına can verirken, erken hasat buğday közde tütsülenerek firik kokusunu kazanır.
@@ -82,7 +82,7 @@ export const CulturalIntro: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="bg-ivory/40 border border-sand/70 rounded-2xl p-6 sm:p-7 hover:border-copper/40 transition-colors flex-1"
             >
-              <span className="text-[10px] font-mono uppercase tracking-widest text-copper-dark font-semibold">
+              <span className="text-[10px] font-sans uppercase tracking-widest text-copper-dark font-bold">
                 02 / Pişirme Usulü
               </span>
               <h3 className="text-xl font-display font-bold text-forest mt-1 mb-2">

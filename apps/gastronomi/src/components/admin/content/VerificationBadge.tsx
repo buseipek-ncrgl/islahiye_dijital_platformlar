@@ -10,25 +10,25 @@ interface VerificationBadgeProps {
 export const VerificationBadge: React.FC<VerificationBadgeProps> = ({ status, isDemo }) => {
   if (isDemo || status === 'simulated') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[11px] font-mono font-medium bg-amber-50 text-amber-900 border border-amber-200/80">
-        <AlertTriangle className="w-3 h-3 text-amber-600" />
-        <span>Temsili Demo</span>
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-sans font-medium bg-amber-50 text-amber-900 border border-amber-200 shadow-2xs">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+        <span>Ön İnceleme</span>
       </span>
     );
   }
 
   if (status === 'verified') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[11px] font-mono font-semibold bg-forest-50 text-forest-800 border border-forest-200">
-        <ShieldCheck className="w-3 h-3 text-forest-600" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-sans font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
         <span>Doğrulanmış</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[11px] font-mono font-medium bg-slate-100 text-slate-700 border border-slate-200">
-      <HelpCircle className="w-3 h-3 text-slate-400" />
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-sans font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+      <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
       <span>Doğrulanmamış</span>
     </span>
   );

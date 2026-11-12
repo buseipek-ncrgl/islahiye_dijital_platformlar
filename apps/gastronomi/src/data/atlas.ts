@@ -33,7 +33,7 @@ export const CULTURAL_REGIONS: CulturalAtlasRegion[] = [
       'İslahiye merkezindeki asırlık taş fırınlar; döküm tavalar, sac üzerinde pişen peynirli semsekler ve geleneksel bayram kömbesi.',
     terrainBadge: 'Çarşı & Taş Fırın Mirası',
     positionPercent: { x: 44, y: 84 },
-    associatedDishIds: ['islahiye-tava', 'semsek-boregi', 'islahiye-kombesi'],
+    associatedDishIds: ['islahiye-tava', 'islahiye-semsegi', 'bayram-kombesi'],
   },
 ];
 
@@ -65,14 +65,14 @@ export const ATLAS_DISH_NODES: AtlasDishNode[] = [
   },
   // 4. Geleneksel Semsek Böreği - Riverside village / western slope
   {
-    dishId: 'semsek-boregi',
+    dishId: 'islahiye-semsegi',
     regionId: 'tarihi-tascarsi',
     canvasPosition: { x: 28, y: 64 },
     accentNote: 'Köy Çökeleği & Sac Böreği',
   },
   // 5. Taş Fırın Bayram Kömbesi - Historic bakery tradition (South-Center)
   {
-    dishId: 'islahiye-kombesi',
+    dishId: 'bayram-kombesi',
     regionId: 'tarihi-tascarsi',
     canvasPosition: { x: 48, y: 68 },
     accentNote: 'Ahşap Kalıp & 7 Baharat',

@@ -73,20 +73,20 @@ export const EditorialAgendaShowcase: React.FC = () => {
     publishedAnnouncements[0];
 
   return (
-    <section id="gundem" className="py-20 md:py-28 bg-paper border-t border-sand/70 relative">
+    <section id="gundem" className="py-20 md:py-28 scroll-mt-24 bg-paper border-t border-sand/70 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Editorial Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 lg:mb-16">
           <div>
             <div className="inline-flex items-center gap-2 mb-3">
               <span className="w-8 h-px bg-copper" />
-              <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
-                TOPRAĞIN HAFIZASI & GÜNCEL BÜLTEN
+              <span className="text-[11px] font-sans uppercase tracking-[0.25em] text-copper-dark font-bold">
+                04 / TOPRAĞIN HAFIZASI &amp; GÜNCEL BÜLTEN
               </span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-forest leading-tight">
-              Mutfak Kültürü Gazetesi & Gündem
+              Mutfak Kültürü Gazetesi &amp; Gündem
             </h2>
 
             <p className="text-sm sm:text-base text-charcoal/75 mt-3 max-w-2xl font-sans leading-relaxed">
@@ -98,7 +98,7 @@ export const EditorialAgendaShowcase: React.FC = () => {
           <div className="flex items-center gap-3">
             <Link
               to="/haberler"
-              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-copper hover:text-forest transition-colors font-semibold py-2 px-3.5 rounded-sm bg-sand/20 hover:bg-sand/35"
+              className="inline-flex items-center gap-2 text-xs font-sans uppercase tracking-wider text-copper hover:text-forest transition-colors font-bold py-2.5 px-4 rounded-xl bg-sand/20 hover:bg-sand/35"
             >
               <BookOpen className="w-3.5 h-3.5" />
               <span>Tüm Yazılar ({publishedArticles.length})</span>
@@ -111,7 +111,7 @@ export const EditorialAgendaShowcase: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mb-12">
           {/* Lead Article (7 cols) - Refined Editorial Monograph */}
           {leadArticle ? (
-            <article className="lg:col-span-7 bg-ivory border border-sand/80 rounded-sm overflow-hidden shadow-xs flex flex-col justify-between group hover:border-copper/50 transition-all duration-300">
+            <article className="lg:col-span-7 bg-ivory border border-sand/80 rounded-2xl overflow-hidden shadow-xs flex flex-col justify-between group hover:border-copper/50 transition-all duration-300">
               <div>
                 <div className="relative aspect-[16/10] bg-sand/20 overflow-hidden">
                   <ImageWithFallback
@@ -122,14 +122,14 @@ export const EditorialAgendaShowcase: React.FC = () => {
                     className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-700 ease-out"
                   />
                   <div className="absolute top-4 left-4">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-xs bg-forest text-ivory border border-sand/30 shadow-xs">
+                    <span className="text-[10px] font-sans font-bold uppercase tracking-widest px-2.5 py-1 rounded-md bg-forest text-ivory border border-sand/30 shadow-xs">
                       {leadArticle.contentType === 'news' ? 'Resmî Kayıt & Haber' : leadArticle.categoryLabel}
                     </span>
                   </div>
                 </div>
 
                 <div className="p-6 sm:p-8">
-                  <div className="flex items-center gap-3 text-xs font-mono text-charcoal/50 mb-3">
+                  <div className="flex items-center gap-3 text-xs font-sans text-charcoal/50 mb-3 font-medium">
                     <span>{leadArticle.formattedDate}</span>
                     <span>•</span>
                     <span className="flex items-center gap-1 text-copper-dark">
@@ -157,13 +157,13 @@ export const EditorialAgendaShowcase: React.FC = () => {
               </div>
 
               <div className="px-6 sm:px-8 pb-6 pt-4 border-t border-sand/60 flex items-center justify-between">
-                <span className="text-xs font-mono text-charcoal/60">
+                <span className="text-xs font-sans text-charcoal/60 font-medium">
                   {leadArticle.author.name}
                 </span>
 
                 <Link
                   to={`/haberler/${leadArticle.slug}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-copper hover:text-forest transition-colors font-mono"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-copper hover:text-forest transition-colors font-sans"
                 >
                   <span>Yazıyı İncele</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -171,7 +171,7 @@ export const EditorialAgendaShowcase: React.FC = () => {
               </div>
             </article>
           ) : (
-            <div className="lg:col-span-7 bg-ivory border border-sand/80 rounded-sm p-12 text-center text-charcoal/60 text-sm font-sans flex items-center justify-center">
+            <div className="lg:col-span-7 bg-ivory border border-sand/80 rounded-2xl p-12 text-center text-charcoal/60 text-sm font-sans flex items-center justify-center">
               Şu anda yayında öne çıkan haber bulunmamaktadır.
             </div>
           )}
@@ -183,9 +183,9 @@ export const EditorialAgendaShowcase: React.FC = () => {
               {secondaryArticles.map((art) => (
                 <article
                   key={art.id}
-                  className="p-5 rounded-sm bg-ivory border border-sand/70 hover:border-copper/50 transition-colors shadow-xs group flex items-start gap-4"
+                  className="p-5 rounded-2xl bg-ivory border border-sand/70 hover:border-copper/50 transition-colors shadow-xs group flex items-start gap-4"
                 >
-                  <div className="w-24 h-24 rounded-sm overflow-hidden bg-sand/30 shrink-0">
+                  <div className="w-24 h-24 rounded-xl overflow-hidden bg-sand/30 shrink-0">
                     <ImageWithFallback
                       src={art.coverImage}
                       alt={art.title}
@@ -196,7 +196,7 @@ export const EditorialAgendaShowcase: React.FC = () => {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-copper-dark uppercase mb-1">
+                    <div className="flex items-center gap-2 text-[10px] font-sans font-bold text-copper-dark uppercase mb-1">
                       <span>{art.categoryLabel}</span>
                       <span>•</span>
                       <span>{art.readingTime}</span>
@@ -217,14 +217,14 @@ export const EditorialAgendaShowcase: React.FC = () => {
             </div>
 
             {/* Upcoming Event & Latest Announcement Mini-Ribbon */}
-            <div className="p-6 rounded-sm bg-forest text-ivory border border-sand/20 space-y-4 shadow-xs">
+            <div className="p-6 rounded-2xl bg-forest text-ivory border border-sand/20 space-y-4 shadow-xs">
               <div className="flex items-center justify-between border-b border-sand/20 pb-3">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-copper-light font-bold">
-                  YAKLAŞAN PROGRAM & BİLDİRİM BÜLTENİ
+                <span className="text-[10px] font-sans uppercase tracking-widest text-copper-light font-bold">
+                  YAKLAŞAN PROGRAM &amp; BİLDİRİM BÜLTENİ
                 </span>
                 <Link
                   to="/etkinlikler"
-                  className="text-[11px] font-mono text-sand/80 hover:text-ivory underline underline-offset-4"
+                  className="text-xs font-sans text-sand/80 hover:text-ivory underline underline-offset-4"
                 >
                   Takvim ↗
                 </Link>
@@ -233,11 +233,11 @@ export const EditorialAgendaShowcase: React.FC = () => {
               {/* Event Snippet */}
               {upcomingEvent && (
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xs bg-copper/20 text-copper-light flex items-center justify-center shrink-0 border border-copper/30">
+                  <div className="w-8 h-8 rounded-lg bg-copper/20 text-copper-light flex items-center justify-center shrink-0 border border-copper/30">
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-mono text-sand/70 block">
+                    <span className="text-[10px] font-sans text-sand/70 block">
                       {upcomingEvent.formattedDate} • {upcomingEvent.eventTypeLabel}
                     </span>
                     <Link
@@ -253,11 +253,11 @@ export const EditorialAgendaShowcase: React.FC = () => {
               {/* Announcement Snippet */}
               {latestAnnouncement && (
                 <div className="flex items-start gap-3 pt-3 border-t border-sand/15">
-                  <div className="w-8 h-8 rounded-xs bg-copper/20 text-copper-light flex items-center justify-center shrink-0 border border-copper/30">
+                  <div className="w-8 h-8 rounded-lg bg-copper/20 text-copper-light flex items-center justify-center shrink-0 border border-copper/30">
                     <Bell className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-mono text-sand/70 block">
+                    <span className="text-[10px] font-sans text-sand/70 block">
                       {latestAnnouncement.formattedDate} • {latestAnnouncement.categoryLabel}
                     </span>
                     <Link
@@ -274,7 +274,7 @@ export const EditorialAgendaShowcase: React.FC = () => {
         </div>
 
         {/* Footer CTAs for Full Pages */}
-        <div className="pt-8 border-t border-sand/60 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+        <div className="pt-8 border-t border-sand/60 flex flex-wrap items-center justify-between gap-4 text-xs font-sans">
           <div className="flex flex-wrap items-center gap-6">
             <Link
               to="/haberler"

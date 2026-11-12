@@ -9,10 +9,11 @@ import { ImageWithFallback } from '../components/ui/ImageWithFallback';
 export const HeritageStoryDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { getCulturalStoryBySlug, getCulturalStories, getDishes } = useContent();
+  const { getCulturalStoryBySlug, getCulturalStories, getDishes, getRecipeById, getRecipes } = useContent();
 
   const story = getCulturalStoryBySlug(slug || '');
   const allDishes = getDishes(true);
+  const publishedRecipes = getRecipes(true);
   const relatedDishes = story
     ? allDishes.filter((d) => story.relatedDishIds?.includes(d.id))
     : [];
@@ -23,13 +24,7 @@ export const HeritageStoryDetailPage: React.FC = () => {
     : [];
 
   const handleOpenWorkshop = (recipeId: string) => {
-    navigate('/', { state: { recipeId } });
-    setTimeout(() => {
-      const el = document.querySelector('#tarif-atolyesi');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
+    navigate(`/yemekler?view=book&recipe=${encodeURIComponent(recipeId)}#tarif-atolyesi`);
   };
 
   if (!story || (story.publicationStatus && story.publicationStatus !== 'published')) {
@@ -42,13 +37,13 @@ export const HeritageStoryDetailPage: React.FC = () => {
             Kültürel Anlatı Bulunamadı veya Taslak Durumunda
           </h1>
           <p className="text-xs sm:text-sm text-charcoal/70 font-sans leading-relaxed">
-            Talep ettiğiniz mutfak mirası anlatısı henüz demo ortamında yayımlanmamış veya yayından kaldırılmış olabilir.
+            Talep ettiğiniz mutfak mirası anlatısı henüz yayımlanmamış veya yayından kaldırılmış olabilir.
           </p>
           <div className="pt-2">
             <button
               type="button"
               onClick={() => navigate('/mutfak-mirasi')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xs bg-forest text-ivory text-xs font-mono font-semibold hover:bg-forest-800 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-forest text-ivory text-xs font-sans font-bold hover:bg-forest-800 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Kültürel Miras Arşivine Dön</span>
@@ -72,20 +67,20 @@ export const HeritageStoryDetailPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/mutfak-mirasi')}
-              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-charcoal/60 hover:text-forest transition-colors focus:outline-none"
+              className="inline-flex items-center gap-2 text-xs font-sans uppercase tracking-wider text-charcoal/60 hover:text-forest transition-colors focus:outline-none font-semibold"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Mutfak Mirası Arşivine Dön</span>
             </button>
 
-            <span className="text-[11px] font-mono text-copper-dark uppercase tracking-widest font-semibold">
+            <span className="text-[11px] font-sans text-copper-dark uppercase tracking-widest font-bold">
               {story.categoryLabel}
             </span>
           </div>
 
           {/* Article Header & Typography (Prestigious Book Typography) */}
           <header className="mb-8">
-            <div className="flex items-center gap-3 text-xs font-mono text-charcoal/50 mb-3">
+            <div className="flex items-center gap-3 text-xs font-sans text-charcoal/60 mb-3 font-medium">
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-copper" />
                 {story.readingTime} Okuma
@@ -93,7 +88,7 @@ export const HeritageStoryDetailPage: React.FC = () => {
               <span>•</span>
               <span>{story.publishedDate}</span>
               <span>•</span>
-              <span className="text-copper-dark font-medium">Sözlü Kültür Derlemesi</span>
+              <span className="text-copper-dark font-bold">Mutfak Belleği Derlemesi</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-forest leading-[1.15] tracking-tight mb-4">
@@ -107,7 +102,7 @@ export const HeritageStoryDetailPage: React.FC = () => {
 
           {/* Large Editorial Cover Image & Caption */}
           <figure className="mb-10">
-            <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-sm overflow-hidden bg-sand/20 shadow-sm border border-sand/60">
+            <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl overflow-hidden bg-sand/20 shadow-sm border border-sand/60">
               <ImageWithFallback
                 src={story.coverImageUrl}
                 alt={story.title}
@@ -117,7 +112,7 @@ export const HeritageStoryDetailPage: React.FC = () => {
               />
             </div>
             {story.imageCredit && (
-              <figcaption className="mt-2 text-[11px] font-mono text-charcoal/60 text-right">
+              <figcaption className="mt-2 text-[11px] font-sans text-charcoal/60 text-right font-medium">
                 Fotoğraf / Arşiv: {story.imageCredit}
               </figcaption>
             )}
@@ -145,15 +140,15 @@ export const HeritageStoryDetailPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Methodological Oral History Footnote */}
-          <div className="mt-10 p-5 rounded-sm bg-sand/20 border border-sand/60 flex items-start gap-3.5 text-xs text-charcoal/70 font-sans">
+          {/* Methodological Footnote */}
+          <div className="mt-10 p-5 rounded-xl bg-sand/20 border border-sand/60 flex items-start gap-3.5 text-xs text-charcoal/70 font-sans">
             <Info className="w-4 h-4 text-copper shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="font-mono text-[11px] uppercase tracking-wider text-forest font-semibold block">
+              <span className="font-sans text-[11px] uppercase tracking-wider text-forest font-bold block">
                 Metodoloji & Kaynakça Bildirimi
               </span>
               <p className="leading-relaxed">
-                Bu monografi, İslahiye Kültür Arşivi kapsamında bölge sakinleri, fırın ustaları ve yaşlı kuşak kaynak kişilerle gerçekleştirilen saha görüşmelerine dayanır. Resmî tescilli değerler TÜRKPATENT kayıtları (İslahiye Biberi - Tescil No: 991) ile doğrulanmıştır.
+                Bu monografi, İslahiye mutfak kültürünü ve geleneksel pişirme usullerini tanıtmak amacıyla hazırlanan editoryal derlemedir. Resmî coğrafi işaret tescili yalnızca TÜRKPATENT kayıtlı İslahiye Biberi (Tescil No: 991) için geçerlidir.
               </p>
             </div>
           </div>
@@ -163,41 +158,56 @@ export const HeritageStoryDetailPage: React.FC = () => {
             <div className="mt-12 pt-8 border-t border-sand/70">
               <div className="flex items-center gap-2 mb-4">
                 <ChefHat className="w-4 h-4 text-copper" />
-                <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-copper-dark font-semibold">
+                <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
                   BU KÜLTÜREL ANLATIYLA İLGİLİ LEZZETLER
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {relatedDishes.map((dish) => (
-                  <div
-                    key={dish.id}
-                    className="p-5 rounded-sm bg-paper border border-sand/70 flex items-center justify-between gap-4 shadow-xs"
-                  >
-                    <div>
-                      <span className="text-[10px] font-mono text-copper-dark uppercase tracking-wider block mb-0.5">
-                        {dish.categoryLabel}
-                      </span>
-                      <h4 className="text-base font-display font-bold text-forest">
-                        {dish.name}
-                      </h4>
-                      <span className="text-xs text-charcoal/60 font-sans block mt-0.5">
-                        {dish.originNote}
-                      </span>
-                    </div>
+                {relatedDishes.map((dish) => {
+                  const dishRecipe =
+                    (dish.recipeId ? getRecipeById(dish.recipeId) : undefined) ||
+                    publishedRecipes.find((r) => r.dishId === dish.id);
 
-                    {dish.recipeId && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenWorkshop(dish.recipeId!)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-600 transition-colors shrink-0 shadow-xs"
-                      >
-                        <span>Atölyede Pişir</span>
-                        <ArrowRight className="w-3 h-3 text-copper-light" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  return (
+                    <div
+                      key={dish.id}
+                      className="p-5 rounded-xl bg-paper border border-sand/70 flex items-center justify-between gap-4 shadow-xs"
+                    >
+                      <div>
+                        <span className="text-[10px] font-sans text-copper-dark uppercase tracking-wider block mb-0.5 font-bold">
+                          {dish.categoryLabel}
+                        </span>
+                        <h4 className="text-base font-display font-bold text-forest">
+                          {dish.name}
+                        </h4>
+                        <span className="text-xs text-charcoal/60 font-sans block mt-0.5">
+                          {dish.originNote}
+                        </span>
+                      </div>
+
+                      {dishRecipe ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWorkshop(dishRecipe.id)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-forest text-ivory text-xs font-sans font-bold uppercase tracking-wider hover:bg-forest-600 transition-colors shrink-0 shadow-xs"
+                        >
+                          <span>Atölyede Pişir</span>
+                          <ArrowRight className="w-3 h-3 text-copper-light" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/yemekler/${dish.id}`)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-sand bg-ivory text-forest text-xs font-sans font-bold uppercase tracking-wider hover:border-copper transition-colors shrink-0"
+                        >
+                          <span>İncele</span>
+                          <ArrowRight className="w-3 h-3 text-copper" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -206,13 +216,13 @@ export const HeritageStoryDetailPage: React.FC = () => {
           {otherStories.length > 0 && (
             <div className="mt-14 pt-8 border-t border-sand/70">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-copper-dark font-semibold">
+                <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
                   DİĞER KÜLTÜREL ANLATILAR
                 </span>
                 <button
                   type="button"
                   onClick={() => navigate('/mutfak-mirasi')}
-                  className="text-xs font-mono text-charcoal/60 hover:text-forest uppercase tracking-wider transition-colors"
+                  className="text-xs font-sans text-charcoal/60 hover:text-forest uppercase tracking-wider transition-colors font-semibold"
                 >
                   Tüm Arşiv →
                 </button>
@@ -220,12 +230,13 @@ export const HeritageStoryDetailPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 {otherStories.map((other) => (
-                  <div
+                  <button
                     key={other.id}
+                    type="button"
                     onClick={() => navigate(`/mutfak-mirasi/${other.slug}`)}
-                    className="p-5 rounded-sm bg-paper border border-sand/70 hover:border-copper/50 transition-colors cursor-pointer group shadow-xs"
+                    className="text-left w-full p-5 rounded-xl bg-paper border border-sand/70 hover:border-copper/50 transition-colors cursor-pointer group shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
                   >
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-copper-dark font-semibold block mb-1">
+                    <span className="text-[10px] font-sans uppercase tracking-wider text-copper-dark font-bold block mb-1">
                       {other.categoryLabel}
                     </span>
                     <h5 className="text-base font-display font-bold text-forest group-hover:text-copper-dark transition-colors mb-1.5">
@@ -234,7 +245,7 @@ export const HeritageStoryDetailPage: React.FC = () => {
                     <p className="text-xs text-charcoal/70 font-sans line-clamp-2">
                       {other.subtitle}
                     </p>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -246,14 +257,14 @@ export const HeritageStoryDetailPage: React.FC = () => {
               {story.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[11px] font-mono px-2.5 py-1 rounded-xs bg-paper border border-sand/60 text-charcoal/70"
+                  className="text-[11px] font-sans px-2.5 py-1 rounded-md bg-paper border border-sand/60 text-charcoal/70 font-medium"
                 >
                   #{tag}
                 </span>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-charcoal/50 font-mono">
+            <div className="flex items-center gap-2 text-xs text-charcoal/60 font-sans font-medium">
               <BookOpen className="w-3.5 h-3.5 text-copper" />
               <span>İslahiye Kültür Arşivi</span>
             </div>

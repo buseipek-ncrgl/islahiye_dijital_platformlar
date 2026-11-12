@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Filter, Clock, ChefHat, Users, ArrowRight, UtensilsCrossed, Sparkles } from 'lucide-react';
+import { Filter, Clock, ChefHat, Users, ArrowRight, UtensilsCrossed } from 'lucide-react';
 import { Dish, DishCategory } from '../../types';
 import { useContent } from '../../hooks/useContent';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
@@ -15,8 +15,10 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
   onSelectDish,
 }) => {
   const navigate = useNavigate();
-  const { getDishes, getRecipeById } = useContent();
+  const { getDishes, getRecipeById, getRecipes, getCategories } = useContent();
   const publishedDishes = getDishes(true);
+  const publishedRecipes = getRecipes(true);
+  const dishCategories = getCategories('dish', true);
 
   const [activeCategory, setActiveCategory] = useState<DishCategory>('all');
   const [activeDishId, setActiveDishId] = useState<string>('');
@@ -25,28 +27,19 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
   const categories = useMemo(() => {
     return [
       { key: 'all' as DishCategory, label: 'Tüm Lezzetler', count: publishedDishes.length },
-      {
-        key: 'main' as DishCategory,
-        label: 'Ana Yemekler',
-        count: publishedDishes.filter((d) => d.category === 'main').length,
-      },
-      {
-        key: 'pastry' as DishCategory,
-        label: 'Hamur İşleri',
-        count: publishedDishes.filter((d) => d.category === 'pastry').length,
-      },
-      {
-        key: 'local_product' as DishCategory,
-        label: 'Yöresel Ürünler',
-        count: publishedDishes.filter((d) => d.category === 'local_product').length,
-      },
-      {
-        key: 'dessert' as DishCategory,
-        label: 'Tatlılar',
-        count: publishedDishes.filter((d) => d.category === 'dessert').length,
-      },
+      ...dishCategories.map((cat) => ({
+        key: cat.id as DishCategory,
+        label: cat.label,
+        count: publishedDishes.filter((d) => d.category === cat.id).length,
+      })),
     ];
-  }, [publishedDishes]);
+  }, [publishedDishes, dishCategories]);
+
+  useEffect(() => {
+    if (activeCategory !== 'all' && !dishCategories.some((c) => c.id === activeCategory)) {
+      setActiveCategory('all');
+    }
+  }, [activeCategory, dishCategories]);
 
   // Filtered dishes
   const filteredDishes = useMemo(() => {
@@ -74,24 +67,16 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
     return filteredDishes.find((d) => d.id === activeDishId) || filteredDishes[0];
   }, [filteredDishes, activeDishId]);
 
-  // Keyboard navigation handler for right list items
-  const handleItemKeyDown = (e: React.KeyboardEvent, dishId: string) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      setActiveDishId(dishId);
-    }
-  };
-
   return (
-    <section id="lezzetler" className="py-20 md:py-28 bg-ivory relative border-t border-sand/60">
+    <section id="lezzetler" className="py-20 md:py-28 scroll-mt-24 bg-ivory relative border-t border-sand/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Section Header: High Editorial Pacing */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 md:mb-14">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
               <span className="w-8 h-px bg-copper" />
-              <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
+              <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
                 03 / YÖRESEL TARİFLER &amp; GASTRONOMİ
               </span>
             </div>
@@ -107,7 +92,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
           </div>
 
           {/* Quick Counter */}
-          <div className="flex items-center gap-2 text-xs font-mono text-charcoal/70 bg-paper px-4 py-2.5 rounded-sm border border-sand/70 self-start md:self-auto shadow-2xs">
+          <div className="flex items-center gap-2 text-xs font-sans font-semibold text-charcoal/75 bg-paper px-4 py-2.5 rounded-xl border border-sand/70 self-start md:self-auto shadow-2xs">
             <UtensilsCrossed className="w-3.5 h-3.5 text-copper" />
             <span>{filteredDishes.length} Yöresel Lezzet Listeleniyor</span>
           </div>
@@ -116,9 +101,9 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
         {/* Category Filter Tabs */}
         <div className="mb-10 sm:mb-12 overflow-x-auto pb-2 scrollbar-none">
           <div className="flex items-center gap-2 min-w-max border-b border-sand/50 pb-4">
-            <div className="flex items-center gap-1.5 text-xs font-mono text-charcoal/50 pr-2 border-r border-sand/60">
+            <div className="flex items-center gap-1.5 text-xs font-sans text-charcoal/50 pr-2 border-r border-sand/60">
               <Filter className="w-3.5 h-3.5 text-copper" />
-              <span className="uppercase tracking-wider">Kategori</span>
+              <span className="uppercase tracking-wider font-semibold">Kategori</span>
             </div>
 
             {categories.map((cat) => {
@@ -128,17 +113,15 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                   key={cat.key}
                   type="button"
                   onClick={() => setActiveCategory(cat.key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-semibold tracking-wider uppercase transition-all duration-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-forest ${
-                    isActive
-                      ? 'bg-forest text-ivory shadow-xs'
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all duration-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-forest cursor-pointer ${isActive
+                      ? 'bg-forest text-ivory shadow-xs font-bold'
                       : 'bg-paper text-charcoal/75 border border-sand/70 hover:border-copper/60 hover:text-forest'
-                  }`}
+                    }`}
                 >
                   <span>{cat.label}</span>
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-xs ${
-                      isActive ? 'bg-forest-600 text-ivory' : 'bg-sand/40 text-charcoal/60'
-                    }`}
+                    className={`text-[10px] font-sans font-bold tabular-nums px-2 py-0.5 rounded-md ${isActive ? 'bg-forest-600 text-ivory' : 'bg-sand/40 text-charcoal/70'
+                      }`}
                   >
                     {cat.count}
                   </span>
@@ -154,10 +137,10 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
             {/* MOBILE COMPACT SELECTOR STRIP (< 768px): Horizontal Touch Rail */}
             <div className="block lg:hidden mb-8">
               <div className="flex items-center justify-between pb-2 mb-3 border-b border-sand/50">
-                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-copper-dark font-semibold">
+                <span className="text-[10px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
                   LEZZET SEÇİMİ
                 </span>
-                <span className="text-[10px] font-mono text-charcoal/50">
+                <span className="text-[10px] font-sans tabular-nums text-charcoal/60 font-semibold">
                   {filteredDishes.findIndex((d) => d.id === activeDish.id) + 1} / {filteredDishes.length}
                 </span>
               </div>
@@ -170,13 +153,12 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                       key={dish.id}
                       type="button"
                       onClick={() => setActiveDishId(dish.id)}
-                      className={`flex-shrink-0 flex items-center gap-2.5 p-2 rounded-sm border transition-all text-left min-w-[200px] max-w-[240px] ${
-                        isSelected
+                      className={`flex-shrink-0 flex items-center gap-2.5 p-2 rounded-xl border transition-all text-left min-w-[200px] max-w-[240px] ${isSelected
                           ? 'bg-paper border-copper ring-1 ring-copper shadow-xs'
                           : 'bg-ivory/80 border-sand/70 active:bg-sand/20'
-                      }`}
+                        }`}
                     >
-                      <div className="w-12 h-12 rounded-sm overflow-hidden flex-shrink-0 bg-sand/20">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-sand/20">
                         <ImageWithFallback
                           src={dish.imageUrl}
                           alt={dish.name}
@@ -185,12 +167,11 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                         />
                       </div>
                       <div className="overflow-hidden">
-                        <span className={`block text-xs font-display font-bold truncate ${
-                          isSelected ? 'text-copper-dark' : 'text-forest'
-                        }`}>
+                        <span className={`block text-xs font-display font-bold truncate ${isSelected ? 'text-copper-dark' : 'text-forest'
+                          }`}>
                           {dish.name}
                         </span>
-                        <span className="block text-[10px] font-mono text-charcoal/50 uppercase tracking-wider truncate">
+                        <span className="block text-[10px] font-sans text-charcoal/60 uppercase tracking-wider truncate font-medium">
                           {dish.originNote}
                         </span>
                       </div>
@@ -202,9 +183,9 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
 
             {/* MAIN TWO-COLUMN EDITORIAL BOOK SPREAD (Desktop 7 + 5 cols) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-              
+
               {/* LEFT / MAIN EDITORIAL MONOGRAPH (7 cols): Selected Dish Highlight */}
-              <div className="lg:col-span-7 flex flex-col">
+              <div className="lg:col-span-7 flex flex-col lg:sticky lg:top-24">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeDish.id}
@@ -216,7 +197,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                   >
                     {/* Unconstrained Organic Food Photo */}
                     <figure className="relative m-0 p-0">
-                      <div className="relative aspect-[16/10] sm:aspect-[16/10] w-full overflow-hidden rounded-sm bg-sand/20">
+                      <div className="relative aspect-[16/10] sm:aspect-[16/10] w-full overflow-hidden rounded-2xl bg-sand/20 shadow-sm border border-sand/50">
                         <ImageWithFallback
                           src={activeDish.imageUrl}
                           alt={activeDish.imageAlt || activeDish.name}
@@ -230,22 +211,24 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
 
                         {/* Top Left Cultural Category Badge */}
                         <div className="absolute top-3.5 left-3.5 flex items-center gap-2">
-                          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-2.5 py-1 rounded-xs bg-forest text-ivory shadow-xs">
+                          <span className="text-[10px] font-sans font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-forest text-ivory shadow-xs">
                             {activeDish.categoryLabel}
                           </span>
-                          {activeDish.giStatusNote && (
-                            <span className="text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded-xs bg-paper/90 text-copper-dark border border-sand/50 shadow-xs hidden sm:inline">
-                              {activeDish.giStatusNote}
-                            </span>
-                          )}
+                          {activeDish.giStatusNote &&
+                            (!activeDish.giStatusNote.includes('991') ||
+                              activeDish.id === 'islahiye-biberi') && (
+                              <span className="text-[9px] font-sans font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-paper/90 text-copper-dark border border-sand/50 shadow-xs hidden sm:inline">
+                                {activeDish.giStatusNote}
+                              </span>
+                            )}
                         </div>
                       </div>
 
                       {/* Quiet Typographic Caption OUTSIDE image */}
                       <figcaption className="mt-2.5 flex items-baseline justify-between text-xs text-charcoal/65 font-sans">
                         <span>{activeDish.tagline}</span>
-                        <span className="text-[10px] font-mono text-charcoal/40 uppercase hidden sm:inline">
-                          Temsili Görsel
+                        <span className="text-[10px] font-sans text-charcoal/50 uppercase tracking-wider hidden sm:inline font-medium">
+                          {activeDish.imageCredit || 'İslahiye Gastronomi Arşivi'}
                         </span>
                       </figcaption>
                     </figure>
@@ -254,11 +237,11 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                     <div className="mt-6 sm:mt-8">
                       {/* Sub-header / Provenance line */}
                       <div className="flex items-center gap-2.5 mb-2">
-                        <span className="text-[11px] font-mono uppercase tracking-widest text-copper-dark font-semibold">
+                        <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
                           {activeDish.originNote}
                         </span>
                         <span className="text-sand">•</span>
-                        <span className="text-[11px] font-mono uppercase tracking-wider text-charcoal/50">
+                        <span className="text-[11px] font-sans uppercase tracking-wider text-charcoal/50 font-semibold">
                           Geleneksel Mutfak Mirası
                         </span>
                       </div>
@@ -316,7 +299,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                               navigate(`/yemekler/${activeDish.id}`);
                             }
                           }}
-                          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-widest hover:bg-forest-600 active:scale-[0.99] transition-all shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
+                          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-forest text-ivory text-xs font-sans font-bold uppercase tracking-widest hover:bg-forest-600 active:scale-[0.99] transition-all shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-copper"
                         >
                           <span>Tarifi &amp; Pişirme Adımlarını Öğren</span>
                           <ArrowRight className="w-3.5 h-3.5 text-copper-light" />
@@ -325,7 +308,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                         <button
                           type="button"
                           onClick={() => navigate('/yemekler')}
-                          className="inline-flex items-center gap-2 px-5 py-3.5 rounded-sm border border-sand bg-paper hover:bg-sand/30 text-charcoal hover:text-forest text-xs font-semibold uppercase tracking-wider transition-all"
+                          className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl border border-sand bg-paper hover:bg-sand/30 text-charcoal hover:text-forest text-xs font-sans font-bold uppercase tracking-wider transition-all"
                         >
                           <UtensilsCrossed className="w-3.5 h-3.5 text-copper" />
                           <span>Tüm Kataloğu Gör</span>
@@ -340,10 +323,10 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
               <div className="hidden lg:flex lg:col-span-5 flex-col">
                 {/* Index Header */}
                 <div className="flex items-center justify-between pb-3 mb-4 border-b border-sand/60">
-                  <span className="text-xs font-mono font-semibold uppercase tracking-widest text-copper-dark">
+                  <span className="text-xs font-sans font-bold uppercase tracking-[0.2em] text-copper-dark">
                     YÖRESEL ENVANTER LİSTESİ
                   </span>
-                  <span className="text-xs font-mono text-charcoal/50">
+                  <span className="text-xs font-sans tabular-nums text-charcoal/60 font-medium">
                     {filteredDishes.findIndex((d) => d.id === activeDish.id) + 1} / {filteredDishes.length}
                   </span>
                 </div>
@@ -352,29 +335,29 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                 <div className="space-y-3 max-h-[640px] overflow-y-auto pr-1 scrollbar-thin">
                   {filteredDishes.map((dish, idx) => {
                     const isSelected = dish.id === activeDish.id;
-                    const hasRecipe = Boolean(dish.recipeId && getRecipeById(dish.recipeId));
+                    const hasRecipe = Boolean(
+                      (dish.recipeId && getRecipeById(dish.recipeId)) ||
+                        publishedRecipes.some((r) => r.dishId === dish.id)
+                    );
 
                     return (
-                      <div
+                      <button
                         key={dish.id}
-                        role="button"
-                        tabIndex={0}
+                        type="button"
                         aria-pressed={isSelected}
                         onClick={() => setActiveDishId(dish.id)}
-                        onKeyDown={(e) => handleItemKeyDown(e, dish.id)}
-                        className={`group relative p-4 rounded-sm border transition-all duration-200 cursor-pointer flex items-center gap-4 ${
-                          isSelected
+                        className={`w-full text-left group relative p-4 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-copper ${isSelected
                             ? 'bg-paper border-copper border-l-4 border-l-copper shadow-xs'
                             : 'bg-paper/40 border-sand/60 hover:border-sand hover:bg-paper/80'
-                        }`}
+                          }`}
                       >
                         {/* Number Index */}
-                        <span className="font-mono text-xs text-charcoal/40 font-semibold w-5 shrink-0 text-center">
-                          0{idx + 1}
+                        <span className="font-sans tabular-nums text-xs text-charcoal/50 font-bold w-6 shrink-0 text-center">
+                          {String(idx + 1).padStart(2, '0')}
                         </span>
 
                         {/* Thumbnail */}
-                        <div className="w-16 h-16 rounded-sm overflow-hidden bg-sand/20 shrink-0 relative">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-sand/20 shrink-0 relative">
                           <ImageWithFallback
                             src={dish.imageUrl}
                             alt={dish.name}
@@ -387,19 +370,18 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                         {/* Text info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-mono text-copper-dark uppercase tracking-wider font-semibold">
+                            <span className="text-[10px] font-sans text-copper-dark uppercase tracking-wider font-bold">
                               {dish.categoryLabel}
                             </span>
                             {hasRecipe && (
-                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-xs bg-forest/10 text-forest uppercase">
+                              <span className="text-[9px] font-sans font-bold px-1.5 py-0.5 rounded-md bg-forest/10 text-forest uppercase">
                                 Tarif Var
                               </span>
                             )}
                           </div>
 
-                          <h4 className={`text-base font-display font-bold leading-snug truncate transition-colors ${
-                            isSelected ? 'text-copper-dark' : 'text-forest group-hover:text-copper'
-                          }`}>
+                          <h4 className={`text-base font-display font-bold leading-snug truncate transition-colors ${isSelected ? 'text-copper-dark' : 'text-forest group-hover:text-copper'
+                            }`}>
                             {dish.name}
                           </h4>
 
@@ -418,22 +400,22 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
                             </span>
                           )}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
 
                 {/* Bottom Index Guide */}
-                <div className="mt-4 pt-3 border-t border-sand/40 flex items-center justify-between text-[11px] font-mono text-charcoal/50">
+                <div className="mt-4 pt-3 border-t border-sand/40 flex items-center justify-between text-[11px] font-sans text-charcoal/60">
                   <span>← Listeden lezzet seçerek detayları inceleyebilirsiniz</span>
-                  <Sparkles className="w-3.5 h-3.5 text-copper" />
+                  <span className="text-copper font-bold font-sans text-[10px] uppercase tracking-wider">İslahiye Atlası</span>
                 </div>
               </div>
             </div>
           </div>
         ) : (
           /* Empty State */
-          <div className="text-center py-16 bg-paper rounded-sm border border-sand/70 p-8 max-w-lg mx-auto shadow-xs">
+          <div className="text-center py-16 bg-paper rounded-2xl border border-sand/70 p-8 max-w-lg mx-auto shadow-xs">
             <div className="w-12 h-12 rounded-full bg-sand/30 flex items-center justify-center mx-auto mb-4 text-copper">
               <UtensilsCrossed className="w-6 h-6" />
             </div>
@@ -446,7 +428,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
             <button
               type="button"
               onClick={() => setActiveCategory('all')}
-              className="px-5 py-2.5 rounded-sm bg-forest text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-forest-600 transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-forest text-ivory text-xs font-sans font-bold uppercase tracking-wider hover:bg-forest-600 transition-colors"
             >
               Tüm Lezzetleri Göster
             </button>
@@ -456,7 +438,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
         {/* Catalog CTA Footer */}
         <div className="mt-12 pt-8 border-t border-sand/60 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-copper-dark font-semibold block mb-0.5">
+            <span className="text-[10px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold block mb-0.5">
               GENİŞLETİLMİŞ ARŞİV
             </span>
             <p className="text-sm text-charcoal/80 font-sans">
@@ -466,7 +448,7 @@ export const FeaturedDishes: React.FC<FeaturedDishesProps> = ({
           <button
             type="button"
             onClick={() => navigate('/yemekler')}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xs border border-forest/30 bg-paper text-forest text-xs font-semibold uppercase tracking-wider hover:bg-forest hover:text-ivory transition-all shadow-xs shrink-0"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-forest/30 bg-paper text-forest text-xs font-sans font-bold uppercase tracking-wider hover:bg-forest hover:text-ivory transition-all shadow-xs shrink-0"
           >
             <span>Tüm Yemek &amp; Tarif Kataloğu</span>
             <ArrowRight className="w-3.5 h-3.5 text-copper" />

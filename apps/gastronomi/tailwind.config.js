@@ -52,6 +52,26 @@ export default {
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         sans: ['Manrope', 'system-ui', '-apple-system', 'sans-serif'],
       },
+      borderRadius: {
+        '2xs': '0.125rem',
+        xs: '0.25rem',
+      },
+      boxShadow: {
+        '2xs': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        xs: '0 1px 2px 0 rgb(0 0 0 / 0.06)',
+      },
+      backdropBlur: {
+        xs: '2px',
+      },
+      scale: {
+        102: '1.02',
+        103: '1.03',
+        104: '1.04',
+        108: '1.08',
+      },
+      transitionDuration: {
+        600: '600ms',
+      },
     },
   },
   plugins: [],

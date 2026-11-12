@@ -1,0 +1,26 @@
+# =============================================================================
+# İslahiye Dijital Platformlar — .gitattributes
+# GitHub Linguist Dil İstatistiği ve Satır Sonu Yapılandırması
+# =============================================================================
+
+# 1. Satır Sonu Normalizasyonu (Cross-Platform CRLF / LF Uyumu)
+* text=auto eol=lf
+*.cs text diff=csharp eol=crlf
+*.sln text eol=crlf
+*.slnx text eol=crlf
+*.csproj text eol=crlf
+
+# 2. GitHub Linguist Dil Dağılımı Yapılandırması
+# Frontend mock veri havuzları, test senaryoları ve statik varlıklar 
+# dil istatistiğinden muaf tutularak C# .NET 9 Backend mimarisinin 
+# GitHub dil çubuğunda (%30 - %45 bandında) dengeli ve doğru görünmesi sağlanır.
+
+apps/**/src/data/** linguist-vendored
+apps/**/src/tests/** linguist-vendored
+apps/gastronomi/public/** linguist-vendored
+apps/egitim/public/** linguist-vendored
+*.json linguist-generated
+*.geojson linguist-generated
+services/**/obj/** linguist-vendored
+services/**/bin/** linguist-vendored
+

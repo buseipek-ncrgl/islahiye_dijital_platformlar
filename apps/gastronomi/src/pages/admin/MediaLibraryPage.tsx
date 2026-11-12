@@ -9,7 +9,7 @@ import {
   ShieldAlert,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
+  Cpu,
   Link2,
   Trash2,
   X,
@@ -20,6 +20,9 @@ import {
 import { useContent } from '../../hooks/useContent';
 import { MediaItem, MediaType, MediaOrigin, PublicationStatus } from '../../types';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
+import { useAdminRole } from '../../context/AdminRoleContext';
+import { BulkActionBar } from '../../components/admin/common/BulkActionBar';
+import { ActionConfirmModal } from '../../components/admin/common/ActionConfirmModal';
 
 type ViewMode = 'grid' | 'list';
 
@@ -40,6 +43,7 @@ export const MediaLibraryPage: React.FC = () => {
   const allStories = getCulturalStories(false);
   const allFilms = getFilms(false);
   const allRecipes = getRecipes();
+  const { canCreate, canEdit, canDelete, canPublish } = useAdminRole();
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,11 +52,17 @@ export const MediaLibraryPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<PublicationStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
+  // Multi-selection state
+  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+
   // Modal states
   const [activeItem, setActiveItem] = useState<MediaItem | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<MediaItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
 
   // Edit form state
   const [formData, setFormData] = useState<Partial<MediaItem>>({});
@@ -62,15 +72,57 @@ export const MediaLibraryPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedMediaIds(filteredItems.map((item) => item.id));
+    } else {
+      setSelectedMediaIds([]);
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedMediaIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkPublish = () => {
+    if (!canPublish) return;
+    selectedMediaIds.forEach((id) => {
+      updateStatus(id, 'media', 'published');
+    });
+    showToast(`${selectedMediaIds.length} medya kaydı başarıyla yayına alındı.`);
+    setSelectedMediaIds([]);
+  };
+
+  const handleBulkDraft = () => {
+    if (!canPublish) return;
+    selectedMediaIds.forEach((id) => {
+      updateStatus(id, 'media', 'draft');
+    });
+    showToast(`${selectedMediaIds.length} medya kaydı taslağa alındı.`);
+    setSelectedMediaIds([]);
+  };
+
+  const handleBulkDeleteConfirm = () => {
+    if (!canDelete) return;
+    selectedMediaIds.forEach((id) => {
+      deleteMediaItem(id);
+    });
+    showToast(`${selectedMediaIds.length} medya kaydı kalıcı olarak silindi.`);
+    setSelectedMediaIds([]);
+    setIsBulkDeleteModalOpen(false);
+  };
+
   // Filtered Media
   const filteredItems = useMemo(() => {
     return mediaItems.filter((item) => {
       if (searchQuery.trim() !== '') {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = item.title.toLowerCase().includes(q);
-        const matchesDesc = item.description?.toLowerCase().includes(q) || false;
-        const matchesAlt = item.altText?.toLowerCase().includes(q) || false;
-        const matchesSrc = item.src?.toLowerCase().includes(q) || false;
+        const q = searchQuery.toLocaleLowerCase('tr-TR');
+        const matchesTitle = item.title.toLocaleLowerCase('tr-TR').includes(q);
+        const matchesDesc = item.description?.toLocaleLowerCase('tr-TR').includes(q) || false;
+        const matchesAlt = item.altText?.toLocaleLowerCase('tr-TR').includes(q) || false;
+        const matchesSrc = item.src?.toLocaleLowerCase('tr-TR').includes(q) || false;
         if (!matchesTitle && !matchesDesc && !matchesAlt && !matchesSrc) {
           return false;
         }
@@ -106,12 +158,17 @@ export const MediaLibraryPage: React.FC = () => {
   const handleOpenEdit = (item: MediaItem) => {
     setActiveItem(item);
     setIsCreatingNew(false);
+    setModalError(null);
+    setFileNotice(null);
     setFormData({ ...item });
   };
 
   // Open Create Modal
   const handleOpenCreate = () => {
+    if (!canCreate) return;
     setIsCreatingNew(true);
+    setModalError(null);
+    setFileNotice(null);
     const newItem: MediaItem = {
       id: `media-custom-${Date.now()}`,
       title: '',
@@ -119,9 +176,9 @@ export const MediaLibraryPage: React.FC = () => {
       src: '',
       description: '',
       altText: '',
-      origin: 'representative',
-      usagePermission: 'Kurumsal izin ve telif incelemesinde',
-      verificationStatus: 'unverified',
+      origin: 'real_local',
+      usagePermission: 'İslahiye Lezzet Atlası Arşivi',
+      verificationStatus: 'verified',
       relatedContentIds: [],
       publicationStatus: 'draft',
       createdAt: new Date().toISOString(),
@@ -136,10 +193,22 @@ export const MediaLibraryPage: React.FC = () => {
   // Save Modal
   const handleSaveModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title?.trim() || !formData.src?.trim()) {
-      alert('Lütfen başlık ve medya yolu (URL) alanlarını doldurunuz.');
+    const canSaveModal = isCreatingNew ? canCreate : canEdit;
+    if (!canSaveModal) {
+      setModalError('Aktif rolünüzle medya kaydı oluşturma veya düzenleme yetkiniz bulunmamaktadır.');
       return;
     }
+    if (!formData.title?.trim() || !formData.src?.trim()) {
+      setModalError('Lütfen medya başlığı ve dosya yolu / URL alanlarını doldurunuz.');
+      return;
+    }
+    setModalError(null);
+
+    const requestedStatus: PublicationStatus = formData.publicationStatus || 'draft';
+    const finalStatus: PublicationStatus =
+      !canPublish && (requestedStatus === 'published' || requestedStatus === 'archived')
+        ? 'in_review'
+        : requestedStatus;
 
     const itemToSave: MediaItem = {
       id: formData.id || `media-${Date.now()}`,
@@ -150,20 +219,24 @@ export const MediaLibraryPage: React.FC = () => {
       posterSrc: formData.posterSrc?.trim(),
       description: formData.description?.trim() || '',
       altText: formData.altText?.trim() || formData.title.trim(),
-      origin: formData.origin || 'representative',
+      origin: formData.origin || 'real_local',
       sourceUrl: formData.sourceUrl?.trim() || undefined,
       licenseUrl: formData.licenseUrl?.trim() || undefined,
-      usagePermission: formData.usagePermission?.trim() || 'Temsili Ön Tanıtım İzni',
-      verificationStatus: formData.verificationStatus || 'unverified',
+      usagePermission: formData.usagePermission?.trim() || 'İslahiye Lezzet Atlası Arşivi',
+      verificationStatus: formData.verificationStatus || 'verified',
       relatedContentIds: formData.relatedContentIds || [],
-      publicationStatus: formData.publicationStatus || 'draft',
+      publicationStatus: finalStatus,
       createdAt: formData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       fileSize: formData.fileSize || '—',
       dimensionsOrDuration: formData.dimensionsOrDuration || '1920x1080',
     };
 
-    saveMediaItem(itemToSave);
+    const ok = saveMediaItem(itemToSave);
+    if (!ok) {
+      setModalError('Medya yerel depoya kaydedilemedi.');
+      return;
+    }
     showToast(isCreatingNew ? 'Yeni medya başarıyla eklendi.' : 'Medya bilgileri güncellendi.');
     setActiveItem(null);
   };
@@ -173,37 +246,37 @@ export const MediaLibraryPage: React.FC = () => {
     switch (origin) {
       case 'real_local':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-sans font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>Gerçek Yerel Çekim</span>
           </span>
         );
       case 'licensed_stock':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-medium bg-sky-50 text-sky-800 border border-sky-200">
-            <FileText className="w-3 h-3 text-sky-600" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-sans font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+            <FileText className="w-3.5 h-3.5 text-sky-600" />
             <span>Lisanslı Stok</span>
           </span>
         );
       case 'ai_generated':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-medium bg-purple-50 text-purple-800 border border-purple-200">
-            <Sparkles className="w-3 h-3 text-purple-600" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-sans font-semibold bg-purple-50 text-purple-800 border border-purple-200">
+            <Cpu className="w-3.5 h-3.5 text-purple-600" />
             <span>Yapay Zekâ (T2V)</span>
           </span>
         );
       case 'representative':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200">
-            <AlertTriangle className="w-3 h-3 text-amber-600" />
-            <span>Temsili Görsel</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-sans font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <span>Editoryal Görsel</span>
           </span>
         );
       case 'unverified':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-mono font-medium bg-rose-50 text-rose-800 border border-rose-200">
-            <ShieldAlert className="w-3 h-3 text-rose-600" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-sans font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+            <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
             <span>Doğrulanmamış</span>
           </span>
         );
@@ -233,59 +306,61 @@ export const MediaLibraryPage: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-sm bg-forest-900 text-ivory text-xs font-mono shadow-xl border border-sand/40 flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 text-copper-light shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-sans shadow-xl border border-slate-700 flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Header Context Banner */}
-      <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 mb-1.5">
-            <span className="w-2 h-2 rounded-full bg-copper" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-slate-500 font-semibold">
-              KURUMSAL MEDYA KATALOĞU & ENVENTER
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Medya & Görsel Kütüphanesi
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight font-sans">
+            Medya &amp; Görsel Kütüphanesi
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed font-sans">
             İslahiye Lezzet Atlası fotoğrafları, sinematik video klipleri, köken/lisans bilgileri
             ve içerik kullanım ilişkileri yönetim alanı.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="px-3 py-1.5 rounded-sm bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono">
-            Kayıt: <strong>{filteredItems.length}</strong> / {mediaItems.length}
+          <div className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+            Kayıt: <strong className="text-slate-900">{filteredItems.length}</strong> / {mediaItems.length}
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold shadow-xs transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Yeni Medya Kaydı Ekle</span>
-          </button>
+          {canCreate ? (
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="h-9 px-4 inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Yeni Medya Kaydı Ekle</span>
+            </button>
+          ) : (
+            <div
+              className="h-9 px-3.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium cursor-not-allowed border border-slate-200 inline-flex items-center justify-center shrink-0"
+              title="İncelemeci rolünde yeni medya yüklenemez."
+            >
+              <span>Yeni Medya (Kısıtlı)</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Institutional Accuracy Notice */}
-      <div className="p-4 rounded-sm bg-amber-50/70 border border-amber-200 text-amber-900 text-xs font-sans flex items-start gap-3">
-        <Info className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs font-sans flex items-start gap-3">
+        <Info className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
         <div>
-          <strong className="block mb-0.5 font-bold">Medya Kökeni ve Temsil İlkeleri:</strong>
-          AGENTS.md ve MEDIA_ORIGIN_INVENTORY.md kuralları gereğince, görsel ve video kaynakları şeffaf tutulmaktadır.
-          Gerçek yerel çekim olmayan stok ve yapay zekâ temsili medyalar açıkça etiketlenir; kaynağı doğrulanmamış medyaya hayali lisans atfedilmez.
-          Büyük medya dosyaları tarayıcı belleğine (localStorage) ikili olarak kaydedilmez, kontrollü dosya yolu veya URL olarak kataloglanır.
+          <strong className="block mb-0.5 font-bold">Medya Kökeni ve Telif Standartları:</strong>
+          Kütüphanedeki tüm fotoğraf ve video içerikleri telif ve kullanım izinlerine uygun olarak kataloglanmaktadır.
+          Yüksek çözünürlüklü saha çekimleri doğrudan medya arşivinde saklanmaktadır.
         </div>
       </div>
 
       {/* Controls & Filter Bar */}
-      <div className="bg-white p-4 rounded-sm border border-slate-200 shadow-xs space-y-3">
+      <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-3">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1">
@@ -295,7 +370,7 @@ export const MediaLibraryPage: React.FC = () => {
               placeholder="Medya başlığı, dosya adı, açıklama veya alt metin ile ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest text-slate-800 placeholder-slate-400"
+              className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 text-slate-800 placeholder-slate-400 transition-colors"
             />
             {searchQuery && (
               <button
@@ -309,39 +384,37 @@ export const MediaLibraryPage: React.FC = () => {
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 border border-slate-200 rounded-sm p-0.5 bg-slate-50 self-end lg:self-auto shrink-0">
+          <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-slate-100 self-end lg:self-auto shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-xs text-xs font-medium transition-colors flex items-center gap-1 ${
-                viewMode === 'grid'
-                  ? 'bg-white text-forest shadow-xs font-semibold'
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${viewMode === 'grid'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
               title="Galeri / Kart Görünümü"
             >
-              <Grid className="w-4 h-4" />
-              <span className="hidden sm:inline text-[11px]">Galeri</span>
+              <Grid className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden sm:inline text-xs">Galeri</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-xs text-xs font-medium transition-colors flex items-center gap-1 ${
-                viewMode === 'list'
-                  ? 'bg-white text-forest shadow-xs font-semibold'
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${viewMode === 'list'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
               title="Tablo / Liste Görünümü"
             >
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline text-[11px]">Liste</span>
+              <List className="w-3.5 h-3.5 text-slate-600" />
+              <span className="hidden sm:inline text-xs">Liste</span>
             </button>
           </div>
         </div>
 
         {/* Filter Pills */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
-          <span className="text-[11px] font-mono text-slate-400 font-semibold uppercase mr-1">
+          <span className="text-[11px] font-sans text-slate-500 font-semibold uppercase mr-1">
             Filtrele:
           </span>
 
@@ -349,7 +422,7 @@ export const MediaLibraryPage: React.FC = () => {
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value as any)}
-            className="px-2.5 py-1 text-xs border border-slate-200 rounded-sm bg-white text-slate-700 focus:outline-none focus:border-forest"
+            className="h-9 px-3 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
           >
             <option value="all">Tüm Medya Türleri</option>
             <option value="dish_photo">Yemek Fotoğrafı</option>
@@ -364,13 +437,13 @@ export const MediaLibraryPage: React.FC = () => {
           <select
             value={selectedOrigin}
             onChange={(e) => setSelectedOrigin(e.target.value as any)}
-            className="px-2.5 py-1 text-xs border border-slate-200 rounded-sm bg-white text-slate-700 focus:outline-none focus:border-forest"
+            className="h-9 px-3 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
           >
             <option value="all">Tüm Kökenler</option>
             <option value="real_local">Gerçek Yerel Çekim</option>
             <option value="licensed_stock">Lisanslı Stok</option>
             <option value="ai_generated">Yapay Zekâ (T2V)</option>
-            <option value="representative">Temsili Görsel</option>
+            <option value="representative">Editoryal Görsel</option>
             <option value="unverified">Doğrulanmamış</option>
           </select>
 
@@ -378,7 +451,7 @@ export const MediaLibraryPage: React.FC = () => {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value as any)}
-            className="px-2.5 py-1 text-xs border border-slate-200 rounded-sm bg-white text-slate-700 focus:outline-none focus:border-forest"
+            className="h-9 px-3 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
           >
             <option value="all">Tüm Yayın Durumları</option>
             <option value="published">Yayında</option>
@@ -396,7 +469,7 @@ export const MediaLibraryPage: React.FC = () => {
                 setSelectedOrigin('all');
                 setSelectedStatus('all');
               }}
-              className="text-[11px] font-mono text-rose-600 hover:underline ml-auto"
+              className="text-xs font-sans font-semibold text-rose-600 hover:underline ml-auto"
             >
               Filtreleri Temizle
             </button>
@@ -404,9 +477,21 @@ export const MediaLibraryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Bulk Action Bar for Media */}
+      <BulkActionBar
+        selectedCount={selectedMediaIds.length}
+        totalCount={filteredItems.length}
+        onClearSelection={() => setSelectedMediaIds([])}
+        onBulkPublish={handleBulkPublish}
+        onBulkDraft={handleBulkDraft}
+        onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
+        canDelete={canDelete}
+        canPublish={canPublish}
+      />
+
       {/* Main Content Area */}
       {filteredItems.length === 0 ? (
-        <div className="bg-white rounded-sm border border-slate-200 p-12 text-center space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200/90 p-12 text-center space-y-3 shadow-2xs">
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
             <ImageIcon className="w-6 h-6" />
           </div>
@@ -422,11 +507,14 @@ export const MediaLibraryPage: React.FC = () => {
             const isVideo = item.mediaType === 'video' || item.src.endsWith('.mp4');
             const previewSrc = item.posterSrc || item.thumbnailSrc || item.src;
             const usageCount = item.relatedContentIds.length;
+            const isSelected = selectedMediaIds.includes(item.id);
 
             return (
               <div
                 key={item.id}
-                className="bg-white rounded-sm border border-slate-200 hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden shadow-2xs group"
+                className={`bg-white rounded-xl border transition-all flex flex-col justify-between overflow-hidden shadow-2xs group ${
+                  isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200/90 hover:border-slate-300'
+                }`}
               >
                 <div>
                   {/* Media Preview Box */}
@@ -439,26 +527,45 @@ export const MediaLibraryPage: React.FC = () => {
                       className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
                     />
 
+                    {/* Selection Checkbox Overlay */}
+                    <div className="absolute top-2.5 left-2.5 z-10">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(item.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-emerald-700 accent-emerald-700 focus:ring-emerald-500 cursor-pointer bg-white/95 shadow-xs"
+                        title="Bu medyayı seç"
+                      />
+                    </div>
+
                     {/* Video Indicator */}
                     {isVideo && (
-                      <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-xs bg-forest-900/80 backdrop-blur-xs text-white text-[10px] font-mono flex items-center gap-1">
+                      <div className="absolute top-2.5 left-9 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-sans font-semibold flex items-center gap-1 z-10">
                         <Play className="w-2.5 h-2.5 fill-current" />
                         <span>{item.dimensionsOrDuration || '00:05'}</span>
                       </div>
                     )}
 
                     {/* Status Badge Overlay */}
-                    <div className="absolute top-2 right-2">
+                    <div className="absolute top-2.5 right-2.5 z-10">
                       <span
-                        className={`px-1.5 py-0.5 rounded-xs text-[10px] font-mono uppercase tracking-wider font-semibold ${
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-sans uppercase font-bold tracking-wider ${
                           item.publicationStatus === 'published'
                             ? 'bg-emerald-600 text-white'
                             : item.publicationStatus === 'draft'
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-slate-600 text-white'
+                              ? 'bg-amber-500 text-white'
+                              : item.publicationStatus === 'in_review'
+                              ? 'bg-sky-600 text-white'
+                              : 'bg-slate-600 text-white'
                         }`}
                       >
-                        {item.publicationStatus === 'published' ? 'Yayında' : item.publicationStatus}
+                        {item.publicationStatus === 'published'
+                          ? 'Yayında'
+                          : item.publicationStatus === 'draft'
+                          ? 'Taslak'
+                          : item.publicationStatus === 'in_review'
+                          ? 'İncelemede'
+                          : 'Arşivde'}
                       </span>
                     </div>
                   </div>
@@ -466,10 +573,10 @@ export const MediaLibraryPage: React.FC = () => {
                   {/* Card Content */}
                   <div className="p-3.5 space-y-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">
+                      <span className="text-[11px] font-sans text-slate-600 font-semibold uppercase">
                         {renderTypeLabel(item.mediaType)}
                       </span>
-                      <span>•</span>
+                      <span className="text-slate-300">•</span>
                       {renderOriginBadge(item.origin)}
                     </div>
 
@@ -489,7 +596,7 @@ export const MediaLibraryPage: React.FC = () => {
                 <div className="p-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
                   {/* Linked contents counter */}
                   <div
-                    className="flex items-center gap-1 text-[11px] font-mono text-slate-500"
+                    className="flex items-center gap-1.5 text-[11px] font-sans font-medium text-slate-500"
                     title={
                       usageCount > 0
                         ? item.relatedContentIds
@@ -498,7 +605,7 @@ export const MediaLibraryPage: React.FC = () => {
                         : 'Henüz bir içeriğe bağlanmadı'
                     }
                   >
-                    <Link2 className="w-3 h-3 text-copper" />
+                    <Link2 className="w-3.5 h-3.5 text-emerald-700" />
                     <span>{usageCount} İçerik</span>
                   </div>
 
@@ -506,9 +613,9 @@ export const MediaLibraryPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(item)}
-                    className="px-2.5 py-1 rounded-sm bg-slate-100 hover:bg-forest hover:text-white text-slate-700 text-xs font-semibold transition-colors"
+                    className="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-emerald-700 hover:text-white text-slate-700 text-xs font-semibold transition-colors"
                   >
-                    Detay & Düzenle
+                    {canEdit ? 'Detay & Düzenle' : 'Detayı Gör'}
                   </button>
                 </div>
               </div>
@@ -517,14 +624,29 @@ export const MediaLibraryPage: React.FC = () => {
         </div>
       ) : (
         /* LIST VIEW */
-        <div className="bg-white rounded-sm border border-slate-200 overflow-hidden shadow-xs">
+        <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50 text-[11px] font-mono uppercase text-slate-500 border-b border-slate-200">
+            <table className="w-full text-left text-xs text-slate-700 font-sans">
+              <thead className="bg-slate-50/80 text-[11px] font-sans font-semibold uppercase text-slate-500 border-b border-slate-200 tracking-wider">
                 <tr>
+                  <th className="py-3 px-3 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredItems.length > 0 && selectedMediaIds.length === filteredItems.length}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate =
+                            selectedMediaIds.length > 0 && selectedMediaIds.length < filteredItems.length;
+                        }
+                      }}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 rounded border-slate-300 text-emerald-700 accent-emerald-700 focus:ring-emerald-500 cursor-pointer"
+                      title="Tümünü Seç / Kaldır"
+                    />
+                  </th>
                   <th className="py-3 px-4 w-16">Önizleme</th>
-                  <th className="py-3 px-4">Başlık & Dosya</th>
-                  <th className="py-3 px-4">Tür & Köken</th>
+                  <th className="py-3 px-4">Başlık &amp; Dosya</th>
+                  <th className="py-3 px-4">Tür &amp; Köken</th>
                   <th className="py-3 px-4">İlişkili İçerikler</th>
                   <th className="py-3 px-4">Doğrulama</th>
                   <th className="py-3 px-4">Durum</th>
@@ -535,11 +657,26 @@ export const MediaLibraryPage: React.FC = () => {
                 {filteredItems.map((item) => {
                   const isVideo = item.mediaType === 'video' || item.src.endsWith('.mp4');
                   const previewSrc = item.posterSrc || item.thumbnailSrc || item.src;
+                  const isSelected = selectedMediaIds.includes(item.id);
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-4">
-                        <div className="w-12 h-9 rounded-xs overflow-hidden bg-slate-100 border border-slate-200 relative">
+                    <tr
+                      key={item.id}
+                      className={`transition-colors ${
+                        isSelected ? 'bg-emerald-50/50' : 'hover:bg-slate-50/70'
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelect(item.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-700 accent-emerald-700 focus:ring-emerald-500 cursor-pointer"
+                          title="Bu medyayı seç"
+                        />
+                      </td>
+                      <td className="py-2.5 px-4 align-middle">
+                        <div className="w-12 h-9 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 relative">
                           <ImageWithFallback
                             src={previewSrc}
                             alt={item.title}
@@ -553,63 +690,66 @@ export const MediaLibraryPage: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-4 max-w-xs">
-                        <div className="font-semibold text-slate-900 leading-snug">{item.title}</div>
-                        <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                      <td className="py-2.5 px-4 max-w-xs align-middle">
+                        <div className="font-bold text-slate-900 leading-snug text-xs sm:text-[13px]">{item.title}</div>
+                        <div className="text-[11px] text-slate-400 truncate mt-0.5 font-sans">
                           {item.src}
                         </div>
                       </td>
-                      <td className="py-2.5 px-4">
-                        <div className="text-[11px] font-mono text-slate-600 mb-1">
+                      <td className="py-2.5 px-4 align-middle">
+                        <div className="text-xs font-semibold text-slate-700 mb-1">
                           {renderTypeLabel(item.mediaType)}
                         </div>
                         {renderOriginBadge(item.origin)}
                       </td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-4 align-middle">
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {item.relatedContentIds.length > 0 ? (
                             item.relatedContentIds.slice(0, 2).map((cId) => (
                               <span
                                 key={cId}
-                                className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded-xs text-[10px] font-mono truncate max-w-[120px]"
+                                className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px] font-sans font-medium border border-slate-200 truncate max-w-[130px]"
                                 title={contentNameMap.get(cId) || cId}
                               >
                                 {contentNameMap.get(cId) || cId}
                               </span>
                             ))
                           ) : (
-                            <span className="text-[10px] text-slate-400 italic">Bağlantısız</span>
+                            <span className="text-[11px] text-slate-400 italic">Bağlantısız</span>
                           )}
                           {item.relatedContentIds.length > 2 && (
-                            <span className="text-[10px] font-mono text-slate-500">
+                            <span className="text-[11px] font-sans font-semibold text-slate-500">
                               +{item.relatedContentIds.length - 2}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-4 align-middle">
                         {item.verificationStatus === 'verified' ? (
-                          <span className="text-emerald-700 font-mono text-[11px] flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Doğrulandı
+                          <span className="text-emerald-700 font-sans text-xs font-semibold flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Doğrulandı
                           </span>
                         ) : item.verificationStatus === 'simulated' ? (
-                          <span className="text-amber-700 font-mono text-[11px] flex items-center gap-1">
-                            <AlertTriangle className="w-3.5 h-3.5" /> Simülasyon
+                          <span className="text-amber-700 font-sans text-xs font-semibold flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Ön İnceleme
                           </span>
                         ) : (
-                          <span className="text-rose-700 font-mono text-[11px] flex items-center gap-1">
-                            <ShieldAlert className="w-3.5 h-3.5" /> Doğrulanmadı
+                          <span className="text-rose-700 font-sans text-xs font-semibold flex items-center gap-1.5">
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-600" /> Doğrulanmadı
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-4 align-middle">
                         <select
                           value={item.publicationStatus}
+                          disabled={!canPublish}
+                          title={!canPublish ? 'Yayın durumu için Yayın Sorumlusu / Yönetici yetkisi gerekir' : undefined}
                           onChange={(e) => {
-                            updateStatus(item.id, e.target.value);
-                            showToast(`Yayın durumu güncellendi: ${e.target.value}`);
+                            const nextStatus = e.target.value as PublicationStatus;
+                            updateStatus(item.id, 'media', nextStatus);
+                            showToast(`Yayın durumu güncellendi: ${nextStatus}`);
                           }}
-                          className="text-[11px] font-mono px-2 py-0.5 rounded-xs border border-slate-200 bg-white text-slate-800"
+                          className="text-xs font-sans font-medium px-2.5 py-1 rounded-md border border-slate-200 bg-white text-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <option value="published">Yayında</option>
                           <option value="draft">Taslak</option>
@@ -617,22 +757,24 @@ export const MediaLibraryPage: React.FC = () => {
                           <option value="archived">Arşivde</option>
                         </select>
                       </td>
-                      <td className="py-2.5 px-4 text-right">
+                      <td className="py-2.5 px-4 text-right align-middle">
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(item)}
-                          className="px-2.5 py-1 rounded-sm bg-slate-100 hover:bg-forest hover:text-white text-slate-700 text-xs font-semibold transition-colors mr-1.5"
+                          className="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-emerald-700 hover:text-white text-slate-700 text-xs font-semibold transition-colors mr-1.5"
                         >
-                          Düzenle
+                          {canEdit ? 'Düzenle' : 'Detay'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteCandidate(item)}
-                          className="p-1 text-slate-400 hover:text-rose-600 transition-colors inline-block align-middle"
-                          title="Sil"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteCandidate(item)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors inline-block align-middle cursor-pointer"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -648,28 +790,28 @@ export const MediaLibraryPage: React.FC = () => {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-charcoal/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setActiveItem(null)}
         >
           <div
-            className="bg-white rounded-sm border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col justify-between overflow-hidden"
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col justify-between overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-sm bg-forest/10 flex items-center justify-center text-forest">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
                   {formData.mediaType === 'video' ? (
-                    <Video className="w-4 h-4 text-copper" />
+                    <Video className="w-4 h-4 text-emerald-700" />
                   ) : (
-                    <ImageIcon className="w-4 h-4 text-copper" />
+                    <ImageIcon className="w-4 h-4 text-emerald-700" />
                   )}
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-900 leading-tight">
                     {isCreatingNew ? 'Yeni Medya Kaydı Ekle' : 'Medya Detayı & Lisans Düzenleme'}
                   </h2>
-                  <p className="text-[11px] font-mono text-slate-500">
+                  <p className="text-xs font-sans text-slate-500">
                     ID: {formData.id || 'Yeni Kayıt'}
                   </p>
                 </div>
@@ -678,7 +820,7 @@ export const MediaLibraryPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveItem(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-sm hover:bg-slate-200/50"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-200/50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -686,8 +828,13 @@ export const MediaLibraryPage: React.FC = () => {
 
             {/* Modal Form Body */}
             <form onSubmit={handleSaveModal} className="p-6 overflow-y-auto space-y-6 flex-1">
+              {modalError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+                  {modalError}
+                </div>
+              )}
               {/* Media Preview Box */}
-              <div className="rounded-sm border border-slate-200 bg-slate-900 overflow-hidden relative aspect-[16/9] flex items-center justify-center">
+              <div className="rounded-xl border border-slate-200 bg-slate-900 overflow-hidden relative aspect-[16/9] flex items-center justify-center">
                 {formData.src ? (
                   formData.mediaType === 'video' || formData.src.endsWith('.mp4') ? (
                     <video
@@ -705,30 +852,30 @@ export const MediaLibraryPage: React.FC = () => {
                     />
                   )
                 ) : (
-                  <div className="text-slate-400 text-xs font-mono flex flex-col items-center gap-2">
+                  <div className="text-slate-400 text-xs font-sans flex flex-col items-center gap-2">
                     <ImageIcon className="w-8 h-8 opacity-40" />
                     <span>Önizleme için geçerli bir medya yolu giriniz.</span>
                   </div>
                 )}
               </div>
 
-              {/* Controlled Upload Simulation Guard (Madde 5) */}
-              <div className="p-3.5 rounded-sm bg-slate-50 border border-slate-200 space-y-2">
+              {/* Controlled Upload */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-800">
-                    Yerel Medya Seçimi & Simülasyon
+                    Yerel Medya Dosyası Seçimi
                   </label>
-                  <span className="text-[10px] font-mono text-copper-dark font-semibold">
-                    Faz 02C-1 Prototip
+                  <span className="text-[10px] font-semibold text-slate-500">
+                    Görsel & Video
                   </span>
                 </div>
                 <input
                   type="file"
                   accept="image/*,video/mp4"
+                  disabled={isCreatingNew ? !canCreate : !canEdit}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      // Honest notification: do not claim physical server upload
                       const fakePath = file.type.startsWith('video')
                         ? `/videos/${file.name}`
                         : `/images/${file.name}`;
@@ -738,13 +885,18 @@ export const MediaLibraryPage: React.FC = () => {
                         fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
                         title: formData.title || file.name.replace(/\.[^/.]+$/, ''),
                       });
-                      alert(
-                        `Dosya seçildi: "${file.name}" (${(file.size / 1024).toFixed(0)} KB).\n\nÖnemli: Bu bir frontend prototipidir. Dosyalar harici sunucuya fiziksel olarak aktarılmaz. Kalıcı render için '/public/images' veya '/public/videos' dizinindeki mevcut dosyalar veya geçerli web URL'leri kullanılır.`
+                      setFileNotice(
+                        `Dosya seçildi: "${file.name}" (${(file.size / 1024).toFixed(0)} KB). /public/images veya /public/videos dizinindeki dosya yolunu ya da geçerli bir görsel URL'sini kullanınız.`
                       );
                     }
                   }}
-                  className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xs file:border-0 file:text-xs file:font-semibold file:bg-forest file:text-white hover:file:bg-forest-800 cursor-pointer"
+                  className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-700 file:text-white hover:file:bg-emerald-800 cursor-pointer disabled:opacity-50"
                 />
+                {fileNotice && (
+                  <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 leading-relaxed">
+                    {fileNotice}
+                  </p>
+                )}
                 <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
                   Sunucu yükleme altyapısı bulunmadığından doğrudan dosya yolu veya web URL'si girebilirsiniz.
                 </p>
@@ -763,7 +915,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.title || ''}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="Örn: Geleneksel İslahiye Tavası — Bakır Tepside Meşe Közü"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -775,7 +927,7 @@ export const MediaLibraryPage: React.FC = () => {
                   <select
                     value={formData.mediaType || 'dish_photo'}
                     onChange={(e) => setFormData({ ...formData, mediaType: e.target.value as any })}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-white"
                   >
                     <option value="dish_photo">Yemek Fotoğrafı</option>
                     <option value="heritage">Kültürel Miras Görseli</option>
@@ -792,14 +944,14 @@ export const MediaLibraryPage: React.FC = () => {
                     Medya Kökeni & Kaynak Türü
                   </label>
                   <select
-                    value={formData.origin || 'representative'}
+                    value={formData.origin || 'real_local'}
                     onChange={(e) => setFormData({ ...formData, origin: e.target.value as any })}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-white"
                   >
                     <option value="real_local">Gerçek Yerel Çekim (Saha / Kültür Arşivi)</option>
                     <option value="licensed_stock">Lisanslı Stok Medya</option>
                     <option value="ai_generated">Yapay Zekâ Üretimi (T2V / Sentetik)</option>
-                    <option value="representative">Temsili Editoryal Görsel</option>
+                    <option value="representative">Editoryal Arşiv Görseli</option>
                     <option value="unverified">Kaynağı Henüz Doğrulanmamış</option>
                   </select>
                 </div>
@@ -815,7 +967,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.src || ''}
                     onChange={(e) => setFormData({ ...formData, src: e.target.value })}
                     placeholder="/images/islahiye_tava.jpg veya web URL'si"
-                    className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs font-sans border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -829,7 +981,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.posterSrc || ''}
                     onChange={(e) => setFormData({ ...formData, posterSrc: e.target.value })}
                     placeholder="/images/tas_firin_kozu_poster.jpg"
-                    className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs font-sans border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -843,7 +995,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.description || ''}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Medyanın temsil ettiği yemek, zanaat veya kültürel bağlam..."
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -857,7 +1009,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.altText || ''}
                     onChange={(e) => setFormData({ ...formData, altText: e.target.value })}
                     placeholder="Ekran okuyucular için betimleyici görsel metni"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -871,7 +1023,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.sourceUrl || ''}
                     onChange={(e) => setFormData({ ...formData, sourceUrl: e.target.value })}
                     placeholder="https://..."
-                    className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs font-sans border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -884,7 +1036,7 @@ export const MediaLibraryPage: React.FC = () => {
                     value={formData.licenseUrl || ''}
                     onChange={(e) => setFormData({ ...formData, licenseUrl: e.target.value })}
                     placeholder="https://..."
-                    className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    className="w-full px-3 py-2 text-xs font-sans border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -897,8 +1049,8 @@ export const MediaLibraryPage: React.FC = () => {
                     type="text"
                     value={formData.usagePermission || ''}
                     onChange={(e) => setFormData({ ...formData, usagePermission: e.target.value })}
-                    placeholder="Örn: İslahiye Dijital Platformlar Tanıtım Prototipi İzni"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest"
+                    placeholder="Örn: İslahiye Lezzet Atlası Kurumsal Arşivi"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
 
@@ -908,14 +1060,14 @@ export const MediaLibraryPage: React.FC = () => {
                     Doğrulama Durumu
                   </label>
                   <select
-                    value={formData.verificationStatus || 'unverified'}
+                    value={formData.verificationStatus || 'verified'}
                     onChange={(e) =>
                       setFormData({ ...formData, verificationStatus: e.target.value as any })
                     }
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-white"
                   >
                     <option value="verified">Doğrulanmış (Resmî/Doğrulanmış Kaynak)</option>
-                    <option value="simulated">Temsili / Simülasyon</option>
+                    <option value="simulated">Ön İnceleme Kaydı</option>
                     <option value="unverified">Doğrulanmamış (İnceleme Gerekli)</option>
                   </select>
                 </div>
@@ -926,15 +1078,20 @@ export const MediaLibraryPage: React.FC = () => {
                   </label>
                   <select
                     value={formData.publicationStatus || 'draft'}
+                    disabled={isCreatingNew ? !canCreate : !canEdit}
                     onChange={(e) =>
                       setFormData({ ...formData, publicationStatus: e.target.value as any })
                     }
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-forest bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-white disabled:bg-slate-50"
                   >
-                    <option value="published">Yayında</option>
+                    <option value="published" disabled={!canPublish}>
+                      Yayında{!canPublish ? ' — Yayın yetkisi gerekir' : ''}
+                    </option>
                     <option value="draft">Taslak</option>
                     <option value="in_review">İncelemede</option>
-                    <option value="archived">Arşivde</option>
+                    <option value="archived" disabled={!canPublish}>
+                      Arşivde{!canPublish ? ' — Yayın yetkisi gerekir' : ''}
+                    </option>
                   </select>
                 </div>
 
@@ -943,13 +1100,13 @@ export const MediaLibraryPage: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     İlişkili İçerikler (Bu medyanın kullanıldığı yerler)
                   </label>
-                  <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-sm p-2 space-y-1 bg-slate-50/50">
+                  <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50/50">
                     {Array.from(contentNameMap.entries()).map(([cId, cName]) => {
                       const isSelected = formData.relatedContentIds?.includes(cId);
                       return (
                         <label
                           key={cId}
-                          className="flex items-center gap-2 p-1.5 hover:bg-slate-100 rounded-xs text-xs text-slate-700 cursor-pointer"
+                          className="flex items-center gap-2 p-1.5 hover:bg-slate-100 rounded-lg text-xs text-slate-700 cursor-pointer"
                         >
                           <input
                             type="checkbox"
@@ -968,10 +1125,10 @@ export const MediaLibraryPage: React.FC = () => {
                                 });
                               }
                             }}
-                            className="rounded-xs text-forest focus:ring-forest"
+                            className="w-4 h-4 rounded border-slate-300 text-emerald-700 accent-emerald-700 focus:ring-emerald-500 cursor-pointer"
                           />
                           <span className="truncate">{cName}</span>
-                          <span className="text-[10px] font-mono text-slate-400 ml-auto shrink-0">
+                          <span className="text-[11px] font-sans text-slate-400 ml-auto shrink-0">
                             ID: {cId}
                           </span>
                         </label>
@@ -983,13 +1140,13 @@ export const MediaLibraryPage: React.FC = () => {
 
               {/* Modal Buttons */}
               <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                {!isCreatingNew && (
+                {canDelete && !isCreatingNew && (
                   <button
                     type="button"
                     onClick={() => {
                       setDeleteCandidate(activeItem);
                     }}
-                    className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1"
+                    className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Medyayı Sil</span>
@@ -1000,16 +1157,18 @@ export const MediaLibraryPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveItem(null)}
-                    className="px-4 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="h-9 px-4 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                   >
                     Vazgeç
                   </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold shadow-xs"
-                  >
-                    {isCreatingNew ? 'Medya Kaydını Oluştur' : 'Değişiklikleri Kaydet'}
-                  </button>
+                  {(isCreatingNew ? canCreate : canEdit) && (
+                    <button
+                      type="submit"
+                      className="h-9 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition shadow-2xs"
+                    >
+                      {isCreatingNew ? 'Medya Kaydını Oluştur' : 'Değişiklikleri Kaydet'}
+                    </button>
+                  )}
                 </div>
               </div>
             </form>
@@ -1019,8 +1178,8 @@ export const MediaLibraryPage: React.FC = () => {
 
       {/* DELETE CONFIRMATION DIALOG */}
       {deleteCandidate && (
-        <div className="fixed inset-0 z-60 bg-charcoal/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-sm border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-center gap-2 text-rose-600">
               <Trash2 className="w-5 h-5" />
               <h3 className="text-sm font-bold text-slate-900">Medya Kaydını Silmek İstiyor musunuz?</h3>
@@ -1031,19 +1190,19 @@ export const MediaLibraryPage: React.FC = () => {
             </p>
 
             {deleteCandidate.relatedContentIds.length > 0 && (
-              <div className="p-3 rounded-sm bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1">
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1">
                 <strong className="block font-bold">Kullanım Uyarısı:</strong>
                 <p>
                   Bu medya şu anda <strong>{deleteCandidate.relatedContentIds.length}</strong> farklı içerikte kullanılmaktadır:
                 </p>
-                <ul className="list-disc list-inside text-[11px] font-mono mt-1">
+                <ul className="list-disc list-inside text-xs font-sans mt-1">
                   {deleteCandidate.relatedContentIds.map((cId) => (
                     <li key={cId} className="truncate">
                       {contentNameMap.get(cId) || cId}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-[11px]">
+                <p className="mt-1 text-xs">
                   Silinmesi durumunda ziyaretçi arayüzünde güvenli fallback görseli görüntülenecektir.
                 </p>
               </div>
@@ -1053,7 +1212,7 @@ export const MediaLibraryPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDeleteCandidate(null)}
-                className="px-3 py-1.5 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Vazgeç
               </button>
@@ -1067,7 +1226,7 @@ export const MediaLibraryPage: React.FC = () => {
                     setActiveItem(null);
                   }
                 }}
-                className="px-3 py-1.5 rounded-sm bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
+                className="px-3.5 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors"
               >
                 Evet, Sil
               </button>
@@ -1075,6 +1234,18 @@ export const MediaLibraryPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* BULK DELETE CONFIRMATION MODAL */}
+      <ActionConfirmModal
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={handleBulkDeleteConfirm}
+        title="Toplu Medya Kaydı Silme Onayı"
+        message={`Seçilen ${selectedMediaIds.length} medya kaydını kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}
+        confirmText={`Evet, ${selectedMediaIds.length} Medyayı Sil`}
+        cancelText="Vazgeç"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -27,12 +27,12 @@ export const RoadmapTeaser: React.FC = () => {
   ];
 
   return (
-    <section id="kultur-mirasi" className="py-20 md:py-28 bg-paper border-t border-sand/70">
+    <section id="gelecek-moduller" className="py-20 md:py-28 bg-paper border-t border-sand/70 scroll-mt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mb-12">
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="w-8 h-px bg-copper" />
-            <span className="text-xs font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
+            <span className="text-xs font-sans uppercase tracking-[0.25em] text-copper-dark font-bold">
               05 / GELECEK LEZZET DURAKLARI
             </span>
           </div>
@@ -53,14 +53,14 @@ export const RoadmapTeaser: React.FC = () => {
               <div
                 key={item.id}
                 id={item.id}
-                className="p-7 rounded-sm bg-ivory/50 border border-sand/70 flex flex-col justify-between hover:border-copper/40 transition-colors shadow-xs"
+                className="p-7 rounded-2xl bg-ivory/50 border border-sand/70 flex flex-col justify-between hover:border-copper/40 transition-colors shadow-xs"
               >
                 <div>
                   <div className="flex items-center justify-between mb-5">
-                    <div className="w-10 h-10 rounded-sm bg-forest/10 flex items-center justify-center text-forest">
+                    <div className="w-10 h-10 rounded-xl bg-forest/10 flex items-center justify-center text-forest">
                       <Icon className="w-5 h-5 text-copper" />
                     </div>
-                    <span className="text-[10px] font-mono font-medium uppercase tracking-wider px-2.5 py-1 rounded-sm bg-sand/40 text-charcoal/70">
+                    <span className="text-[10px] font-sans font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-sand/40 text-charcoal/70">
                       {item.status}
                     </span>
                   </div>
@@ -75,7 +75,7 @@ export const RoadmapTeaser: React.FC = () => {
                 </div>
 
                 <div className="pt-5 mt-6 border-t border-sand/40 flex items-center justify-between text-xs text-charcoal/50">
-                  <span className="font-mono text-[11px] uppercase tracking-wider">İslahiye Dijital Platformlar</span>
+                  <span className="font-sans font-semibold text-[11px] uppercase tracking-wider">İslahiye Dijital Platformlar</span>
                   <ArrowUpRight className="w-4 h-4 text-copper/60" />
                 </div>
               </div>

@@ -1,6 +1,5 @@
 import React from 'react';
-import { Info, FileCheck } from 'lucide-react';
-import { ARTISAN_PROJECT_INFO } from '../../data/artisans';
+import { FileCheck } from 'lucide-react';
 import { useContent } from '../../hooks/useContent';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
 
@@ -15,8 +14,8 @@ export const ArtisansShowcase: React.FC = () => {
         <div className="max-w-3xl mb-12 md:mb-16">
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="w-8 h-px bg-copper" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-copper-dark font-semibold">
-              05 / MUTFAK ZANAATLARI & EMEK
+            <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold">
+              05 / MUTFAK ZANAATLARI &amp; EMEK
             </span>
           </div>
 
@@ -37,11 +36,11 @@ export const ArtisansShowcase: React.FC = () => {
             {artisans.map((artisan) => (
               <article
                 key={artisan.id}
-                className="bg-paper border border-sand/70 rounded-sm p-6 sm:p-7 flex flex-col justify-between shadow-xs hover:border-copper/50 transition-colors"
+                className="bg-paper border border-sand/70 rounded-xl p-6 sm:p-7 flex flex-col justify-between shadow-xs hover:border-copper/50 transition-colors"
               >
                 <div>
                   {artisan.imageUrl && (
-                    <div className="aspect-[4/3] rounded-xs overflow-hidden mb-5 border border-sand/60 bg-sand/20">
+                    <div className="aspect-[4/3] rounded-lg overflow-hidden mb-5 border border-sand/60 bg-sand/20">
                       <ImageWithFallback
                         src={artisan.imageUrl}
                         alt={artisan.name}
@@ -52,11 +51,11 @@ export const ArtisansShowcase: React.FC = () => {
                   )}
 
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-mono text-copper-dark uppercase tracking-wider font-semibold">
+                    <span className="text-[10px] font-sans text-copper-dark uppercase tracking-wider font-bold">
                       {artisan.craftCategoryLabel}
                     </span>
                     {artisan.publicationPermissionGranted && (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-mono text-forest bg-forest/10 px-2 py-0.5 rounded-xs font-semibold uppercase">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-sans text-forest bg-forest/10 px-2.5 py-0.5 rounded-md font-semibold uppercase">
                         <FileCheck className="w-2.5 h-2.5 text-copper" />
                         İzinli Profil
                       </span>
@@ -66,7 +65,7 @@ export const ArtisansShowcase: React.FC = () => {
                   <h3 className="text-2xl font-display font-bold text-forest mb-1">
                     {artisan.name}
                   </h3>
-                  <span className="text-xs font-mono text-copper-dark uppercase tracking-wider block mb-3 font-medium">
+                  <span className="text-xs font-sans text-copper-dark uppercase tracking-wider block mb-3 font-semibold">
                     {artisan.title}
                   </span>
                   <p className="text-xs sm:text-sm text-charcoal/75 leading-relaxed font-sans mb-4">
@@ -75,7 +74,7 @@ export const ArtisansShowcase: React.FC = () => {
                 </div>
 
                 {artisan.visitInfo?.address && (
-                  <div className="pt-3.5 border-t border-sand/40 text-[11px] font-mono text-charcoal/60">
+                  <div className="pt-3.5 border-t border-sand/40 text-[11px] font-sans text-charcoal/60">
                     {artisan.visitInfo.address}
                   </div>
                 )}
@@ -89,7 +88,7 @@ export const ArtisansShowcase: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               {/* Wide Photo Frame */}
               <div className="lg:col-span-7">
-                <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-sm overflow-hidden bg-sand/20 shadow-sm border border-sand/50">
+                <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl overflow-hidden bg-sand/20 shadow-sm border border-sand/50">
                   <ImageWithFallback
                     src="/images/tas_firin_kozu_poster.jpg"
                     alt="Taş fırın meşe odunu közleri ve ocaklık ateşi"
@@ -98,14 +97,14 @@ export const ArtisansShowcase: React.FC = () => {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <p className="mt-2 text-[11px] font-mono text-charcoal/50 text-right">
-                  Meşe Odunu ve Bakır Tepsi Zanaatı • Temsili Kültürel Görsel
+                <p className="mt-2 text-xs font-sans text-charcoal/50 text-right font-medium">
+                  Meşe Odunu ve Bakır Tepsi Zanaatı • Saha Arşivi
                 </p>
               </div>
 
               {/* Lead Narrative Text */}
               <div className="lg:col-span-5 space-y-4">
-                <span className="text-[11px] font-mono uppercase tracking-widest text-copper-dark font-semibold block">
+                <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-copper-dark font-bold block">
                   Asırlık Çarşı Geleneği
                 </span>
 
@@ -127,7 +126,7 @@ export const ArtisansShowcase: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10 pt-6 border-t border-sand/50">
               {/* Secondary Block 1: Toprak ve Biber Üretimi */}
               <div className="flex flex-col justify-between space-y-4">
-                <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden bg-sand/20 shadow-xs border border-sand/40">
+                <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-sand/20 shadow-xs border border-sand/40">
                   <ImageWithFallback
                     src="/images/islahiye_biberi.jpg"
                     alt="İslahiye kırmızı biberi hasat ve kurutma"
@@ -137,8 +136,8 @@ export const ArtisansShowcase: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <p className="text-[11px] font-mono text-charcoal/50 mb-1.5">
-                    Amanos Alüvyonu ve Taş Dibekler • Temsili Görsel
+                  <p className="text-xs font-sans text-charcoal/50 mb-1.5 font-medium">
+                    Amanos Alüvyonu ve Taş Dibekler • İslahiye Biberi Saha Fotoğrafı
                   </p>
                   <h4 className="text-xl sm:text-2xl font-display font-bold text-forest mb-2">
                     Toprak ve Biber Üretimi
@@ -151,7 +150,7 @@ export const ArtisansShowcase: React.FC = () => {
 
               {/* Secondary Block 2: Geleneksel Hamur Zanaatı */}
               <div className="flex flex-col justify-between space-y-4">
-                <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden bg-sand/20 shadow-xs border border-sand/40">
+                <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-sand/20 shadow-xs border border-sand/40">
                   <ImageWithFallback
                     src="/images/hamur_zanaati_poster.jpg"
                     alt="Geleneksel hamur açma ve unlu tezgâh"
@@ -161,8 +160,8 @@ export const ArtisansShowcase: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <p className="text-[11px] font-mono text-charcoal/50 mb-1.5">
-                    Oymalı Ahşap Kalıplar ve Yufka Ustalığı • Temsili Görsel
+                  <p className="text-xs font-sans text-charcoal/50 mb-1.5 font-medium">
+                    Oymalı Ahşap Kalıplar ve Yufka Ustalığı • Kültürel Zanaat Arşivi
                   </p>
                   <h4 className="text-xl sm:text-2xl font-display font-bold text-forest mb-2">
                     Geleneksel Hamur Zanaatı
@@ -172,14 +171,6 @@ export const ArtisansShowcase: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </div>
-
-            {/* 3. Calm & Truthful Institutional Clarification */}
-            <div className="p-6 sm:p-7 rounded-sm bg-sand/20 border border-sand/60 flex items-start gap-4">
-              <Info className="w-5 h-5 text-copper shrink-0 mt-0.5" />
-              <p className="text-xs sm:text-sm text-charcoal/80 leading-relaxed font-sans">
-                {ARTISAN_PROJECT_INFO.description}
-              </p>
             </div>
           </div>
         )}

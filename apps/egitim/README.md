@@ -246,7 +246,8 @@ apps/egitim/src/
 
 ## 9. Geliştirme ve Çalıştırma Komutları
 
-Uygulama klasöründe doğrudan çalıştırılabilecek doğrulanmış npm komutları:
+### 9.1. Frontend Arayüzünü Çalıştırma
+Uygulama klasöründe veya monorepo kök dizininde çalıştırılabilecek komutlar:
 
 ```bash
 # apps/egitim klasörüne geçiş yapıldığında:
@@ -262,23 +263,43 @@ npm run build
 npm run preview
 ```
 
-> **Not:** Monorepo kök dizininden çalıştırmak için `npm run dev:egitim` komutunu kullanabilirsiniz.
+> **Hızlı Yol:** Monorepo kök dizininden doğrudan `npm run dev:egitim` komutunu çalıştırabilirsiniz.
+
+### 9.2. C# .NET 9 Backend Web API'sini Çalıştırma
+Eğitim platformunun kurumsal C# arka uç servisi `services/education-api` altında yer almaktadır:
+
+```bash
+# 1. Monorepo kök dizininden tek komutla başlatma:
+npm run dev:api:egitim
+
+# 2. Veya doğrudan dotnet CLI ile başlatma:
+dotnet run --project services/education-api/src/Education.Api
+```
+
+* **API Adresi & Swagger Arayüzü:** `http://localhost:5234/swagger`
+* **Sağlık Denetimi (Health Check):** `http://localhost:5234/health/live`
+* **Temel REST Uç Noktaları:**
+  * `GET /api/programs` — Tüm eğitim programları ve müfredat detayları
+  * `POST /api/applications` — Aday başvurusu ve otomatik kriter puanlaması
+  * `GET /api/groups` — Şube ve grup kontenjan yönetimi
+  * `GET /api/sessions` — Oturum takvimi ve ders planları
+  * `POST /api/sessions/{id}/attendance` — Manuel eğitmen yoklaması girişi
+  * `POST /api/assignments` — Ödev teslimi, puanlama ve revizyon notları
+  * `GET /api/certificates/verify/{code}` — Karekodlu belge doğrulama sorgusu
+* **Otomatik Veritabanı ve Idempotency:** API başladığında `EnsureCreatedAsync` ve `SeedReferenceDataAsync` ile veritabanı şeması ve başlangıç programları otomatik kurulur; mükerrer işlemleri önleyen Idempotency motoru devrededir.
 
 ---
 
-## 10. Mevcut Geliştirme Durumu ve Üretim Ortamı Yol Haritası
+## 10. Mevcut Geliştirme Durumu ve Backend Mimarisi
 
-### Mevcut Geliştirme Durumu (Frontend Simülasyonu)
-- **Arayüz ve Deneyim:** Sistem, tüm halka açık sayfaları, aday formlarını, kursiyer/eğitmen panellerini, idari karar masalarını ve süper yönetici yetki matrisini içeren eksiksiz ve çalışan bir frontend prototipidir.
-- **Veri Saklama:** Demo verileri tarayıcının `localStorage` alanında saklanır; sayfa yenilendiğinde yapılan işlemler korunur.
-- **Rol Değiştirme:** Gerçek bir kimlik doğrulama sunucusu yerine, hızlı değerlendirme ve test imkânı sağlayan `DemoRoleContext` üzerinden rol geçişi simüle edilir.
-- **İletişim ve E-Posta:** Mesajlaşma ve toplu e-posta gönderimleri tarayıcı içi simülasyon kuyrukları üzerinden yürütülür; harici sunucuya gerçek e-posta veya SMS atılmaz.
+### Mevcut Geliştirme Durumu (Frontend & C# Backend)
+- **Arayüz ve Deneyim:** Sistem, tüm halka açık sayfaları, aday formlarını, kursiyer/eğitmen panellerini, idari karar masalarını ve süper yönetici yetki matrisini içeren eksiksiz ve çalışan bir frontend platformudur.
+- **Backend Mimarisi (`services/education-api`):** .NET 9 tabanlı ASP.NET Core Web API, Entity Framework Core, SQL Server/SQLite desteği, Idempotency motoru ve katmanlı mimari (Domain, Application, Infrastructure, Api) geliştirilmiştir.
+- **Veri Saklama:** İstemci tarafında `localStorage` tabanlı canlı reaktif durum senkronizasyonu; sunucu tarafında ise Entity Framework Core ilişkisel modelleri mevcuttur.
+- **Rol Değiştirme:** Hızlı test ve değerlendirme imkânı sağlayan `DemoRoleContext` ve API düzeyinde JWT/Bootstrap yetkilendirmesi mevcuttur.
 
-### Üretim Ortamı Gereksinimleri (Production Backend Roadmap)
-Sistemin sahada resmî olarak devreye alınabilmesi için gelecekte geliştirilecek kurumsal altyapı adımları:
-1. **Merkezi Backend API:** ASP.NET Core Web API (veya eşdeğer kurumsal REST mimarisi) ile iş kurallarının ve yetkilendirmelerin sunucu tarafında doğrulanması.
-2. **İlişkisel Veritabanı:** PostgreSQL veya Microsoft SQL Server üzerinde `Program`, `Dönem`, `Grup`, `Oturum`, `Yoklama`, `Ödev`, `Kullanıcı` tabloları ve transaction güvencesi.
-3. **Gerçek Kimlik Doğrulama (Auth & RBAC):** JWT / OAuth2 tabanlı oturum yönetimi, güvenli şifreleme (Argon2/bcrypt) ve frontenddeki 24 yetki anahtarının API middleware katmanında doğrulanması.
-4. **Resmî e-İmza ve Karekod Entegrasyonu:** Düzenlenen başarı belgelerinin kurum yetkilileri tarafından 5070 sayılı kanuna uygun güvenli elektronik imza veya mobil imza ile imzalanması ve zaman damgası eklenmesi.
-5. **Gerçek İletişim Servisleri:** İslahiye Ticaret Odası kurumsal SMTP sunucusu ve SMS başlığı üzerinden otomatik bilgilendirme gönderimi.
-6. **KVKK ve Veri Güvenliği:** T.C. kimlik numaraları, iletişim bilgileri ve ikamet belgelerinin KVKK standartlarına uygun olarak veritabanında şifrelenmiş (AES-256) biçimde saklanması.
+### Canlıya Alma (Production Deployment Roadmap)
+Sistemin sahada resmî olarak devreye alınabilmesi için kalan kurumsal operasyon adımları:
+1. **Canlı SMS & Kurumsal E-Posta:** İslahiye Ticaret Odası kurumsal SMTP sunucusu ve SMS başlığı (Netgsm/Turkcell) üzerinden otomatik SMS/e-posta gateway entegrasyonu.
+2. **Resmî e-İmza Entegrasyonu:** Düzenlenen başarı belgelerine 5070 sayılı kanuna uygun güvenli elektronik imza veya mobil imza zaman damgasının eklenmesi.
+3. **Canlı Sunucu Barındırma:** Docker / Azure App Service üzerinde .NET 9 API ve SPA yayın konteynerlerinin yapılandırılması.

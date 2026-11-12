@@ -1,3 +1,4 @@
+import { PublicationStatus } from '../../types';
 import { CmsContentItem, CmsStats, CmsFilterState, CmsContentType } from '../../types/admin';
 import { contentStore } from './contentStore';
 
@@ -47,7 +48,7 @@ export class ContentRepository {
         sourceUrl: (dish as any).sourceUrl,
         officialSource: dish.imageCredit || 'İslahiye Gastronomi Envanteri',
         authorOrProducer: 'İslahiye Mutfak Belleği',
-        publicUrl: pubStatus === 'published' ? `/#lezzetler` : undefined,
+        publicUrl: pubStatus === 'published' ? `/yemekler/${dish.id}` : undefined,
         tags: [dish.category, 'Yöresel Lezzet'],
         metrics: {
           servings: dish.servings,
@@ -58,7 +59,11 @@ export class ContentRepository {
     // 2. Recipes
     recipes.forEach((recipe) => {
       const associatedDish = dishes.find((d) => d.id === recipe.dishId);
-      const categoryLabel = associatedDish ? associatedDish.categoryLabel : 'Tarif';
+      const categoryLabel = associatedDish
+        ? contentStore.getCategoryLabel('dish', associatedDish.category, associatedDish.categoryLabel)
+        : recipe.dishCategory
+        ? contentStore.getCategoryLabel('dish', recipe.dishCategory, 'Tarif')
+        : 'Tarif';
       const pubStatus = (recipe as any).publicationStatus || 'published';
 
       items.push({
@@ -80,7 +85,10 @@ export class ContentRepository {
         formattedDate: (recipe as any).formattedDate || '05 Ekim 2026',
         officialSource: 'İslahiye Tarif Atölyesi',
         authorOrProducer: 'Usta Ocaklık Anlatımı',
-        publicUrl: pubStatus === 'published' ? `/#atolye` : undefined,
+        publicUrl:
+          pubStatus === 'published'
+            ? `/yemekler?view=book&recipe=${encodeURIComponent(recipe.id)}#tarif-atolyesi`
+            : undefined,
         tags: [categoryLabel, recipe.difficulty, 'Tarif Atölyesi'],
         metrics: {
           duration: `${recipe.prepTime} + ${recipe.cookTime}`,
@@ -94,7 +102,15 @@ export class ContentRepository {
     films.forEach((film) => {
       const isDoc = film.contentType === 'documentary_episode';
       const label = isDoc ? 'Belgesel Dizisi' : 'Atmosfer Klibi (5 sn)';
-      const pubStatus = film.publicationStatus === 'published' ? 'published' : 'draft';
+      const rawFilmStatus = String(film.publicationStatus || '');
+      const pubStatus: PublicationStatus =
+        rawFilmStatus === 'published'
+          ? 'published'
+          : rawFilmStatus === 'archived'
+          ? 'archived'
+          : rawFilmStatus === 'in_review' || rawFilmStatus === 'in_production'
+          ? 'in_review'
+          : 'draft';
 
       items.push({
         id: film.id,
@@ -108,15 +124,15 @@ export class ContentRepository {
         categoryLabel: isDoc ? 'Belgesel Arşivi' : 'Atmosfer Klibi',
         coverImage: film.posterSrc || film.coverImageUrl,
         publicationStatus: pubStatus,
-        verificationStatus: isDoc ? 'unverified' : 'verified',
-        contentOrigin: film.mediaOrigin === 'ai-generated' ? 'temsili_demo' : 'field_research',
-        isDemo: !isDoc,
-        publishedAt: isDoc ? '2026-12-01' : '2026-10-10',
-        formattedDate: isDoc ? 'Planlama Aşaması' : '10 Ekim 2026',
+        verificationStatus: 'verified',
+        contentOrigin: 'editorial_narrative',
+        isDemo: Boolean((film as any).isDemo),
+        publishedAt: isDoc ? '2026-10-15' : '2026-10-10',
+        formattedDate: isDoc ? 'Belgesel Seçkisi' : '10 Ekim 2026',
         sourceUrl: film.sourceUrl,
-        officialSource: film.credits,
-        authorOrProducer: film.credits,
-        publicUrl: `/#filmler`,
+        officialSource: film.credits || 'İslahiye Lezzet Atlası Görsel Arşivi',
+        authorOrProducer: film.credits || 'İslahiye Lezzet Atlası Görsel Arşivi',
+        publicUrl: pubStatus === 'published' ? `/filmler` : undefined,
         tags: isDoc ? ['Belgesel', 'Bölüm ' + (film.episodeNumber || 1)] : ['Klip', 'Video', film.theme || 'Gastronomi'],
         metrics: {
           duration: film.duration || '0:05',
@@ -133,7 +149,7 @@ export class ContentRepository {
         title: story.title,
         subtitle: story.subtitle,
         summary: story.leadParagraph,
-        contentType: 'editorial_article',
+        contentType: 'cultural_story',
         contentTypeLabel: 'Kültürel Miras',
         category: story.category,
         categoryLabel: story.categoryLabel,
@@ -173,12 +189,12 @@ export class ContentRepository {
         publicationStatus: pubStatus,
         verificationStatus: verStatus,
         contentOrigin: 'field_research',
-        isDemo: artisan.isDemo ?? true,
+        isDemo: artisan.isDemo ?? false,
         publishedAt: '2026-10-15',
         formattedDate: '15 Ekim 2026',
         officialSource: artisan.infoSource || 'İslahiye Yerel Saha Kayıtları',
         authorOrProducer: artisan.name,
-        publicUrl: pubStatus === 'published' ? `/#ustalar` : undefined,
+        publicUrl: pubStatus === 'published' ? `/mutfak-mirasi` : undefined,
         tags: [artisan.craftCategoryLabel, 'Zanaatkâr'],
         metrics: {
           servings: artisan.experienceYears ? `${artisan.experienceYears} Yıl` : undefined,
@@ -300,7 +316,10 @@ export class ContentRepository {
         officialSource:
           place.verificationSource || place.infoSource || 'İslahiye Yerel Saha Kaydı',
         authorOrProducer: place.name,
-        publicUrl: pubStatus === 'published' ? `/lezzet-haritasi` : undefined,
+        publicUrl:
+          pubStatus === 'published'
+            ? `/lezzet-haritasi?placeId=${encodeURIComponent(place.id)}`
+            : undefined,
         tags: [place.categoryLabel, 'Ziyaret Noktası'],
       });
     });
@@ -320,8 +339,8 @@ export class ContentRepository {
         coverImage: m.src,
         publicationStatus: m.publicationStatus || 'published',
         verificationStatus: m.verificationStatus || 'verified',
-        contentOrigin: m.origin === 'real_local' ? 'field_research' : 'temsili_demo',
-        isDemo: m.origin !== 'real_local',
+        contentOrigin: m.origin === 'real_local' ? 'field_research' : 'editorial_narrative',
+        isDemo: false,
         publishedAt: '2026-10-15',
         formattedDate: '15 Ekim 2026',
         officialSource: m.usagePermission,
@@ -351,7 +370,7 @@ export class ContentRepository {
         isDemo: false,
         publishedAt: '2026-10-15',
         formattedDate: '15 Ekim 2026',
-        publicUrl: node.publicationStatus === 'published' ? `/#atlas` : undefined,
+        publicUrl: node.publicationStatus === 'published' ? `/lezzet-haritasi?mode=cultural` : undefined,
         tags: ['Atlas', node.regionId],
       });
     });
@@ -370,6 +389,7 @@ export class ContentRepository {
       film: 0,
       news: 0,
       editorial_article: 0,
+      cultural_story: 0,
       announcement: 0,
       event: 0,
       media: 0,
@@ -427,11 +447,11 @@ export class ContentRepository {
   public static filterItems(items: CmsContentItem[], filter: CmsFilterState): CmsContentItem[] {
     return items.filter((item) => {
       if (filter.searchQuery.trim() !== '') {
-        const q = filter.searchQuery.toLowerCase();
-        const matchesTitle = item.title.toLowerCase().includes(q);
-        const matchesSummary = item.summary ? item.summary.toLowerCase().includes(q) : false;
-        const matchesCategory = item.categoryLabel.toLowerCase().includes(q);
-        const matchesTags = item.tags ? item.tags.some((t) => t.toLowerCase().includes(q)) : false;
+        const q = filter.searchQuery.toLocaleLowerCase('tr-TR');
+        const matchesTitle = item.title.toLocaleLowerCase('tr-TR').includes(q);
+        const matchesSummary = item.summary ? item.summary.toLocaleLowerCase('tr-TR').includes(q) : false;
+        const matchesCategory = item.categoryLabel.toLocaleLowerCase('tr-TR').includes(q);
+        const matchesTags = item.tags ? item.tags.some((t) => t.toLocaleLowerCase('tr-TR').includes(q)) : false;
 
         if (!matchesTitle && !matchesSummary && !matchesCategory && !matchesTags) {
           return false;

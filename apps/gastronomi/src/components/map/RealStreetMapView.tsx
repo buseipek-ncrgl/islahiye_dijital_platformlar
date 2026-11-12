@@ -13,7 +13,7 @@ import {
   ChevronRight,
   X,
   AlertCircle,
-  Sparkles,
+  Award,
   Flame,
   Wheat,
   UtensilsCrossed,
@@ -23,6 +23,7 @@ import {
 import { GastronomyPlace, Dish } from '../../types';
 import { useContent } from '../../hooks/useContent';
 import islahiyeDistrictBoundaryGeojson from '../../data/geo/islahiye-district.json';
+import { sanitizeCssUrl } from '../../utils/security';
 
 // --- HARİTA SAĞLAYICISI YAPILANDIRMASI (OSM STANDARDI) ---
 export interface MapProviderConfig {
@@ -57,14 +58,24 @@ export const ISLAHIYE_MAX_BOUNDS: [[number, number], [number, number]] = [
   [37.22, 37.05],
 ];
 
+// Leaflet HTML içi güvenli metin kaçışı
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // 6 Özgün Yöresel Lezzet Hızlı Odak Çipleri (Emojisiz, İkon Tabanlı)
 const SIGNATURE_DISH_FILTERS = [
   { id: 'all', label: 'Tüm Duraklar' },
   { id: 'islahiye-tava', label: 'İslahiye Tavası' },
   { id: 'firik-pilavi', label: 'Firik Pilavı' },
   { id: 'islahiye-biberi', label: 'İslahiye Biberi' },
-  { id: 'semsek-boregi', label: 'Şemsek Böreği' },
-  { id: 'islahiye-kombesi', label: 'İslahiye Kömbesi' },
+  { id: 'islahiye-semsegi', label: 'Şemsek Böreği' },
+  { id: 'bayram-kombesi', label: 'Bayram Kömbesi' },
   { id: 'incir-tatlisi', label: 'İncir Tatlısı' },
 ];
 
@@ -81,10 +92,10 @@ const renderDishFilterIcon = (filterId: string, isActive: boolean) => {
     case 'firik-pilavi':
       return <Wheat className={iconClass} />;
     case 'islahiye-biberi':
-      return <Sparkles className={iconClass} />;
-    case 'semsek-boregi':
+      return <Award className={iconClass} />;
+    case 'islahiye-semsegi':
       return <UtensilsCrossed className={iconClass} />;
-    case 'islahiye-kombesi':
+    case 'bayram-kombesi':
       return <Cookie className={iconClass} />;
     case 'incir-tatlisi':
       return <Coffee className={iconClass} />;
@@ -127,6 +138,24 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const maskLayerRef = useRef<L.Polygon | null>(null);
   const boundaryPolylineRef = useRef<L.Polyline | null>(null);
+  const lastFocusedQueryPlaceRef = useRef<string | null>(null);
+
+  // URL veya üst bileşen placeId parametresiyle gelen durağa odaklan
+  useEffect(() => {
+    if (!initialSelectedPlaceId) return;
+    setSelectedPlaceId(initialSelectedPlaceId);
+    if (!mapLoaded || !mapInstanceRef.current) return;
+    if (lastFocusedQueryPlaceRef.current === initialSelectedPlaceId) return;
+
+    const targetPlace = allPlaces.find((p) => p.id === initialSelectedPlaceId);
+    if (targetPlace?.coordinates) {
+      lastFocusedQueryPlaceRef.current = initialSelectedPlaceId;
+      mapInstanceRef.current.flyTo([targetPlace.coordinates.lat, targetPlace.coordinates.lng], 16, {
+        animate: true,
+        duration: 0.8,
+      });
+    }
+  }, [initialSelectedPlaceId, mapLoaded, allPlaces]);
 
   // Filtrelenmiş Noktalar
   const filteredPlaces = useMemo(() => {
@@ -138,20 +167,25 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
 
       // 2. Lezzet Filtresi (Burada şu yemek var filtresi)
       if (selectedDishFilter !== 'all') {
-        const hasDish = place.relatedDishIds?.includes(selectedDishFilter);
+        const hasDish = (place.relatedDishIds || []).some(
+          (id) =>
+            id === selectedDishFilter ||
+            (selectedDishFilter === 'islahiye-semsegi' && id === 'semsek-boregi') ||
+            (selectedDishFilter === 'bayram-kombesi' && id === 'islahiye-kombesi')
+        );
         if (!hasDish) return false;
       }
 
       // 3. Arama sorgusu
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchName = place.name.toLowerCase().includes(query);
-        const matchAddress = place.address.toLowerCase().includes(query);
-        const matchCat = (place.categoryLabel || '').toLowerCase().includes(query);
-        const matchDesc = (place.description || '').toLowerCase().includes(query);
+        const query = searchQuery.toLocaleLowerCase('tr-TR').trim();
+        const matchName = place.name.toLocaleLowerCase('tr-TR').includes(query);
+        const matchAddress = place.address.toLocaleLowerCase('tr-TR').includes(query);
+        const matchCat = (place.categoryLabel || '').toLocaleLowerCase('tr-TR').includes(query);
+        const matchDesc = (place.description || '').toLocaleLowerCase('tr-TR').includes(query);
         const matchDishes = (place.relatedDishIds || []).some((dishId) => {
           const dishObj = allDishes.find((d) => d.id === dishId);
-          return dishObj?.name.toLowerCase().includes(query);
+          return dishObj?.name.toLocaleLowerCase('tr-TR').includes(query);
         });
         return matchName || matchAddress || matchCat || matchDesc || matchDishes;
       }
@@ -231,16 +265,25 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
       setMapLoaded(true);
 
       const timer = setTimeout(() => {
-        map.invalidateSize();
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
       }, 150);
 
+      let rAF: number | null = null;
       const resizeObserver = new ResizeObserver(() => {
-        map.invalidateSize();
+        if (rAF !== null) cancelAnimationFrame(rAF);
+        rAF = requestAnimationFrame(() => {
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.invalidateSize();
+          }
+        });
       });
       resizeObserver.observe(mapContainerRef.current);
 
       return () => {
         clearTimeout(timer);
+        if (rAF !== null) cancelAnimationFrame(rAF);
         resizeObserver.disconnect();
         map.remove();
         mapInstanceRef.current = null;
@@ -315,48 +358,75 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
       if (!place.coordinates) return;
       const isSelected = place.id === selectedPlaceId;
 
-      // İlgili yemeği bul
+      // İlgili yemeği bul (id veya slug eşleşmesi)
       const primaryDish = place.relatedDishIds?.[0]
-        ? allDishes.find((d) => d.id === place.relatedDishIds![0])
+        ? allDishes.find((d) => d.id === place.relatedDishIds![0] || (d as any).slug === place.relatedDishIds![0])
         : null;
 
-      const dishImage = primaryDish?.imageUrl || '/images/dishes/islahiye-tava.jpg';
-      const dishTitle = primaryDish ? primaryDish.name : place.name;
+      // Dayanıklı ve güvenli görsel çözücü: CSS kaçış/enjeksiyon korumalı
+      const dishImage = sanitizeCssUrl(
+        place.coverImage || primaryDish?.imageUrl || '/images/islahiye_tava.jpg'
+      );
+      const spotTitle = escapeHtml(place.name);
+      const dishKey = place.relatedDishIds?.[0] || '';
 
-      // Kompakt dairesel pin: Harita üzerinde küçük yuvarlak gerçek yemek fotoğrafı
+      // Kategori ve Lezzete Özel Vektör İkonu
+      let catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8Z"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/></svg>`;
+
+      if (dishKey === 'islahiye-tava' || place.category === 'bakery' || place.category === 'oven') {
+        catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`;
+      } else if (dishKey === 'firik-pilavi') {
+        catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0 4.94Z"/></svg>`;
+      } else if (dishKey === 'islahiye-biberi' || place.category === 'cooperative') {
+        catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>`;
+      } else if (dishKey === 'islahiye-semsegi' || dishKey === 'semsek-boregi') {
+        catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8Z"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/></svg>`;
+      } else if (dishKey === 'bayram-kombesi' || dishKey === 'islahiye-kombesi') {
+        catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`;
+      } else if (dishKey === 'incir-tatlisi' || place.category === 'producer') {
+        catSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFF9E9" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`;
+      }
+
+      // Asil Editoryal Pin: CSS background-image ve SVG bindirme (Asla kırık resim ikonu veya taşan alt metin göstermez)
       const iconHtml = `
         <div class="relative group cursor-pointer -translate-x-1/2 -translate-y-full flex flex-col items-center ${
           isSelected ? 'z-50' : 'z-20 hover:z-40'
         }">
           ${isSelected ? '<span class="absolute -inset-1.5 rounded-full bg-[#BA855E]/40 animate-ping pointer-events-none"></span>' : ''}
           
-          <!-- AÇILIR LEZZET ETİKETİ (Sadece Hover veya Seçili Durumda Gösterilir - Çakışmayı Önler) -->
+          <!-- AÇILIR DURAK ETİKETİ (Sadece Hover veya Seçili Durumda Gösterilir - Çakışmayı Önler) -->
           <div class="transition-all duration-200 pointer-events-none mb-1.5 ${
             isSelected
               ? 'opacity-100 scale-100'
               : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'
           }">
-            <div class="px-2.5 py-1 rounded-xs text-[10px] font-bold font-sans tracking-wide whitespace-nowrap shadow-lg border flex items-center gap-1.5 ${
+            <div class="px-2.5 py-1 rounded-xs text-[10px] font-bold font-sans tracking-wide whitespace-nowrap shadow-xl border flex items-center gap-1.5 ${
               isSelected
                 ? 'bg-[#203B31] text-[#FFF9E9] border-[#BA855E] ring-2 ring-[#BA855E]/40'
-                : 'bg-[#FFFDF8] text-[#203B31] border-[#BA855E]'
+                : 'bg-[#203B31] text-[#FFF9E9] border-[#BA855E]'
             }">
               <span class="w-1.5 h-1.5 rounded-full bg-[#BA855E]"></span>
-              <span class="font-display font-semibold">${dishTitle}</span>
+              <span class="font-display font-semibold">${spotTitle}</span>
             </div>
           </div>
 
-          <!-- KÜÇÜK YUVARLAK YEMEK RESMİ (36x36px) -->
-          <div class="w-9 h-9 rounded-full overflow-hidden transition-all duration-200 border-2 shadow-md bg-[#FFFDF8] ${
+          <!-- KÜÇÜK YUVARLAK İŞARETÇİ (36x36px) -->
+          <div class="w-9 h-9 rounded-full overflow-hidden transition-all duration-200 border-2 shadow-lg bg-[#203B31] relative flex items-center justify-center ${
             isSelected
-              ? 'border-[#BA855E] scale-120 shadow-xl ring-2 ring-[#BA855E]/60'
+              ? 'border-[#BA855E] scale-120 shadow-2xl ring-2 ring-[#BA855E]/70'
               : 'border-[#FFFDF8] ring-1.5 ring-[#BA855E]/70 hover:scale-110 hover:ring-[#BA855E]'
           }">
-            <img src="${dishImage}" alt="${dishTitle}" class="w-full h-full object-cover block select-none pointer-events-none" />
+            <div style="background-image: url('${dishImage}'); background-size: cover; background-position: center;" class="absolute inset-0 w-full h-full"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-[#203B31]/95 via-[#203B31]/40 to-transparent"></div>
+            <div class="relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] flex items-center justify-center">
+              ${catSvg}
+            </div>
           </div>
           
-          <!-- İĞNE NOKTASI -->
-          <div class="w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[#BA855E]' : 'bg-[#936645]'} mt-0.5 shadow-xs"></div>
+          <!-- İĞNE NOKTASI / TEARDROP İPUCU -->
+          <div class="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] ${
+            isSelected ? 'border-t-[#BA855E]' : 'border-t-[#203B31]'
+          } -mt-[1px] drop-shadow-xs"></div>
         </div>
       `;
 
@@ -430,7 +500,14 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
         return;
       }
 
-      const matchPlace = allPlaces.find((p) => p.relatedDishIds?.includes(dishId));
+      const matchPlace = allPlaces.find((p) =>
+        (p.relatedDishIds || []).some(
+          (id) =>
+            id === dishId ||
+            (dishId === 'islahiye-semsegi' && id === 'semsek-boregi') ||
+            (dishId === 'bayram-kombesi' && id === 'islahiye-kombesi')
+        )
+      );
       if (matchPlace && matchPlace.coordinates) {
         setSelectedPlaceId(matchPlace.id);
         if (mapInstanceRef.current) {
@@ -445,9 +522,10 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
     [allPlaces]
   );
 
-  // Yol Tarifi Al (Gerçek Google Maps Harita Navigasyonu)
+  // Yol Tarifi Al (Gerçek Google Maps Harita Navigasyonu - Koordinat Doğrulamalı)
   const handleOpenDirections = useCallback((lat: number, lng: number) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 
@@ -473,7 +551,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
           <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-10" />
 
           {/* Harita İçi Sağ Üst Yüzen Sade Kontroller (Tek ve Net) */}
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-[#fffdf8]/95 backdrop-blur-xs px-2 py-1.5 rounded-xs border border-[#dccbb3] shadow-xs text-xs font-sans">
+          <div className="absolute top-3 right-3 z-20 flex flex-wrap items-center justify-end gap-1.5 max-w-[calc(100%-24px)] bg-[#fffdf8]/95 backdrop-blur-xs px-2 py-1.5 rounded-xs border border-[#dccbb3] shadow-xs text-xs font-sans">
             <button
               type="button"
               onClick={handleFitDistrict}
@@ -514,7 +592,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
           </div>
 
           {/* Sol Alt Koordinat & Bilgi Göstergesi */}
-          <div className="absolute bottom-3 left-3 z-20 pointer-events-none bg-[#fffdf8]/90 backdrop-blur-xs px-2.5 py-1 rounded-2xs border border-[#dccbb3] shadow-xs text-[10px] font-mono text-[#6d6b5f] flex items-center gap-2">
+          <div className="absolute bottom-3 left-3 z-20 pointer-events-none bg-[#fffdf8]/90 backdrop-blur-xs px-2.5 py-1 rounded-2xs border border-[#dccbb3] shadow-xs text-[10px] font-sans text-[#6d6b5f] flex items-center gap-2">
             <span>● Yalnızca İslahiye İlçe Haritası (OpenStreetMap + Sınır Maskesi)</span>
           </div>
         </div>
@@ -527,10 +605,10 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
           <div>
             {/* 1. Başlık ve Sayaç */}
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#dfd2c0]">
-              <span className="text-[#936645] text-[11px] font-bold tracking-[0.2em] font-mono uppercase">
+              <span className="text-[#936645] text-[11px] font-bold tracking-[0.2em] font-sans uppercase">
                 GASTRONOMİ DURAKLARI
               </span>
-              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-2xs bg-[#ede3ca] text-[#203b31]">
+              <span className="text-[11px] font-sans font-semibold px-2 py-0.5 rounded-2xs bg-[#ede3ca] text-[#203b31]">
                 {filteredPlaces.length} Doğrulanmış Nokta
               </span>
             </div>
@@ -558,7 +636,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
 
             {/* 3. 6 Özgün Lezzet Odak Çipleri (Sidebar İçinde Derli Toplu) */}
             <div className="mb-4 pb-3 border-b border-[#dfd2c0]">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#936645] font-bold block mb-2">
+              <span className="text-[10px] font-sans uppercase tracking-wider text-[#936645] font-bold block mb-2">
                 Lezzet Odakları (6 Özgün Tat):
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -587,7 +665,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
             {selectedPlace ? (
               <div className="bg-[#fffdf8] border border-[#dccbb3] rounded-xs p-4 shadow-xs mb-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-2xs bg-[#203b31] text-[#fff9e9]">
+                  <span className="text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-2xs bg-[#203b31] text-[#fff9e9]">
                     {selectedPlace.categoryLabel || 'Gastronomi Noktası'}
                   </span>
                   <button
@@ -603,8 +681,8 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
                 {/* BURADA BULUNAN YÖRESEL LEZZET VURGUSU */}
                 {selectedPlaceDish && (
                   <div className="mb-3.5 p-3 bg-[#fbf6ec] border border-[#dccbb3] rounded-xs">
-                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-mono font-bold text-[#ba855e] uppercase tracking-wider">
-                      <Sparkles className="w-3 h-3 text-[#ba855e]" />
+                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-sans font-bold text-[#ba855e] uppercase tracking-wider">
+                      <UtensilsCrossed className="w-3 h-3 text-[#ba855e]" />
                       <span>BURADA BULUNAN YÖRESEL LEZZET</span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -649,7 +727,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
                 <div className="flex items-start gap-2 text-xs text-[#3d4a3e] bg-[#f7f2e7] p-2.5 rounded-2xs mb-3">
                   <MapPin className="w-4 h-4 text-[#ba855e] shrink-0 mt-0.5" />
                   <div className="flex-1 font-sans">
-                    <strong className="block text-[11px] font-semibold text-[#203b31] uppercase font-mono">
+                    <strong className="block text-[11px] font-semibold text-[#203b31] uppercase font-sans">
                       Açık Adres
                     </strong>
                     <span>{selectedPlace.address}</span>
@@ -666,7 +744,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
 
                 {/* Doğrulama / Kaynak Bilgisi */}
                 {selectedPlace.verificationSource && (
-                  <div className="text-[10px] text-[#7a7161] font-mono mb-3 px-1 border-t border-[#dfd2c0] pt-2 flex items-center gap-1.5">
+                  <div className="text-[10px] text-[#7a7161] font-sans mb-3 px-1 border-t border-[#dfd2c0] pt-2 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3 h-3 text-[#203b31]" />
                     <span>Doğrulama: {selectedPlace.verificationSource}</span>
                   </div>
@@ -707,7 +785,7 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
                     >
                       <div className="min-w-0">
                         {placeDish && (
-                          <span className="text-[10px] font-mono font-bold text-[#ba855e] block mb-0.5 truncate">
+                          <span className="text-[10px] font-sans font-bold text-[#ba855e] block mb-0.5 truncate">
                             ● Lezzet: {placeDish.name}
                           </span>
                         )}
@@ -730,8 +808,8 @@ export const RealStreetMapView: React.FC<RealStreetMapViewProps> = ({
                   <MapPin className="w-5 h-5" />
                 </div>
 
-                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#936645] font-bold block mb-1">
-                  SAHA DOĞRULAMA ENVENTERİ
+                <span className="text-[10px] font-sans uppercase tracking-[0.2em] text-[#936645] font-bold block mb-1">
+                  SAHA DOĞRULAMA ENVANTERİ
                 </span>
 
                 <h3 className="text-base sm:text-lg font-display font-medium text-[#1b3a2d] mb-2 leading-snug">

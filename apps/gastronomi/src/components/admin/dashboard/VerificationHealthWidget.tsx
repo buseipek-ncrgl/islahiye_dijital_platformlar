@@ -1,102 +1,128 @@
 import React from 'react';
-import { ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Info } from 'lucide-react';
 import { CmsStats } from '../../../types/admin';
+import { DonutChart, DonutSegment } from '../charts/DonutChart';
 
 interface VerificationHealthWidgetProps {
   stats: CmsStats;
 }
 
 export const VerificationHealthWidget: React.FC<VerificationHealthWidgetProps> = ({ stats }) => {
-  const verifiedPercent = Math.round((stats.verifiedCount / stats.totalItems) * 100) || 0;
-  const demoPercent = Math.round((stats.simulatedDemoCount / stats.totalItems) * 100) || 0;
-  const unverifiedPercent = 100 - verifiedPercent - demoPercent;
+  const publishedPercent =
+    stats.totalItems > 0 ? Math.round((stats.publishedCount / stats.totalItems) * 100) : 0;
+  const verifiedPercent =
+    stats.totalItems > 0 ? Math.round((stats.verifiedCount / stats.totalItems) * 100) : 0;
+  const draftCount = stats.draftCount + stats.inReviewCount;
+
+  const donutSegments: DonutSegment[] = [
+    {
+      id: 'published',
+      label: 'Canlı Yayında',
+      value: stats.publishedCount,
+      color: '#059669', // Emerald
+      sublabel: 'Ziyaretçiye açık içerikler',
+    },
+    {
+      id: 'draft',
+      label: 'Taslak & İnceleme',
+      value: draftCount,
+      color: '#f59e0b', // Amber
+      sublabel: 'Hazırlık / editör kontrolünde',
+    },
+    {
+      id: 'archived',
+      label: 'Arşiv & Diğer',
+      value: stats.archivedCount || 0,
+      color: '#94a3b8', // Slate
+      sublabel: 'Yayından kaldırılmış kayıtlar',
+    },
+  ];
 
   return (
-    <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs flex flex-col justify-between">
+    <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between font-sans">
       <div>
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-forest" />
-            <h3 className="text-sm font-sans font-bold text-slate-900">
-              İçerik Güvenilirlik & Doğrulama Sağlığı
-            </h3>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                İçerik Güvenilirlik &amp; Tescil Sağlığı
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                TÜRKPATENT tescil belgeleri, saha onayları ve yayın doğruluk dağılımı.
+              </p>
+            </div>
           </div>
-          <span className="text-xs font-mono font-semibold text-forest bg-forest-50 px-2 py-0.5 rounded-xs border border-forest-200">
-            %{verifiedPercent} Doğrulanmış Kayıt
+          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/70 shrink-0">
+            %{verifiedPercent} Doğrulanmış
           </span>
         </div>
 
-        {/* Multi-segment Progress Bar */}
-        <div className="h-2.5 w-full bg-slate-100 rounded-xs overflow-hidden flex mb-4">
-          <div
-            style={{ width: `${verifiedPercent}%` }}
-            className="bg-forest h-full transition-all duration-500"
-            title={`Doğrulanmış: %${verifiedPercent}`}
-          />
-          <div
-            style={{ width: `${demoPercent}%` }}
-            className="bg-amber-400 h-full transition-all duration-500"
-            title={`Temsili Demo: %${demoPercent}`}
-          />
-          <div
-            style={{ width: `${unverifiedPercent}%` }}
-            className="bg-slate-300 h-full transition-all duration-500"
-            title={`Planlama / Doğrulanmamış: %${unverifiedPercent}`}
+        {/* Interactive Donut Chart Distribution */}
+        <div className="py-2">
+          <DonutChart
+            segments={donutSegments}
+            centerTitle={`%${publishedPercent}`}
+            centerSubtitle="YAYINDA"
+            size={140}
+            strokeWidth={18}
           />
         </div>
 
-        {/* Segment Metrics */}
-        <div className="grid grid-cols-3 gap-2 text-xs font-sans mb-4">
-          <div className="p-2.5 rounded-sm bg-slate-50 border border-slate-200">
-            <div className="flex items-center gap-1.5 text-forest mb-1 font-mono text-[11px] font-semibold">
-              <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
-              <span>Doğrulanmış</span>
+        {/* 3 Metric Summary Boxes */}
+        <div className="grid grid-cols-3 gap-2.5 text-xs my-4">
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="flex items-center gap-1.5 text-emerald-700 mb-1 text-[11px] font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>Yayında</span>
             </div>
-            <div className="text-lg font-bold text-slate-900 font-mono">
-              {stats.verifiedCount}
+            <div className="text-xl font-extrabold text-slate-900 tabular-nums">
+              {stats.publishedCount}
             </div>
-            <div className="text-[10px] text-slate-500 font-sans">
-              Resmî & belgelenmiş
-            </div>
-          </div>
-
-          <div className="p-2.5 rounded-sm bg-slate-50 border border-slate-200">
-            <div className="flex items-center gap-1.5 text-amber-700 mb-1 font-mono text-[11px] font-semibold">
-              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-              <span>Temsili Demo</span>
-            </div>
-            <div className="text-lg font-bold text-slate-900 font-mono">
-              {stats.simulatedDemoCount}
-            </div>
-            <div className="text-[10px] text-slate-500 font-sans">
-              Arayüz şablonu
+            <div className="text-[10px] text-slate-500">
+              Canlı portalda
             </div>
           </div>
 
-          <div className="p-2.5 rounded-sm bg-slate-50 border border-slate-200">
-            <div className="flex items-center gap-1.5 text-slate-600 mb-1 font-mono text-[11px] font-semibold">
-              <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-              <span>İncelemede</span>
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="flex items-center gap-1.5 text-amber-700 mb-1 text-[11px] font-semibold">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <span>Taslak / İnceleme</span>
             </div>
-            <div className="text-lg font-bold text-slate-900 font-mono">
-              {stats.unverifiedCount}
+            <div className="text-xl font-extrabold text-slate-900 tabular-nums">
+              {draftCount}
             </div>
-            <div className="text-[10px] text-slate-500 font-sans">
-              Planlanan arşiv
+            <div className="text-[10px] text-slate-500">
+              Hazırlık aşamasında
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="flex items-center gap-1.5 text-slate-600 mb-1 text-[11px] font-semibold">
+              <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+              <span>Toplam Kayıt</span>
+            </div>
+            <div className="text-xl font-extrabold text-slate-900 tabular-nums">
+              {stats.totalItems}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              Envanter geneli
             </div>
           </div>
         </div>
       </div>
 
-      {/* Compliance Note */}
-      <div className="p-3 rounded-sm bg-slate-50 border border-slate-200 text-xs font-sans text-slate-600 space-y-1">
-        <div className="font-semibold text-slate-800 flex items-center gap-1">
-          <CheckCircle2 className="w-3.5 h-3.5 text-forest" />
-          <span>TÜRKPATENT Coğrafi İşaret İlkesi</span>
+      {/* Corporate Institutional Callout */}
+      <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-200/70 text-xs text-emerald-950 space-y-1">
+        <div className="font-semibold text-emerald-900 flex items-center gap-1.5">
+          <Info className="w-4 h-4 text-emerald-700 shrink-0" />
+          <span>TÜRKPATENT Tescil Güvencesi</span>
         </div>
-        <p className="text-[11px] leading-relaxed">
-          İslahiye Biberi tescili (No: 991, 05.01.2022) Gaziantep Ticaret Borsası mülkiyetindedir.
-          Yayın ve duyuru onaylarında resmî kurum tescil ve kaynak URL şartı aranmaktadır.
+        <p className="text-[11px] leading-relaxed text-emerald-800/80">
+          İslahiye Biberi 991 tescil numarasıyla kayıtlıdır. Doğrulanmamış hiçbir yemek veya ürün sistemde resmî tescilli olarak sunulamaz.
         </p>
       </div>
     </div>

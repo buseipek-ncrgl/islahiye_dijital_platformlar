@@ -1,47 +1,37 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
-  Globe,
+  Check,
   Trash2,
   AlertCircle,
-  CheckCircle2,
   Eye,
   Info,
   Clock,
   Users,
 } from 'lucide-react';
 import { useContent } from '../../hooks/useContent';
+import { useAdminRole } from '../../context/AdminRoleContext';
 import { Dish, DishCategory, PublicationStatus, VerificationStatus } from '../../types';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
-
-const PRESET_IMAGES = [
-  { label: 'İslahiye Tavası', url: '/images/islahiye_tava.jpg' },
-  { label: 'Firik Pilavı', url: '/images/firik_pilavi.jpg' },
-  { label: 'Şemsek Böreği', url: '/images/semsek_boregi.jpg' },
-  { label: 'İslahiye Kömbesi', url: '/images/islahiye_kombesi.jpg' },
-  { label: 'İncir Tatlısı', url: '/images/incir_tatlisi.jpg' },
-  { label: 'İslahiye Biberi', url: '/images/islahiye_biberi.jpg' },
-  { label: 'Taş Fırın Közü', url: '/images/tas_firin_kozu_poster.jpg' },
-  { label: 'Hamur Zanaatı', url: '/images/hamur_zanaati_poster.jpg' },
-];
-
-const CATEGORIES: { id: Exclude<DishCategory, 'all'>; label: string }[] = [
-  { id: 'main', label: 'Ana Yemekler' },
-  { id: 'pastry', label: 'Hamur İşleri' },
-  { id: 'local_product', label: 'Yöresel Ürünler' },
-  { id: 'dessert', label: 'Tatlılar' },
-];
+import { ActionConfirmModal } from '../../components/admin/common/ActionConfirmModal';
+import { ImageUploadField } from '../../components/admin/common/ImageUploadField';
+import { FormNotificationToast, FormNotification } from '../../components/admin/common/FormNotificationToast';
+import { QuickCategoryButton } from '../../components/admin/common/QuickCategoryButton';
+import { mergeCategoryOption } from '../../data/categories';
 
 export const DishFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getDishById, getRecipes, saveDish, deleteDish } = useContent();
+  const { getDishById, getRecipes, saveDish, deleteDish, getCategories, getCategoryLabel } = useContent();
+  const { canCreate, canEdit, canDelete, canPublish } = useAdminRole();
 
   const isEditing = Boolean(id);
+  const canSave = isEditing ? canEdit : canCreate;
   const existingDish = useMemo(() => (id ? getDishById(id) : undefined), [id, getDishById]);
   const availableRecipes = getRecipes();
+  const initializedKeyRef = useRef<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -56,68 +46,155 @@ export const DishFormPage: React.FC = () => {
   const [difficulty, setDifficulty] = useState<'Kolay' | 'Orta' | 'Ustalık Gerektirir'>('Orta');
   const [imageUrl, setImageUrl] = useState('/images/islahiye_tava.jpg');
   const [imageAlt, setImageAlt] = useState('');
-  const [imageCredit, setImageCredit] = useState('İslahiye Lezzet Atlası Demo Arşivi');
+  const [imageCredit, setImageCredit] = useState('İslahiye Lezzet Atlası Arşivi');
   const [recipeId, setRecipeId] = useState<string>('');
   const [isRegisteredGI, setIsRegisteredGI] = useState(false);
   const [giStatusNote, setGiStatusNote] = useState('Yöresel Mutfak Mirası');
-  const [publicationStatus, setPublicationStatus] = useState<PublicationStatus>('draft');
+  const [publicationStatus, setPublicationStatus] = useState<PublicationStatus>(() =>
+    canPublish ? 'published' : 'draft'
+  );
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('verified');
   const [sourceUrl, setSourceUrl] = useState('');
-  const [isDemo, setIsDemo] = useState(true);
 
   // UI state
   const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form');
   const [isDirty, setIsDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [notification, setNotification] = useState<FormNotification | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Populate form if editing
-  useEffect(() => {
-    if (existingDish) {
-      setName(existingDish.name);
-      setTagline(existingDish.tagline || '');
-      setDescription(existingDish.description || '');
-      setCulturalNote(existingDish.culturalNote || '');
-      setOriginNote(existingDish.originNote || 'İslahiye Taş Fırın Geleneği');
-      setCategory(existingDish.category);
-      setPrepTime(existingDish.prepTime || '25 dk');
-      setCookTime(existingDish.cookTime || '45 dk');
-      setServings(existingDish.servings || '4-6 Kişilik');
-      setDifficulty(existingDish.difficulty || 'Orta');
-      setImageUrl(existingDish.imageUrl);
-      setImageAlt(existingDish.imageAlt || '');
-      setImageCredit(existingDish.imageCredit || 'İslahiye Lezzet Atlası Demo Arşivi');
-      setRecipeId(existingDish.recipeId || '');
-      setIsRegisteredGI(Boolean(existingDish.isRegisteredGeographicalIndication));
-      setGiStatusNote(existingDish.giStatusNote || 'Yöresel Mutfak Mirası');
-      setPublicationStatus(existingDish.publicationStatus || 'published');
-      setVerificationStatus(existingDish.verificationStatus || 'verified');
-      setSourceUrl(existingDish.sourceUrl || '');
-      setIsDemo(existingDish.isDemo !== undefined ? existingDish.isDemo : true);
-    }
-  }, [existingDish]);
+  // Smooth scroll and focus on missing/invalid input field
+  const scrollToField = (fieldName: string) => {
+    setActiveTab('form');
+    setTimeout(() => {
+      const element = document.getElementById(`field-${fieldName}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input =
+          element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT'
+            ? element
+            : element.querySelector('input, textarea, select');
+        if (input) {
+          (input as HTMLElement).focus();
+        }
+        element.classList.add('ring-4', 'ring-rose-500/40', 'transition-all');
+        setTimeout(() => {
+          element.classList.remove('ring-4', 'ring-rose-500/40');
+        }, 2500);
+      }
+    }, 120);
+  };
 
-  // Validation
+  // Populate form if editing or reset when switching from edit to create
+  useEffect(() => {
+    if (isEditing && id) {
+      if (existingDish) {
+        if (initializedKeyRef.current !== existingDish.id) {
+          initializedKeyRef.current = existingDish.id;
+          setName(existingDish.name);
+          setTagline(existingDish.tagline || '');
+          setDescription(existingDish.description || '');
+          setCulturalNote(existingDish.culturalNote || '');
+          setOriginNote(existingDish.originNote || 'İslahiye Taş Fırın Geleneği');
+          setCategory(existingDish.category);
+          setPrepTime(existingDish.prepTime || '25 dk');
+          setCookTime(existingDish.cookTime || '45 dk');
+          setServings(existingDish.servings || '4-6 Kişilik');
+          setDifficulty(existingDish.difficulty || 'Orta');
+          setImageUrl(existingDish.imageUrl);
+          setImageAlt(existingDish.imageAlt || '');
+          setImageCredit(existingDish.imageCredit || 'İslahiye Lezzet Atlası Arşivi');
+          setRecipeId(existingDish.recipeId || '');
+          setIsRegisteredGI(Boolean(existingDish.isRegisteredGeographicalIndication));
+          setGiStatusNote(existingDish.giStatusNote || 'Yöresel Mutfak Mirası');
+          setPublicationStatus(existingDish.publicationStatus || 'published');
+          setVerificationStatus(existingDish.verificationStatus || 'verified');
+          setSourceUrl(existingDish.sourceUrl || '');
+          setErrors({});
+          setIsDirty(false);
+          setActiveTab('form');
+        }
+      } else if (initializedKeyRef.current !== `__missing__${id}`) {
+        initializedKeyRef.current = `__missing__${id}`;
+        setNotification({
+          type: 'error',
+          title: 'Kayıt Bulunamadı',
+          message: 'Düzenlenecek yemek kaydı bulunamadı. Yemek listesine yönlendiriliyorsunuz.',
+        });
+        setTimeout(() => navigate('/yonetim/yemekler'), 1200);
+      }
+    } else if (!isEditing && initializedKeyRef.current !== '__create__') {
+      initializedKeyRef.current = '__create__';
+      setName('');
+      setTagline('');
+      setDescription('');
+      setCulturalNote('');
+      setOriginNote('İslahiye Taş Fırın Geleneği');
+      setCategory('main');
+      setPrepTime('25 dk');
+      setCookTime('45 dk');
+      setServings('4-6 Kişilik');
+      setDifficulty('Orta');
+      setImageUrl('/images/islahiye_tava.jpg');
+      setImageAlt('');
+      setImageCredit('İslahiye Lezzet Atlası Arşivi');
+      setRecipeId('');
+      setIsRegisteredGI(false);
+      setGiStatusNote('Yöresel Mutfak Mirası');
+      setPublicationStatus(canPublish ? 'published' : 'draft');
+      setVerificationStatus('verified');
+      setSourceUrl('');
+      setErrors({});
+      setIsDirty(false);
+      setActiveTab('form');
+    }
+  }, [isEditing, id, existingDish, navigate, canPublish]);
+
+  // Validation with precise field mapping and auto-focus
   const validate = () => {
     const newErrors: Record<string, string> = {};
+    const fieldDetails: { name: string; label: string; message: string }[] = [];
+
     if (!name.trim() || name.trim().length < 3) {
-      newErrors.name = 'Yemek adı en az 3 karakter olmalıdır.';
+      const msg = 'Yemek adı en az 3 karakter olmalıdır.';
+      newErrors.name = msg;
+      fieldDetails.push({ name: 'name', label: 'Yemek Adı', message: msg });
     }
     if (!description.trim() || description.trim().length < 15) {
-      newErrors.description = 'Açıklama alanı en az 15 karakter içermelidir.';
+      const msg = 'Açıklama alanı en az 15 karakter içermelidir.';
+      newErrors.description = msg;
+      fieldDetails.push({ name: 'description', label: 'Lezzet Açıklaması', message: msg });
     }
     if (!imageUrl.trim()) {
-      newErrors.imageUrl = 'Görsel URL alanı zorunludur.';
+      const msg = 'Lütfen bir yemek fotoğrafı seçin veya bilgisayarınızdan yükleyin.';
+      newErrors.imageUrl = msg;
+      fieldDetails.push({ name: 'imageUrl', label: 'Yemek Fotoğrafı', message: msg });
     }
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    if (fieldDetails.length > 0) {
+      setActiveTab('form');
+      setNotification({
+        type: 'error',
+        title: `${fieldDetails.length} Alanda Eksiklik Bulundu`,
+        message: 'Kaydetme işleminin tamamlanması için lütfen eksik alanları doldurunuz.',
+        fields: fieldDetails,
+        onScrollToField: scrollToField,
+      });
+
+      // Automatically smoothly scroll and focus the very first missing field!
+      scrollToField(fieldDetails[0].name);
+      return false;
+    }
+
+    return true;
   };
 
   // Generate Unique ID & Slug
   const generateId = (text: string) => {
     const slug = text
-      .toLowerCase()
+      .toLocaleLowerCase('tr-TR')
       .replace(/ğ/g, 'g')
       .replace(/ü/g, 'u')
       .replace(/ş/g, 's')
@@ -131,140 +208,204 @@ export const DishFormPage: React.FC = () => {
   };
 
   const handleSave = (targetStatus?: PublicationStatus) => {
-    if (!validate()) {
-      setActiveTab('form');
-      setNotification({ type: 'error', message: 'Lütfen formdaki zorunlu alanları kontrol edin.' });
+    if (!canSave) {
+      setNotification({
+        type: 'error',
+        title: 'Yetki Yetersiz',
+        message: 'Aktif rolünüz bu işlemde yemek kaydı oluşturma veya düzenleme yetkisine sahip değildir.',
+      });
       return;
     }
 
-    const finalStatus = targetStatus || publicationStatus;
+    if (!validate()) {
+      return;
+    }
+
+    const requestedStatus = targetStatus || publicationStatus;
+    const finalStatus: PublicationStatus =
+      !canPublish && (requestedStatus === 'published' || requestedStatus === 'archived')
+        ? 'in_review'
+        : requestedStatus;
     const dishId = isEditing && existingDish ? existingDish.id : generateId(name);
-    const categoryObj = CATEGORIES.find((c) => c.id === category);
+    const resolvedCategoryLabel = getCategoryLabel('dish', category, 'Ana Yemekler');
 
     const updatedDish: Dish = {
       id: dishId,
       name: name.trim(),
       category,
-      categoryLabel: categoryObj?.label || 'Ana Yemekler',
+      categoryLabel: resolvedCategoryLabel,
       tagline: tagline.trim() || description.slice(0, 80) + '...',
       description: description.trim(),
       culturalNote: culturalNote.trim() || 'İslahiye geleneksel fırın kültüründe özenle hazırlanır.',
       originNote: originNote.trim() || 'İslahiye Mutfak Mirası',
       isRegisteredGeographicalIndication: isRegisteredGI,
-      giStatusNote: isRegisteredGI ? 'Tescilli Coğrafi İşaret' : giStatusNote,
+      giStatusNote: isRegisteredGI
+        ? dishId === 'islahiye-biberi'
+          ? 'Tescilli Coğrafi İşaret'
+          : 'Coğrafi İşaret Beyanı'
+        : giStatusNote,
       prepTime,
       cookTime,
       difficulty,
       servings,
       imageUrl,
       imageAlt: imageAlt.trim() || name,
-      imageCredit,
-      recipeId: recipeId ? recipeId : undefined,
-      ingredients: existingDish?.ingredients || [],
+      imageCredit: imageCredit.trim(),
+      recipeId: recipeId || undefined,
       publicationStatus: finalStatus,
       verificationStatus,
       sourceUrl: sourceUrl.trim() || undefined,
-      isDemo,
-      isLead: existingDish?.isLead || false,
-    };
+      isDemo: existingDish?.isDemo ?? false,
+    } as Dish;
 
-    saveDish(updatedDish);
-    setIsDirty(false);
-    setPublicationStatus(finalStatus);
-    setNotification({
-      type: 'success',
-      message:
+    (updatedDish as any).publishedAt = (existingDish as any)?.publishedAt || new Date().toISOString().split('T')[0];
+    (updatedDish as any).formattedDate =
+      (existingDish as any)?.formattedDate ||
+      new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const success = saveDish(updatedDish);
+    if (success) {
+      setIsDirty(false);
+      setPublicationStatus(finalStatus);
+      const statusMessage =
         finalStatus === 'published'
-          ? 'Yemek başarıyla kaydedildi ve demo portalında yayımlandı!'
-          : 'Yemek taslak olarak kaydedildi (ziyaretçi portalında gizlidir).',
-    });
-
-    setTimeout(() => {
-      navigate('/yonetim/yemekler');
-    }, 1200);
-  };
-
-  const handleDelete = () => {
-    if (existingDish) {
-      deleteDish(existingDish.id);
-      setShowDeleteModal(false);
-      navigate('/yonetim/yemekler');
+          ? isEditing
+            ? 'Yemek kaydı güncellendi ve yayında.'
+            : 'Yeni yemek envantere eklendi ve yayımlandı.'
+          : finalStatus === 'in_review'
+          ? 'Yemek kaydı inceleme onayına gönderildi (henüz yayında değil).'
+          : finalStatus === 'archived'
+          ? 'Yemek kaydı arşivlendi ve portaldan kaldırıldı.'
+          : 'Yemek kaydı taslak olarak kaydedildi (ziyaretçilere kapalıdır).';
+      setNotification({
+        type: 'success',
+        message: statusMessage,
+      });
+      setTimeout(() => {
+        navigate('/yonetim/yemekler');
+      }, 700);
+    } else {
+      setNotification({ type: 'error', message: 'Kayıt sırasında bir hata oluştu.' });
     }
   };
 
+  const handleDelete = () => {
+    if (!id || !canDelete) return;
+    const success = deleteDish(id);
+    if (success) {
+      navigate('/yonetim/yemekler');
+    } else {
+      setNotification({ type: 'error', message: 'Kayıt silinemedi.' });
+      setShowDeleteModal(false);
+    }
+  };
+
+  const effectiveSaveStatus: PublicationStatus =
+    !canPublish && (publicationStatus === 'published' || publicationStatus === 'archived')
+      ? 'in_review'
+      : publicationStatus;
+
+  const primaryButtonLabel =
+    effectiveSaveStatus === 'published'
+      ? isEditing
+        ? 'Kaydet ve Yayımla'
+        : 'Kaydet ve Yayımla'
+      : effectiveSaveStatus === 'in_review'
+      ? 'İncelemeye Gönder'
+      : effectiveSaveStatus === 'archived'
+      ? 'Arşivle ve Kaydet'
+      : 'Taslağı Kaydet';
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20 font-sans">
-      {/* Top Breadcrumb & Action Header */}
-      <div className="bg-white p-5 rounded-sm border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12 font-sans">
+      {/* 1. Header Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <Link
             to="/yonetim/yemekler"
-            className="p-2 rounded-sm text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            title="Yemek Listesine Dön"
+            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition shadow-2xs"
+            title="Listeye Geri Dön"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-xs bg-slate-100 text-slate-700 border border-slate-200">
-                {isEditing ? 'Yemek Düzenle' : 'Yeni Yemek Oluştur'}
-              </span>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight font-sans">
+                {isEditing ? (name ? `Yemek Düzenle: ${name}` : 'Yemek Düzenleme') : 'Yeni Yöresel Yemek Tanımla'}
+              </h1>
               <span
-                className={`text-[10px] font-mono px-2 py-0.5 rounded-xs font-semibold ${
+                className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shrink-0 ${
                   publicationStatus === 'published'
-                    ? 'bg-emerald-100 text-emerald-800'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : publicationStatus === 'in_review'
+                    ? 'bg-sky-50 text-sky-800 border-sky-200'
                     : publicationStatus === 'archived'
-                    ? 'bg-slate-200 text-slate-700'
-                    : 'bg-amber-100 text-amber-800'
+                    ? 'bg-slate-100 text-slate-700 border-slate-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
                 }`}
               >
                 {publicationStatus === 'published'
                   ? 'Yayında'
+                  : publicationStatus === 'in_review'
+                  ? 'İncelemede'
                   : publicationStatus === 'archived'
                   ? 'Arşivde'
                   : 'Taslak'}
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
-              {name || (isEditing ? 'Yemek Düzenleme' : 'Yeni Yöresel Yemek')}
-            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isEditing
+                ? 'Mevcut yemek kaydı içeriklerini, malzemelerini ve ocaklık hazırlıklarını güncelleyin.'
+                : 'İslahiye Lezzet Atlası envanterine yeni yöresel yemek kaydı oluşturun.'}
+            </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {Object.keys(errors).length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-lg animate-pulse">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+              <span>{Object.keys(errors).length} eksik alan</span>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setActiveTab(activeTab === 'form' ? 'preview' : 'form')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
           >
-            <Eye className="w-4 h-4 text-slate-500" />
-            <span>{activeTab === 'form' ? 'Kart Önizleme' : 'Forma Dön'}</span>
+            <Eye className="w-4 h-4 text-slate-400" />
+            <span>{activeTab === 'form' ? 'Önizle' : 'Forma Dön'}</span>
           </button>
+
+          {canSave && publicationStatus !== 'draft' && (
+            <button
+              type="button"
+              onClick={() => handleSave('draft')}
+              className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+            >
+              <Save className="w-4 h-4 text-slate-400" />
+              <span>Taslak Sakla</span>
+            </button>
+          )}
 
           <button
             type="button"
-            onClick={() => handleSave('draft')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition-colors"
+            disabled={!canSave}
+            onClick={() => handleSave()}
+            title={!canSave ? 'Aktif rolünüzle kayıt kaydedemezsiniz' : undefined}
+            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition shadow-2xs disabled:opacity-45 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4 text-slate-600" />
-            <span>Taslak Kaydet</span>
+            <Check className="w-4 h-4" />
+            <span>{primaryButtonLabel}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => handleSave('published')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold shadow-xs transition-colors"
-          >
-            <Globe className="w-4 h-4" />
-            <span>Demo Olarak Yayımla</span>
-          </button>
-
-          {isEditing && (
+          {isEditing && canDelete && (
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
-              className="p-2 rounded-sm text-rose-600 hover:bg-rose-50 transition-colors border border-transparent hover:border-rose-200"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
               title="Kaydı Sil"
             >
               <Trash2 className="w-4 h-4" />
@@ -273,58 +414,34 @@ export const DishFormPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Notifications */}
-      {notification && (
-        <div
-          className={`p-4 rounded-sm border flex items-center justify-between text-xs animate-fade-in ${
-            notification.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {notification.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
-            <span>{notification.message}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-slate-600 font-bold ml-4"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Floating Viewport Toast for Guaranteed Visibility */}
+      <FormNotificationToast
+        notification={notification}
+        onClose={() => setNotification(null)}
+      />
 
       {/* Unsaved Changes Banner */}
       {isDirty && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-sm text-xs text-amber-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>Kaydedilmemiş değişiklikleriniz var. Sayfadan ayrılmadan önce lütfen kaydedin.</span>
-          </div>
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+          <Info className="w-4 h-4 text-amber-700 shrink-0" />
+          <span>Kaydedilmemiş değişiklikleriniz var. Sayfadan ayrılmadan önce lütfen kaydedin.</span>
         </div>
       )}
 
       {/* Main Form or Preview Tab */}
       {activeTab === 'preview' ? (
-        /* Preview Card */
-        <div className="bg-white p-8 rounded-sm border border-slate-200 shadow-xs space-y-6">
-          <div className="border-b border-slate-200 pb-4">
-            <span className="text-xs font-mono text-slate-500 uppercase tracking-wider block">
-              ZİYARETÇİ KARTI VE LEZZET DETAYI CANLI ÖNİZLEME
-            </span>
-            <h3 className="text-lg font-bold text-slate-900 mt-1">
-              Portalda Nasıl Görünecek?
+        <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200/90 shadow-2xs space-y-6">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-900">
+              Ziyaretçi Portalı Kart Önizlemesi
             </h3>
+            <p className="text-xs text-slate-500">
+              Bu lezzet portalda ziyaretçilere bu şekilde gösterilecektir.
+            </p>
           </div>
 
-          <div className="max-w-md mx-auto bg-ivory rounded-sm border border-sand/70 overflow-hidden shadow-sm">
-            <div className="relative aspect-[4/3] bg-sand/30 overflow-hidden">
+          <div className="max-w-md mx-auto bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
               <ImageWithFallback
                 src={imageUrl}
                 alt={name}
@@ -333,56 +450,45 @@ export const DishFormPage: React.FC = () => {
                 className="w-full h-full object-cover"
               />
               <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                <span className="px-2 py-0.5 rounded-xs bg-forest text-ivory text-[10px] font-mono uppercase font-bold tracking-wider">
-                  {CATEGORIES.find((c) => c.id === category)?.label}
+                <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[11px] font-semibold">
+                  {getCategoryLabel('dish', category, existingDish?.categoryLabel || category)}
                 </span>
                 {isRegisteredGI && (
-                  <span className="px-2 py-0.5 rounded-xs bg-copper text-ivory text-[10px] font-mono uppercase font-bold tracking-wider">
-                    Tescilli
+                  <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-semibold">
+                    {existingDish?.id === 'islahiye-biberi' ? 'TÜRKPATENT #991' : 'Coğrafi İşaret Beyanı'}
                   </span>
                 )}
               </div>
             </div>
 
             <div className="p-5 space-y-3 font-sans">
-              <div className="flex items-center justify-between text-xs font-mono text-charcoal/60">
+              <div className="flex items-center justify-between text-xs text-slate-500">
                 <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-copper" />
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
                   {prepTime} + {cookTime}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5 text-copper" />
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
                   {servings}
                 </span>
               </div>
 
-              <h4 className="text-xl font-display font-bold text-forest leading-snug">
+              <h4 className="text-lg font-bold text-slate-900 leading-snug">
                 {name || 'Yemek Adı'}
               </h4>
 
-              <p className="text-xs text-charcoal/75 leading-relaxed line-clamp-3">
+              <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
                 {description || 'Yemek açıklaması...'}
               </p>
 
-              <div className="pt-3 border-t border-sand/50 flex items-center justify-between">
-                <span className="text-[11px] font-mono text-charcoal/60">
-                  {originNote}
-                </span>
-                {recipeId ? (
-                  <span className="text-xs font-semibold text-copper font-mono">
-                    Tarifi İncele →
-                  </span>
-                ) : (
-                  <span className="text-xs font-semibold text-forest font-mono">
-                    Lezzet Detayı →
-                  </span>
-                )}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-[11px] text-slate-500">{originNote}</span>
+                <span className="font-semibold text-emerald-700">Lezzet Detayı →</span>
               </div>
             </div>
           </div>
         </div>
       ) : (
-        /* Structured Form */
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -391,14 +497,19 @@ export const DishFormPage: React.FC = () => {
           className="space-y-6"
         >
           {/* Section 1: Temel Bilgiler */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              1. Temel Lezzet Kimliği & Açıklamalar
-            </h2>
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center border border-emerald-100">
+                1
+              </span>
+              <h3 className="text-sm font-bold text-slate-900">
+                Temel Lezzet Tanımı ve Kimliği
+              </h3>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <div id="field-name" className="transition-all rounded-lg">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Yemek Adı <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -409,28 +520,42 @@ export const DishFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="Örn: Geleneksel İslahiye Tavası"
-                  className={`w-full px-3 py-2 text-xs border rounded-sm focus:outline-none focus:ring-1 ${
+                  className={`w-full h-10 px-3.5 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 ${
                     errors.name
-                      ? 'border-rose-400 focus:ring-rose-500'
-                      : 'border-slate-300 focus:ring-forest focus:border-forest'
+                      ? 'border-rose-400 focus:ring-rose-500/20'
+                      : 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600'
                   }`}
                 />
                 {errors.name && <p className="text-[11px] text-rose-500 mt-1">{errors.name}</p>}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kategori <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Kategori <span className="text-rose-500">*</span>
+                  </label>
+                  <QuickCategoryButton
+                    scope="dish"
+                    onCreated={(cat) => {
+                      setCategory(cat.id as Exclude<DishCategory, 'all'>);
+                      setIsDirty(true);
+                    }}
+                  />
+                </div>
                 <select
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value as Exclude<DishCategory, 'all'>);
                     setIsDirty(true);
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest bg-white"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
                 >
-                  {CATEGORIES.map((cat) => (
+                  {mergeCategoryOption(
+                    getCategories('dish', true),
+                    category,
+                    'dish',
+                    getCategoryLabel('dish', category, existingDish?.categoryLabel)
+                  ).map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.label}
                     </option>
@@ -440,7 +565,7 @@ export const DishFormPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Kısa Vurgu / Tagline
               </label>
               <input
@@ -450,27 +575,27 @@ export const DishFormPage: React.FC = () => {
                   setTagline(e.target.value);
                   setIsDirty(true);
                 }}
-                placeholder="Örn: Taş fırının meşe közünde demlenen kuzu eti, sarımsak ve İslahiye biberi."
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
+                placeholder="Örn: Meşe odunu közünde pişen kuzu eti ve İslahiye biberi"
+                className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <div id="field-description" className="transition-all rounded-lg">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Detaylı Lezzet Açıklaması <span className="text-rose-500">*</span>
               </label>
               <textarea
-                rows={3}
+                rows={4}
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
                   setIsDirty(true);
                 }}
-                placeholder="Yemeğin içeriği, fırın veya ocaklık usulü, lezzet profili..."
-                className={`w-full px-3 py-2 text-xs border rounded-sm focus:outline-none focus:ring-1 ${
+                placeholder="Yemeğin içeriği, fırın veya ocaklık usulü lezzet profili..."
+                className={`w-full p-3.5 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 ${
                   errors.description
-                    ? 'border-rose-400 focus:ring-rose-500'
-                    : 'border-slate-300 focus:ring-forest focus:border-forest'
+                    ? 'border-rose-400 focus:ring-rose-500/20'
+                    : 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600'
                 }`}
               />
               {errors.description && (
@@ -478,109 +603,90 @@ export const DishFormPage: React.FC = () => {
               )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Kültürel Bellek & Ocaklık Notu
-              </label>
-              <textarea
-                rows={2}
-                value={culturalNote}
-                onChange={(e) => {
-                  setCulturalNote(e.target.value);
-                  setIsDirty(true);
-                }}
-                placeholder="Örn: İslahiye fırınlarında sabahın erken saatlerinde meşe odunu ateşiyle pişirilir..."
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Kültürel Bellek ve Ocaklık Notu
+                </label>
+                <input
+                  type="text"
+                  value={culturalNote}
+                  onChange={(e) => {
+                    setCulturalNote(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="Örn: Sabahın erken saatlerinde meşe odunu ateşiyle pişirilir"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Menşe / Gelenek Notu
+                </label>
+                <input
+                  type="text"
+                  value={originNote}
+                  onChange={(e) => {
+                    setOriginNote(e.target.value);
+                    setIsDirty(true);
+                  }}
+                  placeholder="Örn: İslahiye Taş Fırın Geleneği"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+              </div>
             </div>
           </div>
 
           {/* Section 2: Görsel ve Medya */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              2. Görsel ve Medya Kökeni
-            </h2>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Hızlı Görsel Seçimi (Doğrulanmış Yerel Arşiv):
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {PRESET_IMAGES.map((img) => (
-                  <button
-                    key={img.url}
-                    type="button"
-                    onClick={() => {
-                      setImageUrl(img.url);
-                      setImageAlt(img.label);
-                      setIsDirty(true);
-                    }}
-                    className={`text-left p-2 rounded-sm border transition-all ${
-                      imageUrl === img.url
-                        ? 'border-forest bg-forest/5 ring-1 ring-forest'
-                        : 'border-slate-200 hover:border-slate-400'
-                    }`}
-                  >
-                    <div className="aspect-[4/3] rounded-xs overflow-hidden mb-1.5 bg-slate-100">
-                      <ImageWithFallback
-                        src={img.url}
-                        alt={img.label}
-                        fallbackText={img.label}
-                        containerClassName="w-full h-full"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-[11px] font-sans font-semibold text-slate-800 block truncate">
-                      {img.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center border border-emerald-100">
+                2
+              </span>
+              <h3 className="text-sm font-bold text-slate-900">
+                Görsel ve Medya Tanımları
+              </h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Özel Görsel URL'si <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={imageUrl}
-                  onChange={(e) => {
-                    setImageUrl(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm font-mono focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Görsel Köken & Lisans Atfı
-                </label>
-                <input
-                  type="text"
-                  value={imageCredit}
-                  onChange={(e) => {
-                    setImageCredit(e.target.value);
-                    setIsDirty(true);
-                  }}
-                  placeholder="Örn: İslahiye Lezzet Atlası Görsel Arşivi"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
-                />
-              </div>
+            <div id="field-imageUrl" className="transition-all rounded-xl">
+              <ImageUploadField
+                value={imageUrl}
+                onChange={(url) => {
+                  setImageUrl(url);
+                  setIsDirty(true);
+                }}
+                altText={imageAlt}
+                onAltTextChange={(alt) => {
+                  setImageAlt(alt);
+                  setIsDirty(true);
+                }}
+                credit={imageCredit}
+                onCreditChange={(credit) => {
+                  setImageCredit(credit);
+                  setIsDirty(true);
+                }}
+                label="Yemek Fotoğrafı"
+                error={errors.imageUrl}
+                required
+              />
             </div>
           </div>
 
-          {/* Section 3: Pişirme ve Porsiyon Bilgileri */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              3. Pişirme Parametreleri & İlişkili Tarif
-            </h2>
+          {/* Section 3: Hazırlık ve Porsiyon */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center border border-emerald-100">
+                3
+              </span>
+              <h3 className="text-sm font-bold text-slate-900">
+                Hazırlık, Pişirme ve Porsiyon Parametreleri
+              </h3>
+            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Hazırlık Süresi
                 </label>
                 <input
@@ -591,12 +697,12 @@ export const DishFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="25 dk"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Pişirme Süresi
                 </label>
                 <input
@@ -607,13 +713,13 @@ export const DishFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="45 dk"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Porsiyon Bilgisi
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Porsiyon Ölçüsü
                 </label>
                 <input
                   type="text"
@@ -623,13 +729,13 @@ export const DishFormPage: React.FC = () => {
                     setIsDirty(true);
                   }}
                   placeholder="4-6 Kişilik"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Zorluk Derecesi
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Zorluk Seviyesi
                 </label>
                 <select
                   value={difficulty}
@@ -637,7 +743,7 @@ export const DishFormPage: React.FC = () => {
                     setDifficulty(e.target.value as 'Kolay' | 'Orta' | 'Ustalık Gerektirir');
                     setIsDirty(true);
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest bg-white"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
                 >
                   <option value="Kolay">Kolay</option>
                   <option value="Orta">Orta</option>
@@ -647,8 +753,8 @@ export const DishFormPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                İlişkili Tarif (Tarif Atölyesi ve Önizleme Bağlantısı)
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                İlişkili Tarif (Tarif Atölyesi Bağlantısı)
               </label>
               <select
                 value={recipeId}
@@ -656,159 +762,136 @@ export const DishFormPage: React.FC = () => {
                   setRecipeId(e.target.value);
                   setIsDirty(true);
                 }}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest bg-white"
+                className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white"
               >
                 <option value="">-- Tarif Yok (Yalnızca Lezzet Detayı Gösterilir) --</option>
                 {availableRecipes.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.title} ({r.id})
+                    {r.title}
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Eğer tarif seçilmezse ziyaretçi kartında sahte "Tarifi İncele" aksiyonu gösterilmez; doğrudan lezzet özeti sunulur.
-              </p>
             </div>
           </div>
 
-          {/* Section 4: Doğrulama ve Yayın Yönetimi */}
-          <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-xs space-y-4">
-            <h2 className="text-sm font-mono uppercase tracking-wider text-slate-800 font-bold border-b border-slate-200 pb-2">
-              4. Doğrulama, Coğrafi İşaret & Yayın Durumu
-            </h2>
+          {/* Section 4: Yayın ve Tescil Durumu */}
+          <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center border border-emerald-100">
+                4
+              </span>
+              <h3 className="text-sm font-bold text-slate-900">
+                Yayın ve Coğrafi İşaret Durumu
+              </h3>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Yayın Durumu
                 </label>
                 <select
                   value={publicationStatus}
+                  disabled={!canSave}
                   onChange={(e) => {
                     setPublicationStatus(e.target.value as PublicationStatus);
                     setIsDirty(true);
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest bg-white"
+                  className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-white disabled:bg-slate-50"
                 >
-                  <option value="draft">Taslak (Yalnızca CMS'te görünür)</option>
+                  <option value="published" disabled={!canPublish}>
+                    Yayında (Portalda görünür){!canPublish ? ' — Yayın yetkisi gerekir' : ''}
+                  </option>
+                  <option value="draft">Taslak (Yalnızca yönetimde görünür)</option>
                   <option value="in_review">İncelemede (Onay bekliyor)</option>
-                  <option value="published">Yayında (Ziyaretçi portalında görünür)</option>
-                  <option value="archived">Arşivde (Portalda gizli)</option>
+                  <option value="archived" disabled={!canPublish}>
+                    Arşivde{!canPublish ? ' — Yayın yetkisi gerekir' : ''}
+                  </option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kaynak Doğrulama Durumu
+              <div className="flex flex-col justify-center pt-5">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isRegisteredGI}
+                    onChange={(e) => {
+                      setIsRegisteredGI(e.target.checked);
+                      setIsDirty(true);
+                    }}
+                    className="w-4 h-4 rounded border-slate-300 text-emerald-700 accent-emerald-700 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    TÜRKPATENT Resmî Coğrafi İşaret Tescilli Ürün
+                  </span>
                 </label>
-                <select
-                  value={verificationStatus}
-                  onChange={(e) => {
-                    setVerificationStatus(e.target.value as VerificationStatus);
-                    setIsDirty(true);
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-forest focus:border-forest bg-white"
-                >
-                  <option value="verified">Doğrulanmış İslahiye Kaydı</option>
-                  <option value="unverified">Aday / Doğrulanmamış İçerik</option>
-                  <option value="simulated">Sentetik Demo / Temsili Kayıt</option>
-                </select>
+                <p className="text-[11px] text-slate-500 mt-1 pl-6">
+                  Yalnızca resmî sicilde tescilli İslahiye Biberi (Tescil No: 991) için tescil atfı yapınız.
+                </p>
               </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isRegisteredGI}
-                  onChange={(e) => {
-                    setIsRegisteredGI(e.target.checked);
-                    setIsDirty(true);
-                  }}
-                  className="rounded-xs text-forest focus:ring-forest w-4 h-4"
-                />
-                <span className="text-xs font-semibold text-slate-800">
-                  TÜRKPATENT Resmî Coğrafi İşaret Tescilli Ürün
-                </span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isDemo}
-                  onChange={(e) => {
-                    setIsDemo(e.target.checked);
-                    setIsDirty(true);
-                  }}
-                  className="rounded-xs text-forest focus:ring-forest w-4 h-4"
-                />
-                <span className="text-xs font-semibold text-slate-600">
-                  Demo İçerik İşareti (Frontend Simülasyonu)
-                </span>
-              </label>
             </div>
           </div>
 
           {/* Form Bottom Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4">
-            <Link
-              to="/yonetim/yemekler"
-              className="px-4 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-            >
-              Vazgeç
-            </Link>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
+            <div>
+              {Object.keys(errors).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => scrollToField(Object.keys(errors)[0])}
+                  className="flex items-center gap-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3.5 py-2 rounded-xl border border-rose-200 transition cursor-pointer"
+                >
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{Object.keys(errors).length} alanda eksik bilgi var (Düzeltmek için tıkla)</span>
+                </button>
+              )}
+            </div>
 
-            <button
-              type="button"
-              onClick={() => handleSave('draft')}
-              className="px-4 py-2 rounded-sm bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition-colors"
-            >
-              Taslak Kaydet
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/yonetim/yemekler"
+                className="h-10 px-4 inline-flex items-center text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Vazgeç
+              </Link>
 
-            <button
-              type="button"
-              onClick={() => handleSave('published')}
-              className="px-6 py-2 rounded-sm bg-forest hover:bg-forest-800 text-white text-xs font-semibold shadow-xs transition-colors"
-            >
-              Kaydet ve Yayımla
-            </button>
+              {canSave && publicationStatus !== 'draft' && (
+                <button
+                  type="button"
+                  onClick={() => handleSave('draft')}
+                  className="h-10 px-4 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+                >
+                  <Save className="w-4 h-4 text-slate-400" />
+                  <span>Taslak Sakla</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={!canSave}
+                onClick={() => handleSave()}
+                title={!canSave ? 'Aktif rolünüzle kayıt kaydedemezsiniz' : undefined}
+                className="h-10 px-5 inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition shadow-2xs cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <Check className="w-4 h-4" />
+                <span>{primaryButtonLabel}</span>
+              </button>
+            </div>
           </div>
         </form>
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 bg-charcoal/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-sm border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <Trash2 className="w-6 h-6" />
-              <h3 className="text-base font-bold text-slate-900">
-                Yemeği Silmek İstiyor musunuz?
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed font-sans">
-              <strong>"{name}"</strong> kaydı silinecek ve ziyaretçi portalından kaldırılacaktır. Başlangıç tohum verileri dilediğiniz zaman CMS ayarlarından sıfırlanabilir.
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 rounded-sm border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                İptal
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-sm bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
-              >
-                Evet, Sil
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ActionConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Yemeği Envanterden Sil"
+        message={`"${name}" kaydını envanterden kaldırmak istediğinize emin misiniz?`}
+        confirmText="Evet, Kalıcı Olarak Sil"
+        cancelText="Vazgeç"
+        variant="danger"
+      />
     </div>
   );
 };

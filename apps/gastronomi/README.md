@@ -74,6 +74,7 @@ Platformda her yemek tek bir tariften ibaret değildir:
 - **Yönetim Paneli Ana Ekranı (`/yonetim`):** Toplam içerik sayıları, taslak/inceleme/yayın istatistikleri ve son işlemler.
 - **Yemekler Envanteri (`/yonetim/yemekler`):** Yöresel yemek kartları, kategori atamaları, vitrin durumu.
 - **Tarifler Envanteri (`/yonetim/tarifler`):** Porsiyon bazlı tarif adımları, malzeme listesi ve pişirme parametreleri.
+- **Dinamik Kategori Yönetimi (`/yonetim/kategoriler`):** Yeni yemek/tarif kategorisi tanımlama, silme, düzenleme ve portala anlık yansıtma.
 - **Ustalar & Üreticiler Arşivi (`/yonetim/ustalar`):** Yerel ustaların biyografileri, zanaat dalları ve izin belgeleri.
 - **Harita ve Mekân Yönetimi (`/yonetim/harita`):** Haritaya yeni ziyaret noktası ekleme, koordinat belirleme ve lezzet kategorisi bağlama.
 - **Kültürel Miras Makaleleri (`/yonetim/kulturel-miras`):** Editoryal hikâyelerin yazımı ve görsel yönetimi.
@@ -84,7 +85,21 @@ Platformda her yemek tek bir tariften ibaret değildir:
 
 ---
 
-## 5. Görsel ve İçerik Doğruluğu Standartları
+## 5. Güvenlik, Kimlik Doğrulama ve API Entegrasyonu
+
+Platform, kurumsal düzeyde güvenlik ve entegrasyon altyapısına sahiptir:
+
+1. **Admin Erişim Kalkanı (`AdminAuthGuard`):** Yönetim paneline (`/yonetim`) halka açık bağlantı veya doğrudan URL girişi engellenir; imza doğrulamalı oturum kontrolü uygulanır.
+2. **Kriptografik Oturum İmzası:** Yerel oturum tokenları tamper-proof (kurcalamaya karşı dayanıklı) SHA-256 HMAC imzasıyla korunur; yetkisiz storage müdahaleleri anında oturumu düşürür.
+3. **XSS & Güvenli İçerik Filtresi (`src/utils/security.ts`):** Dışarıdan girilen URL'ler (`sanitizeUrl`), CSS arka planları (`sanitizeCssUrl`) ve kullanıcı metinleri (`escapeHtml`) XSS açıklarına karşı sanitize edilir.
+4. **C# .NET 9 Web API Entegrasyonu (`services/gastronomy-api`):**
+   - Clean Architecture katmanlı mimarisi (Domain, Application, Infrastructure, Api).
+   - `/api/dishes`, `/api/recipes`, `/api/places`, `/api/stories`, `/api/films`, `/api/news-events` REST endpoint'leri.
+   - Porsiyon ölçekleme motoru (`RecipeScaler`), zengin DTO'lar ve xUnit entegrasyon testleri.
+
+---
+
+## 6. Görsel ve İçerik Doğruluğu Standartları
 
 Proje kapsamında kurumsal editoryal standartlar ve gastronomi gazeteciliği ilkeleri doğrultusunda belirlenen sıkı kurallar uygulanır:
 
@@ -112,7 +127,7 @@ Gastronomi portalı, yüksek gastronomi gazeteciliği ve kitap estetiğinden ilh
 
 ---
 
-## 7. Dizin Yapısı
+## 8. Dizin Yapısı
 
 ```
 apps/gastronomi/
@@ -120,18 +135,25 @@ apps/gastronomi/
 │   ├── assets/             # Statik görseller, motifler ve ikonlar
 │   ├── components/         # Arayüz bileşenleri
 │   │   ├── admin/          # CMS Yönetim Masası bileşenleri (Navbar, Sidebar, Formlar)
+│   │   │   ├── auth/       # Admin giriş formu ve yetki kalkanı (AdminAuthGuard)
+│   │   │   ├── charts/     # İstatistik ve içerik dağılım grafikleri
+│   │   │   ├── common/     # Hızlı kategori modalı, resim yükleme ve onay kutuları
+│   │   │   └── content/    # Veri tabloları, durum ve doğrulama rozetleri
 │   │   ├── common/         # Paylaşılan genel bileşenler (Modal, Breadcrumb, Tabs)
 │   │   ├── home/           # Ana sayfa editoryal blokları
 │   │   ├── layout/         # Sayfa çerçevesi, Header ve Footer
 │   │   └── map/            # Leaflet harita katmanları ve kartları
-│   ├── data/               # Tipli mock içerik havuzu (dishes, recipes, geo, media...)
-│   ├── hooks/              # Özel React kancaları
-│   ├── pages/              # Ziyaretçi sayfaları (Home, Map, Heritage, News...)
-│   │   └── admin/          # CMS yönetim sayfaları (Dishes, Recipes, Places...)
-│   ├── services/           # İçerik deposu ve repository katmanı
+│   ├── context/            # Admin oturumu (AdminAuthContext) ve rol durum yönetimi
+│   ├── data/               # Tipli içerik havuzu (dishes, recipes, geo, categories, media...)
+│   ├── hooks/              # useContent, useAdminRole kancaları
+│   ├── pages/              # Ziyaretçi sayfaları (Home, Map, Heritage, News, Films...)
+│   │   └── admin/          # CMS sayfaları (Dishes, Recipes, CategoryManagement, Map...)
+│   ├── services/           # İçerik deposu ve API istemcisi
+│   │   ├── api/            # Gastronomy.Api C# backend istemcisi (gastronomyApiClient.ts)
 │   │   └── content/        # contentStore.ts, contentRepository.ts
 │   ├── styles/             # Tailwind ve özel CSS kuralları
-│   └── types/              # TypeScript veri modelleri (Dish, Recipe, Place, Artisan...)
+│   ├── utils/              # security.ts (XSS sanitize, HMAC imza doğrulama, safeJsonParse)
+│   └── types/              # TypeScript veri modelleri (Dish, Recipe, Place, Artisan, Admin...)
 ├── index.html              # HTML şablonu (Google Fonts: Cormorant Garamond & Manrope)
 ├── package.json            # Bağımlılıklar ve çalıştırma scriptleri
 ├── tailwind.config.js      # Sıcak Editoryal Premium renk ve font yapılandırması
@@ -141,36 +163,61 @@ apps/gastronomi/
 
 ---
 
-## 8. Geliştirme ve Derleme Komutları
+## 9. Geliştirme ve Çalıştırma Komutları
 
-Uygulama dizininde (`apps/gastronomi`) aşağıdaki komutlar çalıştırılabilir:
+### 9.1. Frontend Arayüzünü Çalıştırma
+Uygulama dizininde (`apps/gastronomi`) veya monorepo kök dizininde aşağıdaki komutlar çalıştırılabilir:
 
 ```bash
-# Geliştirme sunucusunu başlat (Varsayılan Port: 5173)
+# Frontend geliştirme sunucusunu başlat (Port: 5173)
 npm run dev
 
-# TypeScript kontrolü ve üretim derlemesi (Production Build)
+# TypeScript kontrolü ve optimize üretim derlemesi (Production Build)
 npm run build
 
 # Üretim paketini yerel olarak önizle
 npm run preview
 ```
 
+### 9.2. C# .NET 9 Backend Web API'sini Çalıştırma
+Gastronomi platformunun bağımsız C# arka uç servisi `services/gastronomy-api` altında yer almaktadır:
+
+```bash
+# 1. Monorepo kök dizininden tek komutla başlatma:
+npm run dev:api:gastronomi
+
+# 2. Veya doğrudan dotnet CLI ile başlatma:
+dotnet run --project services/gastronomy-api/src/Gastronomy.Api
+
+# 3. Arka uç testlerini çalıştırma:
+npm run test:api:gastronomi
+```
+
+* **API Adresi & Karşılama Ekranı:** `http://localhost:5235`
+* **OpenAPI / Swagger Spesifikasyonu:** `http://localhost:5235/openapi/v1.json`
+* **Sağlık Denetimi (Health Check):** `http://localhost:5235/health/live`
+* **REST Uç Noktaları:**
+  * `GET /api/dishes` — Tüm yöresel yemekler ve kültürel detaylar
+  * `GET /api/recipes` — Dinamik porsiyon ölçeklemeli tarifler
+  * `GET /api/places` — Gerçek işletmeler ve lezzet haritası noktaları
+  * `GET /api/stories` — Kültürel miras makaleleri
+  * `GET /api/films` — Belgesel ve gastronomi filmleri seçkisi
+* **Otomatik Veritabanı:** API ilk kez ayağa kalktığında `EnsureCreatedAsync` ve `GastronomyDataSeeder` sayesinde veritabanı otomatik olarak oluşturulur ve tüm başlangıç verileri tohumlanır (SQL Server veya sıfır konfigürasyonlu SQLite desteğiyle).
+
 ---
 
-## 9. Mevcut Geliştirme Durumu ve Üretim Ortamı Gereksinimleri
+## 10. Mevcut Geliştirme Durumu ve Mimari Olgunluk
 
-### Mevcut Durum (Frontend Prototip & CMS Demosu)
-- Uygulama, tam etkileşimli bir **frontend sunum ve editoryal prototipi** olarak çalışmaktadır.
-- CMS yönetim panelindeki içerik ekleme, düzenleme ve vitrin sıralama işlemleri tarayıcı yerel saklama alanında (`localStorage`) `contentStore.ts` servisi ile simüle edilir.
-- Sayfa yenilendiğinde yapılan düzenlemeler tarayıcı oturumunda korunur; istenildiğinde `/yonetim/ayarlar` sayfasından fabrika ayarlarına sıfırlanabilir.
+### Mevcut Durum (Frontend Portalı & C# Backend)
+- **Frontend Portalı:** Tam etkileşimli, responsive ve WCAG standartlarına uygun modern editoryal vitrin ve CMS yönetim masası tamamlanmıştır.
+- **C# Web API:** `services/gastronomy-api` altında Clean Architecture (Domain, Application, Infrastructure, Api) prensipleriyle yazılmış, DTO doğrulamalı ve Entity Framework Core tabanlı REST API hazırdır.
+- **Dinamik Veri & Kategori Senkronizasyonu:** Hem `localStorage` destekli istemci kütüğü hem de C# REST API modelleri birbirine tam uyumlu çalışır.
 
-### Üretim Sürümü (Production Roadmap) Gereksinimleri
-Canlı operasyona geçiş için geliştirilecek backend altyapısı:
-1. **İlişkisel Veritabanı ve REST API:** Yemek, tarif, porsiyon, malzeme ve koordinat ilişkilerini yöneten PostgreSQL/SQL Server mimarisi.
-2. **Medya Depolama ve CDN:** Yüksek çözünürlüklü fotoğraflar ve videolar için otomatik WebP dönüştürücü ve CDN dağıtımı (AWS S3 / Cloudinary).
-3. **Rol ve Oturum Yönetimi:** Editör ve yayın yetkilisi ayrımını doğrulayan JWT/OAuth2 tabanlı güvenli kimlik doğrulama.
-4. **Resmî Saha Koordinat Doğrulaması:** İslahiye'deki işletmelerin belediye ruhsatı ve harita koordinatlarının saha denetimiyle doğrulanması.
+### Canlıya Alma (Production Deployment Roadmap)
+Canlı kurumsal operasyona geçiş için geriye kalan adımlar:
+1. **Canlı Sunucu Yayını:** Docker / Linux konteynerleri üzerinde .NET 9 API ve Vite SPA yayınının yapılandırılması.
+2. **Medya Depolama ve CDN:** Fotoğraflar ve videolar için AWS S3 / Cloudinary presigned URL ve CDN dağıtımı.
+3. **Resmî Saha Koordinat Doğrulaması:** İslahiye'deki yeni işletmelerin belediye ruhsatı ve harita koordinatlarının saha denetimiyle sisteme eklenmesi.
 
 ---
 
